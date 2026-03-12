@@ -21,9 +21,9 @@ const CSS: &str = r#"
     --diff-header-fg: #0969da;
     --ln-fg: #8b949e;
     --added-bg: #e6ffec;
-    --added-hl: #abf2bc;
+    --added-hl: #aceebb;
     --removed-bg: #ffebe9;
-    --removed-hl: #ff8182;
+    --removed-hl: #ffcecb;
     --sep-bg: #f6f8fa;
     --empty-bg: #f6f8fa;
 }

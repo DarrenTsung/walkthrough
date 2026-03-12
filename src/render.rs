@@ -83,6 +83,7 @@ pre code { background: none; padding: 0; }
     margin: 1rem 0;
     border: 1px solid var(--border);
     border-radius: 6px;
+    max-height: 80vh;
     overflow: hidden;
 }
 
@@ -165,6 +166,72 @@ tr.line-paired td.ln:nth-child(3) { background: var(--added-bg); }
 .hl-add { background: var(--added-hl); border-radius: 2px; }
 "#;
 
+const JS: &str = r#"
+(function() {
+    var blocks = document.querySelectorAll('.diff-block');
+    var pinnedY = null;
+    var activeBlock = null;
+
+    window.addEventListener('wheel', function(e) {
+        // If we have an active block, keep the page pinned and scroll it
+        if (activeBlock) {
+            var maxScroll = activeBlock.scrollHeight - activeBlock.clientHeight;
+            var atEnd = activeBlock.scrollTop >= maxScroll - 1;
+            var atStart = activeBlock.scrollTop <= 0;
+
+            if ((e.deltaY > 0 && !atEnd) || (e.deltaY < 0 && !atStart)) {
+                e.preventDefault();
+                window.scrollTo(0, pinnedY);
+                activeBlock.scrollTop += e.deltaY;
+                return;
+            }
+            // Released: diff reached its end/start
+            activeBlock = null;
+            pinnedY = null;
+            return;
+        }
+
+        // Check if any block should become active
+        for (var i = 0; i < blocks.length; i++) {
+            var block = blocks[i];
+            var rect = block.getBoundingClientRect();
+
+            var maxScroll = block.scrollHeight - block.clientHeight;
+            if (maxScroll <= 0) continue;
+            if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
+
+            var atEnd = block.scrollTop >= maxScroll - 1;
+            var atStart = block.scrollTop <= 0;
+
+            if (e.deltaY > 0 && rect.top <= 80 && !atEnd) {
+                e.preventDefault();
+                pinnedY = window.scrollY;
+                activeBlock = block;
+                window.scrollTo(0, pinnedY);
+                block.scrollTop += e.deltaY;
+                return;
+            }
+
+            if (e.deltaY < 0 && !atStart && rect.bottom >= window.innerHeight - 80) {
+                e.preventDefault();
+                pinnedY = window.scrollY;
+                activeBlock = block;
+                window.scrollTo(0, pinnedY);
+                block.scrollTop += e.deltaY;
+                return;
+            }
+        }
+    }, { passive: false });
+
+    // Also pin on scroll events caused by momentum
+    window.addEventListener('scroll', function() {
+        if (pinnedY !== null) {
+            window.scrollTo(0, pinnedY);
+        }
+    });
+})();
+"#;
+
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -172,33 +239,62 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// Merge adjacent change spans that are only separated by whitespace.
+/// Returns a list of (start, end) byte ranges.
+fn merge_whitespace_spans(spans: &[ChangeSpan], full_line: &str) -> Vec<(usize, usize)> {
+    if spans.is_empty() {
+        return Vec::new();
+    }
+    let line_len = full_line.len();
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    let mut cur_start = spans[0].start.min(line_len);
+    let mut cur_end = spans[0].end.min(line_len);
+
+    for span in &spans[1..] {
+        let next_start = span.start.min(line_len);
+        let next_end = span.end.min(line_len);
+        let gap = full_line.get(cur_end..next_start).unwrap_or("");
+        if gap.is_empty() || gap.bytes().all(|b| b == b' ' || b == b'\t') {
+            cur_end = next_end;
+        } else {
+            merged.push((cur_start, cur_end));
+            cur_start = next_start;
+            cur_end = next_end;
+        }
+    }
+    merged.push((cur_start, cur_end));
+    merged
+}
+
 /// Render a full source line, highlighting changed spans with the given CSS class.
+/// Merges adjacent spans separated only by whitespace into single highlight regions.
 fn render_full_line(full_line: &str, spans: &[ChangeSpan], hl_class: &str) -> String {
+    if spans.is_empty() {
+        return html_escape(full_line);
+    }
+
+    let line_len = full_line.len();
+    let merged = merge_whitespace_spans(spans, full_line);
+
     let mut html = String::new();
     let mut pos: usize = 0;
-    let line_len = full_line.len();
 
-    for span in spans {
-        let start = span.start.min(line_len);
-        let end = span.end.min(line_len);
-
-        // Unchanged portion before this span
+    for &(start, end) in &merged {
         if start > pos {
             if let Some(text) = full_line.get(pos..start) {
                 html.push_str(&html_escape(text));
             }
         }
-
-        // Changed portion with highlight
-        html.push_str(&format!(
-            "<span class=\"{}\">{}</span>",
-            hl_class,
-            html_escape(&span.content)
-        ));
+        if let Some(text) = full_line.get(start..end) {
+            html.push_str(&format!(
+                "<span class=\"{}\">{}</span>",
+                hl_class,
+                html_escape(text)
+            ));
+        }
         pos = end;
     }
 
-    // Unchanged remainder after last span
     if pos < line_len {
         if let Some(text) = full_line.get(pos..) {
             html.push_str(&html_escape(text));
@@ -242,10 +338,10 @@ fn render_side(side: &LineSide, full_lines: &[String], hl_class: &str) -> String
 
 /// Render a full line with only the region [change_start..change_end] highlighted.
 fn render_refined_line(full_line: &str, change_start: usize, change_end: usize, hl_class: &str) -> String {
-    let mut html = String::new();
     let cs = change_start.min(full_line.len());
     let ce = change_end.min(full_line.len());
 
+    let mut html = String::new();
     if cs > 0 {
         html.push_str(&html_escape(&full_line[..cs]));
     }
@@ -889,10 +985,14 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 <article>
 {body}
 </article>
+<script>
+{js}
+</script>
 </body>
 </html>"#,
         css = CSS,
-        body = html_body
+        body = html_body,
+        js = JS
     );
 
     fs::write(output_path, full_html)

@@ -51,35 +51,47 @@ cargo clippy
 
 ## Testing rendered HTML with playwright-cli
 
-Use the `playwright-cli` skill to visually verify rendered walkthrough HTML. Typical workflow:
+Use the `playwright-cli` skill to visually verify rendered walkthrough HTML.
+
+**Important:** `playwright-cli open` does not support `file://` URLs. Serve files over HTTP instead.
+
+### Typical workflow
 
 ```bash
 # 1. Build and render a walkthrough
 cargo run -- collect -- HEAD~3..HEAD
 cargo run -- render walkthrough.md -o /tmp/walkthrough.html
 
-# 2. Open the rendered HTML in a browser
-playwright-cli open file:///tmp/walkthrough.html
+# 2. Serve the HTML over HTTP (playwright blocks file:// URLs)
+python3 -m http.server 8765 --directory /tmp &
 
-# 3. Take a snapshot to inspect the page structure
+# 3. Open in browser and navigate
+playwright-cli open http://localhost:8765/walkthrough.html
+
+# 4. Take a snapshot (required before screenshot or element interaction)
 playwright-cli snapshot
 
-# 4. Screenshot the full page
-playwright-cli screenshot /tmp/walkthrough-screenshot.png
+# 5. Screenshot the full page (use --filename, not a positional arg)
+playwright-cli screenshot --full-page --filename /tmp/walkthrough-full.png
 
-# 5. Interact with the page (scroll, inspect elements, etc.)
+# 6. Screenshot a specific element by ref from the snapshot
+playwright-cli screenshot e7 --filename /tmp/first-diff.png
+
+# 7. Run JS to query the DOM (expression must be a single-expression string)
 playwright-cli eval "document.querySelectorAll('.diff-block').length"
-playwright-cli click <ref>           # click an element from the snapshot
-playwright-cli mousewheel 0 500      # scroll down
+playwright-cli eval "document.querySelector('h1').textContent"
 
-# 6. Close the browser
+# 8. Resize viewport for responsive testing
+playwright-cli resize 1200 900
+
+# 9. Close browser and stop server
 playwright-cli close
+kill %1
 ```
 
-Key commands for testing:
-- `playwright-cli open <url>` - open a browser (supports `file://` URLs)
-- `playwright-cli snapshot` - capture page state as YAML, returns element refs for interaction
-- `playwright-cli screenshot <path>` - save a PNG screenshot
-- `playwright-cli eval <js>` - run JavaScript in the page (e.g. count diff blocks, check styles)
-- `playwright-cli resize <width> <height>` - test responsive layout
-- `playwright-cli -s=<name> open` - use named sessions to compare multiple renders side by side
+### Key gotchas
+
+- **Snapshot before screenshot:** `playwright-cli screenshot` requires a recent snapshot. Always run `snapshot` first, and again after `resize` or navigation.
+- **screenshot syntax:** Use `--filename <path>` for the output path. A bare path arg is interpreted as an element ref. Use `--full-page` for the entire scrollable page.
+- **eval limitations:** Only single JS expressions work. Array spread/map expressions like `[...nodeList].map(...)` fail. Use simpler queries or string concatenation in the eval.
+- **No `file://`:** The browser blocks `file://` protocol. Use a local HTTP server.

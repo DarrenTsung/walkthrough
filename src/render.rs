@@ -6,7 +6,10 @@ use anyhow::{Context, Result};
 use pulldown_cmark::{Options, Parser};
 use regex::Regex;
 
-use crate::difft_json::{DifftOutput, LineEntry, LineSide};
+use crate::difft_json::{ChangeSpan, DifftOutput, LineEntry, LineSide};
+
+/// Number of unchanged context lines to show before/after each chunk.
+const CONTEXT_LINES: usize = 3;
 
 const CSS: &str = r#"
 :root {
@@ -17,16 +20,12 @@ const CSS: &str = r#"
     --diff-header-bg: #f1f8ff;
     --diff-header-fg: #0969da;
     --ln-fg: #8b949e;
-    --added-bg: #dafbe1;
+    --added-bg: #e6ffec;
+    --added-hl: #abf2bc;
     --removed-bg: #ffebe9;
+    --removed-hl: #ff8182;
     --sep-bg: #f6f8fa;
     --empty-bg: #f6f8fa;
-    --hl-keyword: #cf222e;
-    --hl-string: #0a3069;
-    --hl-comment: #6e7781;
-    --hl-type: #8250df;
-    --hl-delimiter: #24292f;
-    --hl-normal: #24292f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,15 +38,11 @@ const CSS: &str = r#"
         --diff-header-fg: #58a6ff;
         --ln-fg: #8b949e;
         --added-bg: #12261e;
+        --added-hl: #1a4721;
         --removed-bg: #2d1215;
+        --removed-hl: #5d1214;
         --sep-bg: #161b22;
         --empty-bg: #161b22;
-        --hl-keyword: #ff7b72;
-        --hl-string: #a5d6ff;
-        --hl-comment: #8b949e;
-        --hl-type: #d2a8ff;
-        --hl-delimiter: #e6edf3;
-        --hl-normal: #e6edf3;
     }
 }
 
@@ -137,25 +132,22 @@ col.code-col { width: calc(50% - 3.5em); }
     border-right: 1px solid var(--border);
 }
 
-/* Removed lines: red background on lhs, empty rhs gets subtle bg */
+/* Context lines (unchanged) */
+tr.line-context td { background: var(--bg); }
+
+/* Removed lines */
 tr.line-removed td.code-lhs { background: var(--removed-bg); }
 tr.line-removed td.ln:first-child { background: var(--removed-bg); }
 tr.line-removed td.code-rhs { background: var(--empty-bg); }
 tr.line-removed td.ln:nth-child(3) { background: var(--empty-bg); }
 
-/* Added lines: green background on rhs, empty lhs gets subtle bg */
+/* Added lines */
 tr.line-added td.code-rhs { background: var(--added-bg); }
 tr.line-added td.ln:nth-child(3) { background: var(--added-bg); }
 tr.line-added td.code-lhs { background: var(--empty-bg); }
 tr.line-added td.ln:first-child { background: var(--empty-bg); }
 
-/* Changed lines: both sides highlighted */
-tr.line-changed td.code-lhs { background: var(--removed-bg); }
-tr.line-changed td.ln:first-child { background: var(--removed-bg); }
-tr.line-changed td.code-rhs { background: var(--added-bg); }
-tr.line-changed td.ln:nth-child(3) { background: var(--added-bg); }
-
-/* Paired rows: one removed on left, one added on right */
+/* Paired rows: removed on left, added on right */
 tr.line-paired td.code-lhs { background: var(--removed-bg); }
 tr.line-paired td.ln:first-child { background: var(--removed-bg); }
 tr.line-paired td.code-rhs { background: var(--added-bg); }
@@ -168,13 +160,9 @@ tr.line-paired td.ln:nth-child(3) { background: var(--added-bg); }
     border-bottom: 1px solid var(--border);
 }
 
-.hl-keyword { color: var(--hl-keyword); }
-.hl-string { color: var(--hl-string); }
-.hl-comment { color: var(--hl-comment); font-style: italic; }
-.hl-type { color: var(--hl-type); }
-.hl-delimiter { color: var(--hl-delimiter); }
-.hl-normal { color: var(--hl-normal); }
-.hl-change { background: rgba(255,200,50,0.25); border-radius: 2px; }
+/* Token-level highlights within changed lines */
+.hl-del { background: var(--removed-hl); border-radius: 2px; }
+.hl-add { background: var(--added-hl); border-radius: 2px; }
 "#;
 
 fn html_escape(s: &str) -> String {
@@ -184,11 +172,8 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// Render a line using full source content, highlighting changed spans.
-/// `full_line` is the complete line from old/new file.
-/// `spans` are the difft change spans (with byte offsets into the line).
-/// For changed lines, only the changed tokens are in spans; the rest is context.
-fn render_full_line(full_line: &str, spans: &[crate::difft_json::ChangeSpan]) -> String {
+/// Render a full source line, highlighting changed spans with the given CSS class.
+fn render_full_line(full_line: &str, spans: &[ChangeSpan], hl_class: &str) -> String {
     let mut html = String::new();
     let mut pos: usize = 0;
     let line_len = full_line.len();
@@ -206,7 +191,8 @@ fn render_full_line(full_line: &str, spans: &[crate::difft_json::ChangeSpan]) ->
 
         // Changed portion with highlight
         html.push_str(&format!(
-            "<span class=\"hl-change\">{}</span>",
+            "<span class=\"{}\">{}</span>",
+            hl_class,
             html_escape(&span.content)
         ));
         pos = end;
@@ -244,17 +230,12 @@ fn render_spans_only(side: &LineSide) -> String {
     html
 }
 
-/// Render one side of a line entry.
-/// Uses full line content with changed spans highlighted when available.
-/// difft uses 0-based line numbers, so `line_number` is used directly as the index.
-fn render_side(side: &LineSide, full_lines: &[String]) -> String {
+/// Render one side of a diff line with the given highlight class for changed spans.
+fn render_side(side: &LineSide, full_lines: &[String], hl_class: &str) -> String {
     let line_idx = side.line_number as usize; // 0-based
-
     if let Some(full_line) = full_lines.get(line_idx) {
-        // Render full line with changed spans highlighted
-        render_full_line(full_line, &side.changes)
+        render_full_line(full_line, &side.changes, hl_class)
     } else {
-        // Fallback: render from spans only
         render_spans_only(side)
     }
 }
@@ -266,8 +247,6 @@ struct DiffRow<'a> {
 }
 
 /// Consolidate entries within a chunk for better side-by-side layout.
-/// Consecutive lhs-only entries followed by rhs-only entries (or vice versa)
-/// are paired together on the same rows.
 fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
     let mut rows = Vec::new();
     let mut i = 0;
@@ -278,28 +257,24 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
         let has_rhs = entry.rhs.is_some();
 
         if has_lhs && has_rhs {
-            // Both sides present: render as-is
             rows.push(DiffRow {
                 lhs: entry.lhs.as_ref(),
                 rhs: entry.rhs.as_ref(),
             });
             i += 1;
         } else if has_lhs {
-            // Collect consecutive lhs-only entries
             let lhs_start = i;
             while i < entries.len() && entries[i].lhs.is_some() && entries[i].rhs.is_none() {
                 i += 1;
             }
             let lhs_run = &entries[lhs_start..i];
 
-            // Check if immediately followed by rhs-only entries
             let rhs_start = i;
             while i < entries.len() && entries[i].rhs.is_some() && entries[i].lhs.is_none() {
                 i += 1;
             }
             let rhs_run = &entries[rhs_start..i];
 
-            // Pair them side-by-side
             let max_len = lhs_run.len().max(rhs_run.len());
             for j in 0..max_len {
                 rows.push(DiffRow {
@@ -308,21 +283,18 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
                 });
             }
         } else if has_rhs {
-            // Collect consecutive rhs-only entries
             let rhs_start = i;
             while i < entries.len() && entries[i].rhs.is_some() && entries[i].lhs.is_none() {
                 i += 1;
             }
             let rhs_run = &entries[rhs_start..i];
 
-            // Check if immediately followed by lhs-only entries
             let lhs_start = i;
             while i < entries.len() && entries[i].lhs.is_some() && entries[i].rhs.is_none() {
                 i += 1;
             }
             let lhs_run = &entries[lhs_start..i];
 
-            // Pair them side-by-side
             let max_len = lhs_run.len().max(rhs_run.len());
             for j in 0..max_len {
                 rows.push(DiffRow {
@@ -331,7 +303,6 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
                 });
             }
         } else {
-            // Neither side - skip
             i += 1;
         }
     }
@@ -339,7 +310,7 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
     rows
 }
 
-fn render_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) -> String {
+fn render_diff_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) -> String {
     let mut html = String::new();
     let has_lhs = row.lhs.is_some();
     let has_rhs = row.rhs.is_some();
@@ -353,23 +324,21 @@ fn render_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) -> Stri
 
     html.push_str(&format!("<tr class=\"{}\">", row_class));
 
-    // LHS cells (display 1-based line number, difft stores 0-based)
     if let Some(lhs) = row.lhs {
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
             lhs.line_number + 1,
-            render_side(lhs, old_lines)
+            render_side(lhs, old_lines, "hl-del")
         ));
     } else {
         html.push_str("<td class=\"ln\"></td><td class=\"code-lhs\"></td>");
     }
 
-    // RHS cells
     if let Some(rhs) = row.rhs {
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
             rhs.line_number + 1,
-            render_side(rhs, new_lines)
+            render_side(rhs, new_lines, "hl-add")
         ));
     } else {
         html.push_str("<td class=\"ln\"></td><td class=\"code-rhs\"></td>");
@@ -377,6 +346,48 @@ fn render_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) -> Stri
 
     html.push_str("</tr>");
     html
+}
+
+/// Render a context (unchanged) line showing both old and new sides.
+fn render_context_row(old_idx: usize, new_idx: usize, old_lines: &[String], new_lines: &[String]) -> String {
+    let old_content = old_lines.get(old_idx).map(|s| html_escape(s)).unwrap_or_default();
+    let new_content = new_lines.get(new_idx).map(|s| html_escape(s)).unwrap_or_default();
+    format!(
+        "<tr class=\"line-context\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
+         <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
+        old_idx + 1, old_content, new_idx + 1, new_content
+    )
+}
+
+/// Get the min/max 0-based line numbers referenced in a chunk, for each side.
+fn chunk_line_range(chunk: &[LineEntry]) -> (Option<(u64, u64)>, Option<(u64, u64)>) {
+    let mut lhs_min: Option<u64> = None;
+    let mut lhs_max: Option<u64> = None;
+    let mut rhs_min: Option<u64> = None;
+    let mut rhs_max: Option<u64> = None;
+
+    for entry in chunk {
+        if let Some(lhs) = &entry.lhs {
+            let ln = lhs.line_number;
+            lhs_min = Some(lhs_min.map_or(ln, |m: u64| m.min(ln)));
+            lhs_max = Some(lhs_max.map_or(ln, |m: u64| m.max(ln)));
+        }
+        if let Some(rhs) = &entry.rhs {
+            let ln = rhs.line_number;
+            rhs_min = Some(rhs_min.map_or(ln, |m: u64| m.min(ln)));
+            rhs_max = Some(rhs_max.map_or(ln, |m: u64| m.max(ln)));
+        }
+    }
+
+    let lhs_range = match (lhs_min, lhs_max) {
+        (Some(a), Some(b)) => Some((a, b)),
+        _ => None,
+    };
+    let rhs_range = match (rhs_min, rhs_max) {
+        (Some(a), Some(b)) => Some((a, b)),
+        _ => None,
+    };
+    (lhs_range, rhs_range)
 }
 
 fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) -> String {
@@ -392,18 +403,84 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
          </colgroup><tbody>",
     );
 
+    // Track the last rendered line indices to avoid duplicating context between chunks.
+    let mut last_old_rendered: Option<usize> = None;
+    let mut last_new_rendered: Option<usize> = None;
+
     let mut first_chunk = true;
     for &idx in chunk_indices {
-        if let Some(chunk) = difft.chunks.get(idx) {
-            if !first_chunk {
-                html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
-            }
-            first_chunk = false;
+        let Some(chunk) = difft.chunks.get(idx) else { continue };
 
-            let rows = consolidate_chunk(chunk);
-            for row in &rows {
-                html.push_str(&render_row(row, &difft.old_lines, &difft.new_lines));
+        let (lhs_range, rhs_range) = chunk_line_range(chunk);
+
+        // Determine context start lines (0-based indices into old/new files).
+        let old_start = lhs_range.map(|(min, _)| (min as usize).saturating_sub(CONTEXT_LINES));
+        let new_start = rhs_range.map(|(min, _)| (min as usize).saturating_sub(CONTEXT_LINES));
+        let old_end = lhs_range.map(|(_, max)| {
+            ((max as usize) + 1 + CONTEXT_LINES).min(difft.old_lines.len())
+        });
+        let new_end = rhs_range.map(|(_, max)| {
+            ((max as usize) + 1 + CONTEXT_LINES).min(difft.new_lines.len())
+        });
+
+        if !first_chunk {
+            html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
+        }
+        first_chunk = false;
+
+        // Render context lines BEFORE the chunk.
+        if let (Some(os), Some(ns)) = (old_start, new_start) {
+            let old_ctx_start = match last_old_rendered {
+                Some(last) if last + 1 > os => last + 1,
+                _ => os,
+            };
+            let new_ctx_start = match last_new_rendered {
+                Some(last) if last + 1 > ns => last + 1,
+                _ => ns,
+            };
+            let lhs_first = lhs_range.map(|(min, _)| min as usize).unwrap_or(old_ctx_start);
+            let rhs_first = rhs_range.map(|(min, _)| min as usize).unwrap_or(new_ctx_start);
+
+            let old_ctx_count = lhs_first.saturating_sub(old_ctx_start);
+            let new_ctx_count = rhs_first.saturating_sub(new_ctx_start);
+            let ctx_count = old_ctx_count.min(new_ctx_count);
+
+            for i in 0..ctx_count {
+                html.push_str(&render_context_row(
+                    lhs_first - ctx_count + i,
+                    rhs_first - ctx_count + i,
+                    &difft.old_lines,
+                    &difft.new_lines,
+                ));
             }
+        }
+
+        // Render the diff rows.
+        let rows = consolidate_chunk(chunk);
+        for row in &rows {
+            html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines));
+        }
+
+        // Render context lines AFTER the chunk.
+        if let (Some(oe), Some(ne)) = (old_end, new_end) {
+            let lhs_last = lhs_range.map(|(_, max)| max as usize + 1).unwrap_or(0);
+            let rhs_last = rhs_range.map(|(_, max)| max as usize + 1).unwrap_or(0);
+
+            let old_ctx_count = oe.saturating_sub(lhs_last);
+            let new_ctx_count = ne.saturating_sub(rhs_last);
+            let ctx_count = old_ctx_count.min(new_ctx_count);
+
+            for i in 0..ctx_count {
+                html.push_str(&render_context_row(
+                    lhs_last + i,
+                    rhs_last + i,
+                    &difft.old_lines,
+                    &difft.new_lines,
+                ));
+            }
+
+            last_old_rendered = Some(lhs_last + ctx_count - 1);
+            last_new_rendered = Some(rhs_last + ctx_count - 1);
         }
     }
 
@@ -496,7 +573,6 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
         }
     }
 
-    // Wrap in HTML template
     let full_html = format!(
         r#"<!DOCTYPE html>
 <html lang="en">

@@ -179,6 +179,7 @@ img { max-width: 100%; }
     position: fixed;
     top: 24px;
     left: 16px;
+    width: 200px;
     max-height: calc(100vh - 48px);
     overflow: visible;
     font-size: 12px;

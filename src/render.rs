@@ -174,6 +174,50 @@ hr {
 
 img { max-width: 100%; }
 
+/* Floating table of contents */
+.toc {
+    position: fixed;
+    top: 24px;
+    left: 16px;
+    width: 200px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.toc a {
+    display: block;
+    padding: 3px 0;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    padding-left: 10px;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toc a:hover {
+    color: var(--text);
+}
+
+.toc a.active {
+    color: var(--text);
+    border-left-color: var(--text);
+    font-weight: 600;
+}
+
+.toc a.toc-h3 {
+    padding-left: 22px;
+    font-size: 11px;
+}
+
+@media (max-width: 1300px) {
+    .toc { display: none; }
+}
+
 /* (diff-block styles consolidated above) */
 
 .diff-header {
@@ -318,6 +362,48 @@ const JS: &str = r#"
             window.scrollTo(0, pinnedY);
         }
     });
+})();
+
+// Table of contents: build from headings and highlight on scroll
+(function() {
+    var headings = document.querySelectorAll('article h1[id], article h2[id], article h3[id]');
+    if (headings.length < 2) return;
+
+    var nav = document.createElement('nav');
+    nav.className = 'toc';
+    for (var i = 0; i < headings.length; i++) {
+        var h = headings[i];
+        var a = document.createElement('a');
+        a.href = '#' + h.id;
+        a.textContent = h.textContent;
+        a.className = 'toc-' + h.tagName.toLowerCase();
+        nav.appendChild(a);
+    }
+    document.body.appendChild(nav);
+
+    var links = nav.querySelectorAll('a');
+    var ticking = false;
+
+    function updateActive() {
+        var current = null;
+        for (var i = 0; i < headings.length; i++) {
+            if (headings[i].getBoundingClientRect().top <= 60) {
+                current = i;
+            }
+        }
+        for (var j = 0; j < links.length; j++) {
+            links[j].classList.toggle('active', j === current);
+        }
+        ticking = false;
+    }
+
+    window.addEventListener('scroll', function() {
+        if (!ticking) {
+            requestAnimationFrame(updateActive);
+            ticking = true;
+        }
+    });
+    updateActive();
 })();
 "#;
 
@@ -1350,13 +1436,40 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
         }
     }
 
+    // Add anchor IDs to headings and extract the first h1 for <title>.
+    let heading_re = Regex::new(r"<(h[1-6])>(.*?)</h[1-6]>")?;
+    let mut page_title = String::from("Walkthrough");
+    let mut first_h1 = true;
+    html_body = heading_re.replace_all(&html_body, |caps: &regex::Captures| {
+        let tag = &caps[1];
+        let content = &caps[2];
+        // Strip HTML tags to get plain text for the slug and title
+        let strip_re = Regex::new(r"<[^>]+>").unwrap();
+        let plain = strip_re.replace_all(content, "");
+        let plain = plain.trim();
+        if first_h1 && tag == "h1" {
+            page_title = plain.to_string();
+            first_h1 = false;
+        }
+        let slug: String = plain
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
+            .collect::<String>()
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+        format!("<{tag} id=\"{slug}\">{content}</{tag}>")
+    }).to_string();
+
     let full_html = format!(
         r#"<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Walkthrough</title>
+<title>{title}</title>
 <style>
 {css}
 </style>
@@ -1370,6 +1483,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 </script>
 </body>
 </html>"#,
+        title = html_escape(&page_title),
         css = CSS,
         body = html_body,
         js = JS

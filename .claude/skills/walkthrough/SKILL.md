@@ -71,7 +71,7 @@ Write the markdown file at `OUTPUT_PATH`. The difft code block bodies can be emp
 rough notes at this stage. The render step will populate them with the actual text diffs.
 
 ````markdown
-# Walkthrough: <concise title describing the change>
+# <concise title describing the change>
 
 <1-2 sentence overview of what this change does and why.>
 
@@ -112,6 +112,12 @@ Rules for writing the markdown:
    naturally appear in the narrative. Anchor explanations with concrete use-cases or examples
    when possible (e.g. "a **sandbox** is an isolated container where user code runs; each
    Figma file gets its own"). Assume the reader may be unfamiliar with the codebase.
+
+8. **Interleave prose and diffs.** When a section has multiple diffs, place explanatory text
+   between them rather than grouping all prose at the top and all diffs at the bottom. Each
+   diff block should be immediately preceded by the prose that explains it. For example, if
+   a section covers a feature flag addition and a new dependency, explain the flag, show the
+   flag diff, explain the dependency, show the dependency diff.
 
 ## Step 5: Verify coverage
 

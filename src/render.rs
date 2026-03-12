@@ -203,8 +203,6 @@ img { max-width: 100%; }
     padding-left: 10px;
     transition: color 0.15s, border-color 0.15s;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .toc a:hover {

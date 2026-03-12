@@ -38,7 +38,7 @@ Run `which walkthrough`. If not found, install it:
 cargo install --path ~/Documents/walkthrough
 ```
 
-## Step 2: Collect difft JSON
+## Step 2: Collect and generate skeleton
 
 Run the collect command:
 ```bash
@@ -47,15 +47,43 @@ walkthrough collect -o .walkthrough_data/ -- $DIFF_ARGS
 
 This produces one JSON file per changed file in `.walkthrough_data/`.
 
-After collecting, read each JSON file to understand the chunks. For each file, note:
-- How many chunks it has
-- What kind of changes each chunk contains (look at the change spans)
-- Whether the file is added, deleted, or modified
+**Do not read the JSON files.** They contain machine-readable token spans and byte offsets
+meant for the renderer, not for understanding changes. Instead, generate a skeleton markdown
+that references all chunks, render it to populate the text diffs, then read those.
+
+List the collected files and their chunk counts:
+```bash
+for f in .walkthrough_data/*.json; do
+  echo "$(python3 -c "import json; d=json.load(open('$f')); print(f\"{d.get('path','?')}: {len(d.get('chunks',[]))} chunks, status={d.get('status','?')}\")")"
+done
+```
+
+Write a skeleton markdown at `OUTPUT_PATH` with a placeholder title and all chunks referenced:
+
+````markdown
+# TODO: title
+
+TODO: overview
+
+```difft path/to/first-file.ts chunks=all
+```
+
+```difft path/to/second-file.ts chunks=all
+```
+````
+
+Then render to populate the text diffs:
+```bash
+walkthrough render "$OUTPUT_PATH" --data-dir .walkthrough_data/ -o "${OUTPUT_PATH%.md}.html"
+```
+
+Now re-read `OUTPUT_PATH`. The difft code blocks contain human-readable unified diffs
+(` ` context, `-` removed, `+` added). Use these to understand what changed.
 
 ## Step 3: Plan the narrative
 
-Analyze the chunks and decide how to organize the walkthrough. Group by narrative theme,
-not by file. Consider:
+Analyze the text diffs in the enriched markdown and decide how to organize the walkthrough.
+Group by narrative theme, not by file. Consider:
 
 - **Core logic changes**: chunks with substantive behavior changes. Lead with these.
 - **New modules/files**: introduce new concepts early, before their usage sites.
@@ -63,12 +91,13 @@ not by file. Consider:
 - **Import/config updates**: boilerplate changes, put these last.
 - **Test changes**: group test updates near the code they test, or in a separate section.
 
-Plan the section titles and which (file, chunk) pairs go in each section.
+Plan the section titles and which (file, chunk) pairs go in each section. If a chunk
+contains multiple logical changes, use `lines=START-END` to split it.
 
-## Step 4: Write the initial walkthrough markdown
+## Step 4: Write the walkthrough narrative
 
-Write the markdown file at `OUTPUT_PATH`. The difft code block bodies can be empty or contain
-rough notes at this stage. The render step will populate them with the actual text diffs.
+Rewrite the markdown file at `OUTPUT_PATH` with the planned structure. The difft code block
+bodies will be repopulated by the next render, so don't worry about their contents.
 
 ````markdown
 # <concise title describing the change>

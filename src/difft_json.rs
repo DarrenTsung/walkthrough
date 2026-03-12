@@ -28,6 +28,15 @@ pub struct LineEntry {
     pub rhs: Option<LineSide>,
 }
 
+/// A unified diff hunk header, giving exact old/new line ranges.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffHunk {
+    pub old_start: u64,
+    pub old_count: u64,
+    pub new_start: u64,
+    pub new_count: u64,
+}
+
 /// The full difft JSON output for a single file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DifftOutput {
@@ -44,4 +53,7 @@ pub struct DifftOutput {
     /// Full lines of the new file version (for rendering full-line context).
     #[serde(default)]
     pub new_lines: Vec<String>,
+    /// Unified diff hunks for accurate old<->new line mapping.
+    #[serde(default)]
+    pub hunks: Vec<DiffHunk>,
 }

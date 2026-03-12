@@ -450,52 +450,53 @@ fn chunk_line_range(chunk: &[LineEntry]) -> (Option<(u64, u64)>, Option<(u64, u6
     (lhs_range, rhs_range)
 }
 
-/// Build a sorted list of (old_line, new_line) correspondences from all paired entries.
-/// Used to estimate old<->new line mapping for one-sided chunks.
-fn build_line_map(difft: &DifftOutput) -> Vec<(usize, usize)> {
-    let mut pairs: Vec<(usize, usize)> = Vec::new();
-    for chunk in &difft.chunks {
-        for entry in chunk {
-            if let (Some(lhs), Some(rhs)) = (&entry.lhs, &entry.rhs) {
-                pairs.push((lhs.line_number as usize, rhs.line_number as usize));
-            }
+use crate::difft_json::DiffHunk;
+
+/// Map a new-file line (1-based) to an old-file line (1-based) using unified diff hunks.
+/// Between hunks the lines are unchanged and advance 1:1; within a hunk we clamp to
+/// the hunk's old range boundary.
+fn new_to_old_line(new_line_1: u64, hunks: &[DiffHunk]) -> u64 {
+    let mut offset: i64 = 0; // accumulated (new_count - old_count) from previous hunks
+    for h in hunks {
+        let h_new_start = h.new_start;
+        let h_new_end = h.new_start + h.new_count; // exclusive
+        let h_old_start = h.old_start;
+
+        if new_line_1 < h_new_start {
+            // Before this hunk: in an unchanged region
+            return (new_line_1 as i64 - offset).max(1) as u64;
         }
+        if new_line_1 < h_new_end {
+            // Inside this hunk: clamp to the old start (insertion point)
+            return h_old_start;
+        }
+        offset += h.new_count as i64 - h.old_count as i64;
     }
-    pairs.sort();
-    pairs.dedup();
-    pairs
+    // After all hunks
+    (new_line_1 as i64 - offset).max(1) as u64
 }
 
-/// Estimate the old line corresponding to a new line using the line map.
-fn estimate_old_line(new_line: usize, line_map: &[(usize, usize)]) -> usize {
-    // Find the nearest pair where new <= new_line
-    let idx = line_map.partition_point(|&(_, n)| n <= new_line);
-    if idx == 0 {
-        // Before any known pair: assume same offset as first pair, or 1:1
-        if let Some(&(o, n)) = line_map.first() {
-            (new_line as isize - n as isize + o as isize).max(0) as usize
-        } else {
-            new_line
+/// Map an old-file line (1-based) to a new-file line (1-based) using unified diff hunks.
+fn old_to_new_line(old_line_1: u64, hunks: &[DiffHunk]) -> u64 {
+    let mut offset: i64 = 0;
+    for h in hunks {
+        let h_old_start = h.old_start;
+        let h_old_end = h.old_start + h.old_count;
+
+        if old_line_1 < h_old_start {
+            return (old_line_1 as i64 + offset).max(1) as u64;
         }
-    } else {
-        let &(o, n) = &line_map[idx - 1];
-        (new_line as isize - n as isize + o as isize).max(0) as usize
+        if old_line_1 < h_old_end {
+            return h.new_start;
+        }
+        offset += h.new_count as i64 - h.old_count as i64;
     }
+    (old_line_1 as i64 + offset).max(1) as u64
 }
 
-/// Estimate the new line corresponding to an old line using the line map.
-fn estimate_new_line(old_line: usize, line_map: &[(usize, usize)]) -> usize {
-    let idx = line_map.partition_point(|&(o, _)| o <= old_line);
-    if idx == 0 {
-        if let Some(&(o, n)) = line_map.first() {
-            (old_line as isize - o as isize + n as isize).max(0) as usize
-        } else {
-            old_line
-        }
-    } else {
-        let &(o, n) = &line_map[idx - 1];
-        (old_line as isize - o as isize + n as isize).max(0) as usize
-    }
+/// Convert a 1-based line number from hunk mapping to 0-based index.
+fn to_0based(line_1: u64) -> usize {
+    (line_1 as usize).saturating_sub(1)
 }
 
 fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) -> String {
@@ -511,8 +512,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
          </colgroup><tbody>",
     );
 
-    // Build a line map from ALL chunks for accurate old<->new estimation.
-    let line_map = build_line_map(difft);
+    let hunks = &difft.hunks;
 
     // Track the last rendered line indices to avoid duplicating context between chunks.
     let mut last_old_rendered: Option<usize> = None;
@@ -524,26 +524,25 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
 
         let (lhs_range, rhs_range) = chunk_line_range(chunk);
 
-        // Resolve the first/last line on each side, estimating from the other side
-        // using the line map when one side has no entries in this chunk.
+        // Resolve the first/last 0-based line on each side, using unified diff hunks
+        // to map between old/new when one side has no entries in this chunk.
         let (old_first, old_last) = match lhs_range {
             Some((min, max)) => (min as usize, max as usize),
             None => {
                 let (rmin, rmax) = rhs_range.unwrap_or((0, 0));
-                (
-                    estimate_old_line(rmin as usize, &line_map),
-                    estimate_old_line(rmax as usize, &line_map),
-                )
+                // rmin/rmax are 0-based difft lines; hunks use 1-based git lines
+                let o_min = to_0based(new_to_old_line(rmin + 1, hunks));
+                let o_max = to_0based(new_to_old_line(rmax + 1, hunks));
+                (o_min, o_max)
             }
         };
         let (new_first, new_last) = match rhs_range {
             Some((min, max)) => (min as usize, max as usize),
             None => {
                 let (lmin, lmax) = lhs_range.unwrap_or((0, 0));
-                (
-                    estimate_new_line(lmin as usize, &line_map),
-                    estimate_new_line(lmax as usize, &line_map),
-                )
+                let n_min = to_0based(old_to_new_line(lmin + 1, hunks));
+                let n_max = to_0based(old_to_new_line(lmax + 1, hunks));
+                (n_min, n_max)
             }
         };
 
@@ -592,65 +591,173 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
             ));
         }
 
-        // Render the diff rows, sorted by line number to avoid out-of-order display.
-        let mut rows = consolidate_chunk(chunk);
-        rows.sort_by_key(|row| {
-            row.rhs
-                .map(|s| s.line_number)
-                .or(row.lhs.map(|s| s.line_number))
-                .unwrap_or(u64::MAX)
-        });
+        // Collect 0-based line numbers that difft already covers in this chunk.
+        let mut difft_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut difft_new_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        for entry in chunk {
+            if let Some(lhs) = &entry.lhs {
+                difft_old_lines.insert(lhs.line_number as usize);
+            }
+            if let Some(rhs) = &entry.rhs {
+                difft_new_lines.insert(rhs.line_number as usize);
+            }
+        }
 
-        // Render rows, filling gaps between non-contiguous entries with context lines.
+        // Find unified diff hunk lines that overlap this chunk's range but difft missed.
+        // These are removed/added lines that difft's structural matching didn't flag.
+        let mut extra_removed: Vec<usize> = Vec::new(); // 0-based old line indices
+        let mut extra_added: Vec<usize> = Vec::new(); // 0-based new line indices
+        let mut extra_paired: Vec<(usize, usize)> = Vec::new(); // (old_0, new_0)
+
+        for h in hunks {
+            let h_old_start_0 = (h.old_start as usize).saturating_sub(1); // 0-based
+            let h_old_end_0 = h_old_start_0 + h.old_count as usize;
+            let h_new_start_0 = (h.new_start as usize).saturating_sub(1);
+            let h_new_end_0 = h_new_start_0 + h.new_count as usize;
+
+            let overlaps_old = h_old_end_0 > old_first.saturating_sub(1) && h_old_start_0 <= old_last + 1;
+            let overlaps_new = h_new_end_0 > new_first.saturating_sub(1) && h_new_start_0 <= new_last + 1;
+
+            if overlaps_old || overlaps_new {
+                let mut hunk_removed: Vec<usize> = Vec::new();
+                let mut hunk_added: Vec<usize> = Vec::new();
+                for line_0 in h_old_start_0..h_old_end_0 {
+                    if !difft_old_lines.contains(&line_0) {
+                        hunk_removed.push(line_0);
+                    }
+                }
+                for line_0 in h_new_start_0..h_new_end_0 {
+                    if !difft_new_lines.contains(&line_0) {
+                        hunk_added.push(line_0);
+                    }
+                }
+                // Pair removed/added lines from the same hunk together
+                let pair_count = hunk_removed.len().min(hunk_added.len());
+                for i in 0..pair_count {
+                    extra_paired.push((hunk_removed[i], hunk_added[i]));
+                }
+                for &r in &hunk_removed[pair_count..] {
+                    extra_removed.push(r);
+                }
+                for &a in &hunk_added[pair_count..] {
+                    extra_added.push(a);
+                }
+            }
+        }
+
+        // Build a unified list of render items: difft rows + hunk-only lines.
+        #[derive(Clone, Copy)]
+        enum RenderItem<'a> {
+            DifftRow(&'a DiffRow<'a>),
+            RemovedLine(usize),        // 0-based old line
+            AddedLine(usize),          // 0-based new line
+            PairedLine(usize, usize),  // (old_0, new_0) from same hunk
+        }
+
+        let rows = consolidate_chunk(chunk);
+        let mut items: Vec<(u64, RenderItem)> = Vec::new();
+
+        for row in &rows {
+            let sort_key = row.rhs.map(|s| s.line_number)
+                .or(row.lhs.map(|s| s.line_number))
+                .unwrap_or(u64::MAX);
+            items.push((sort_key, RenderItem::DifftRow(row)));
+        }
+        for &(old_0, new_0) in &extra_paired {
+            items.push((new_0 as u64, RenderItem::PairedLine(old_0, new_0)));
+        }
+        for &old_0 in &extra_removed {
+            let new_1 = old_to_new_line(old_0 as u64 + 1, hunks);
+            items.push((new_1 - 1, RenderItem::RemovedLine(old_0)));
+        }
+        for &new_0 in &extra_added {
+            items.push((new_0 as u64, RenderItem::AddedLine(new_0)));
+        }
+        items.sort_by_key(|&(k, _)| k);
+
+        // Render items, filling gaps with context lines.
         let mut prev_old: Option<usize> = None;
         let mut prev_new: Option<usize> = None;
 
-        for row in &rows {
-            let cur_old = row.lhs.map(|s| s.line_number as usize);
-            let cur_new = row.rhs.map(|s| s.line_number as usize);
+        for &(_, ref item) in &items {
+            let (cur_old, cur_new) = match item {
+                RenderItem::DifftRow(row) => (
+                    row.lhs.map(|s| s.line_number as usize),
+                    row.rhs.map(|s| s.line_number as usize),
+                ),
+                RenderItem::RemovedLine(o) => (Some(*o), None),
+                RenderItem::AddedLine(n) => (None, Some(*n)),
+                RenderItem::PairedLine(o, n) => (Some(*o), Some(*n)),
+            };
 
-            // Determine the next expected line on each side
+            // Fill gap with context lines
             let expected_old = prev_old.map(|p| p + 1);
             let expected_new = prev_new.map(|p| p + 1);
 
-            // Fill gap with context lines if there are missing lines between entries
             if let (Some(exp_o), Some(cur_o)) = (expected_old, cur_old) {
                 if cur_o > exp_o {
-                    let exp_n = expected_new.unwrap_or(0);
+                    let exp_n = expected_new.unwrap_or_else(|| {
+                        to_0based(old_to_new_line(exp_o as u64 + 1, hunks))
+                    });
                     let gap = cur_o - exp_o;
                     for i in 0..gap {
                         html.push_str(&render_context_row(
-                            exp_o + i,
-                            exp_n + i,
-                            &difft.old_lines,
-                            &difft.new_lines,
+                            exp_o + i, exp_n + i,
+                            &difft.old_lines, &difft.new_lines,
                         ));
                     }
                 }
             } else if let (Some(exp_n), Some(cur_n)) = (expected_new, cur_new) {
                 if cur_n > exp_n {
-                    let exp_o = expected_old.unwrap_or(0);
+                    let exp_o = expected_old.unwrap_or_else(|| {
+                        to_0based(new_to_old_line(exp_n as u64 + 1, hunks))
+                    });
                     let gap = cur_n - exp_n;
                     for i in 0..gap {
                         html.push_str(&render_context_row(
-                            exp_o + i,
-                            exp_n + i,
-                            &difft.old_lines,
-                            &difft.new_lines,
+                            exp_o + i, exp_n + i,
+                            &difft.old_lines, &difft.new_lines,
                         ));
                     }
                 }
             }
 
-            html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines));
+            // Render the item
+            match item {
+                RenderItem::DifftRow(row) => {
+                    html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines));
+                }
+                RenderItem::RemovedLine(old_0) => {
+                    let content = difft.old_lines.get(*old_0).map(|s| html_escape(s)).unwrap_or_default();
+                    html.push_str(&format!(
+                        "<tr class=\"line-removed\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
+                         <td class=\"ln\"></td><td class=\"code-rhs\"></td></tr>",
+                        old_0 + 1, content
+                    ));
+                }
+                RenderItem::AddedLine(new_0) => {
+                    let content = difft.new_lines.get(*new_0).map(|s| html_escape(s)).unwrap_or_default();
+                    html.push_str(&format!(
+                        "<tr class=\"line-added\"><td class=\"ln\"></td><td class=\"code-lhs\"></td>\
+                         <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
+                        new_0 + 1, content
+                    ));
+                }
+                RenderItem::PairedLine(old_0, new_0) => {
+                    let old_line = difft.old_lines.get(*old_0).map(|s| s.as_str()).unwrap_or("");
+                    let new_line = difft.new_lines.get(*new_0).map(|s| s.as_str()).unwrap_or("");
+                    let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
+                    html.push_str(&format!(
+                        "<tr class=\"line-paired\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
+                         <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
+                        old_0 + 1, render_refined_line(old_line, old_cs, old_ce, "hl-del"),
+                        new_0 + 1, render_refined_line(new_line, new_cs, new_ce, "hl-add"),
+                    ));
+                }
+            }
 
-            // Track the last rendered line on each side
-            if let Some(o) = cur_old {
-                prev_old = Some(o);
-            }
-            if let Some(n) = cur_new {
-                prev_new = Some(n);
-            }
+            if let Some(o) = cur_old { prev_old = Some(o); }
+            if let Some(n) = cur_new { prev_new = Some(n); }
         }
 
         // Render context lines AFTER the chunk.

@@ -65,6 +65,41 @@ fn get_file_contents(
     Ok((old_lines, new_lines))
 }
 
+/// Get unified diff hunk headers for a file. These give exact old/new line mappings.
+fn get_diff_hunks(
+    diff_args: &[String],
+    file_path: &str,
+) -> Result<Vec<serde_json::Value>> {
+    let output = Command::new("git")
+        .arg("diff")
+        .args(diff_args)
+        .arg("-U0")
+        .arg("--no-ext-diff")
+        .arg("--")
+        .arg(file_path)
+        .output()
+        .context("Failed to run git diff -U0")?;
+
+    let diff_str = String::from_utf8_lossy(&output.stdout);
+    let hunk_re = regex::Regex::new(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")?;
+
+    let mut hunks = Vec::new();
+    for cap in hunk_re.captures_iter(&diff_str) {
+        let old_start: u64 = cap[1].parse()?;
+        let old_count: u64 = cap.get(2).map_or(1, |m| m.as_str().parse().unwrap_or(1));
+        let new_start: u64 = cap[3].parse()?;
+        let new_count: u64 = cap.get(4).map_or(1, |m| m.as_str().parse().unwrap_or(1));
+        hunks.push(serde_json::json!({
+            "old_start": old_start,
+            "old_count": old_count,
+            "new_start": new_start,
+            "new_count": new_count,
+        }));
+    }
+
+    Ok(hunks)
+}
+
 pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
     fs::create_dir_all(output_dir)
         .with_context(|| format!("Failed to create output dir: {}", output_dir.display()))?;
@@ -189,6 +224,19 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
                 }
                 Err(e) => {
                     eprintln!("(warning: could not get file contents: {})", e);
+                }
+            }
+
+            // Embed unified diff hunks for accurate line mapping
+            match get_diff_hunks(diff_args, file_path) {
+                Ok(hunks) => {
+                    obj.insert(
+                        "hunks".to_string(),
+                        serde_json::Value::Array(hunks),
+                    );
+                }
+                Err(e) => {
+                    eprintln!("(warning: could not get diff hunks: {})", e);
                 }
             }
         }

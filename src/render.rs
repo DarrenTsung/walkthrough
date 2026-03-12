@@ -1367,8 +1367,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     html
 }
 
-/// Generate a human-readable summary of all collected diffs.
-/// Called by `collect` to produce a file the LLM can read to understand the changes.
+/// Generate a walkthrough-ready markdown with all diffs as difft code blocks.
+/// The LLM can use this directly as a starting point for the narrative.
 pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
     let mut data: Vec<(String, DifftOutput)> = Vec::new();
     for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
@@ -1385,30 +1385,43 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
     data.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut out = String::new();
+    out.push_str("# TODO: title\n\nTODO: overview\n\n");
+
     for (file, difft) in &data {
         let status = difft.status.as_deref().unwrap_or("changed");
         let chunk_count = difft.chunks.len();
-        out.push_str(&format!("=== {} ({} chunks, {}) ===\n\n", file, chunk_count, status));
 
-        for (i, chunk) in difft.chunks.iter().enumerate() {
-            let (_, rhs_range) = chunk_line_range(chunk);
-            let line_range = match rhs_range {
-                Some((min, max)) => format!("new lines {}-{}", min + 1, max + 1),
-                None => {
-                    let (lhs_range, _) = chunk_line_range(chunk);
-                    match lhs_range {
-                        Some((min, max)) => format!("old lines {}-{}", min + 1, max + 1),
-                        None => "empty".to_string(),
-                    }
-                }
-            };
-            out.push_str(&format!("--- chunk {} ({}) ---\n", i, line_range));
-            let text = render_chunks_text(difft, &[i], None);
+        if chunk_count <= 2 {
+            // Small files: single block with chunks=all
+            out.push_str(&format!("## {}\n\n", file));
+            out.push_str(&format!("<!-- {}, {} -->\n\n", status, chunk_count));
+            let text = render_chunks_text(difft, &(0..chunk_count).collect::<Vec<_>>(), None);
+            out.push_str(&format!("```difft {} chunks=all\n", file));
             out.push_str(&text);
-            if !text.ends_with('\n') {
-                out.push('\n');
+            out.push_str("```\n\n");
+        } else {
+            // Larger files: one block per chunk with line ranges noted
+            out.push_str(&format!("## {}\n\n", file));
+            out.push_str(&format!("<!-- {} -->\n\n", status));
+            for i in 0..chunk_count {
+                let chunk = &difft.chunks[i];
+                let (_, rhs_range) = chunk_line_range(chunk);
+                let line_info = match rhs_range {
+                    Some((min, max)) => format!(" (new lines {}-{})", min + 1, max + 1),
+                    None => {
+                        let (lhs_range, _) = chunk_line_range(chunk);
+                        match lhs_range {
+                            Some((min, max)) => format!(" (old lines {}-{})", min + 1, max + 1),
+                            None => String::new(),
+                        }
+                    }
+                };
+                out.push_str(&format!("<!-- chunk {}{} -->\n\n", i, line_info));
+                let text = render_chunks_text(difft, &[i], None);
+                out.push_str(&format!("```difft {} chunks={}\n", file, i));
+                out.push_str(&text);
+                out.push_str("```\n\n");
             }
-            out.push('\n');
         }
     }
 

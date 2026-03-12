@@ -45,18 +45,24 @@ Run the collect command:
 walkthrough collect -o .walkthrough_data/ -- $DIFF_ARGS
 ```
 
-This produces JSON files for the renderer and a `SUMMARY.md` with human-readable diffs.
-Read `.walkthrough_data/SUMMARY.md` to understand all the changes. It lists each file
-with its chunks as text diffs (` ` context, `-` removed, `+` added), including chunk
-indices and new-file line ranges you can reference in the walkthrough.
+This produces JSON files for the renderer and a `SUMMARY.md` in the data directory.
 
 **Do not read the JSON files.** They contain machine-readable token spans meant for the
 renderer.
 
-## Step 3: Plan the narrative
+## Step 3: Read the summary and plan
 
-Using the summary, decide how to organize the walkthrough. Group by narrative theme,
-not by file. Consider:
+Copy `.walkthrough_data/SUMMARY.md` to `OUTPUT_PATH`:
+```bash
+cp .walkthrough_data/SUMMARY.md "$OUTPUT_PATH"
+```
+
+Read `OUTPUT_PATH`. It is already a valid walkthrough markdown file with difft code blocks
+containing text diffs for every file and chunk. Each block has the correct `chunks=` spec
+and the text diff body shows exactly what changed. HTML comments note chunk indices and
+new-file line ranges.
+
+Plan how to reorganize this into a narrative. Group by theme, not by file:
 
 - **Core logic changes**: chunks with substantive behavior changes. Lead with these.
 - **New modules/files**: introduce new concepts early, before their usage sites.
@@ -64,30 +70,17 @@ not by file. Consider:
 - **Import/config updates**: boilerplate changes, put these last.
 - **Test changes**: group test updates near the code they test, or in a separate section.
 
-Plan the section titles and which (file, chunk) pairs go in each section. If a chunk
-contains multiple logical changes, use `lines=START-END` to split it.
+If a chunk contains multiple logical changes, use `lines=START-END` to split it.
 
 ## Step 4: Write the walkthrough narrative
 
-Rewrite the markdown file at `OUTPUT_PATH` with the planned structure. The difft code block
-bodies will be repopulated by the next render, so don't worry about their contents.
+Edit `OUTPUT_PATH` to restructure the summary into a narrative. The difft code blocks are
+already there, so focus on:
 
-````markdown
-# <concise title describing the change>
-
-<1-2 sentence overview of what this change does and why.>
-
-## 1. <Section title>
-
-<Narrative explaining what this group of changes does and why.>
-
-```difft path/to/file.rs chunks=0,1
-```
-
-## 2. <Next section>
-
-...
-````
+- Replace the `TODO` title and overview
+- Reorganize sections by theme (move, merge, or split difft blocks as needed)
+- Add prose before each difft block explaining what the diff shows and why
+- Number the sections
 
 Rules for writing the markdown:
 

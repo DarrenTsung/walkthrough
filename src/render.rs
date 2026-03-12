@@ -184,8 +184,8 @@ img { max-width: 100%; }
     overflow-y: auto;
     font-size: 12px;
     line-height: 1.5;
-    mask-image: linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 70%);
-    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 70%);
+    mask-image: linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0) 70%);
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0) 70%);
     transition: mask-image 0.2s ease, -webkit-mask-image 0.2s ease;
 }
 

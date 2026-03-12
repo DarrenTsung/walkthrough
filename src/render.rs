@@ -714,6 +714,31 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
     let mut out = String::new();
     let hunks = &difft.hunks;
 
+    // Compute base new-file line (0-based) for relative line numbering.
+    let mut base_new: usize = usize::MAX;
+    for &idx in chunk_indices {
+        if let Some(chunk) = difft.chunks.get(idx) {
+            for entry in chunk {
+                if let Some(rhs) = &entry.rhs {
+                    base_new = base_new.min(rhs.line_number as usize);
+                }
+            }
+        }
+    }
+    if base_new == usize::MAX { base_new = 0; }
+
+    // Format a text diff line with a relative line number prefix.
+    // The relative number is 1-based, matching the lines= parameter.
+    let fmt_line = |prefix: &str, new_0: usize, content: &str| -> String {
+        if new_0 >= base_new {
+            let rel = new_0 - base_new + 1;
+            format!("{:>4} {}{}\n", rel, prefix, content)
+        } else {
+            // Pre-context line before the first changed line
+            format!("     {}{}\n", prefix, content)
+        }
+    };
+
     let mut last_old_rendered: Option<usize> = None;
     let mut last_new_rendered: Option<usize> = None;
 
@@ -826,7 +851,7 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         for i in 0..pre_count {
             let new_idx = new_first - pre_count + i;
             let line = difft.new_lines.get(new_idx).map(|s| s.as_str()).unwrap_or("");
-            out.push_str(&format!(" {}\n", line));
+            out.push_str(&fmt_line(" ", new_idx, line));
         }
 
         // Build unified item list (same logic as HTML renderer)
@@ -928,7 +953,7 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
                         let o = exp_o + i;
                         if !item_old_lines_t.contains(&o) && !item_new_lines_t.contains(&n) {
                             let line = difft.new_lines.get(n).map(|s| s.as_str()).unwrap_or("");
-                            out.push_str(&format!(" {}\n", line));
+                            out.push_str(&fmt_line(" ", n, line));
                         }
                     }
                 }
@@ -940,46 +965,50 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
                         let o = exp_o + i;
                         if !item_old_lines_t.contains(&o) && !item_new_lines_t.contains(&n) {
                             let line = difft.new_lines.get(n).map(|s| s.as_str()).unwrap_or("");
-                            out.push_str(&format!(" {}\n", line));
+                            out.push_str(&fmt_line(" ", n, line));
                         }
                     }
                 }
             }
 
-            // Render the item
+            // Render the item with relative line numbers
             match item {
                 TextItem::DifftRow(row) => {
                     match (row.lhs, row.rhs) {
                         (Some(lhs), Some(rhs)) => {
+                            let n = rhs.line_number as usize;
                             let old_line = difft.old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
-                            let new_line = difft.new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
-                            out.push_str(&format!("-{}\n", old_line));
-                            out.push_str(&format!("+{}\n", new_line));
+                            let new_line = difft.new_lines.get(n).map(|s| s.as_str()).unwrap_or("");
+                            out.push_str(&fmt_line("-", n, old_line));
+                            out.push_str(&fmt_line("+", n, new_line));
                         }
                         (Some(lhs), None) => {
+                            let n = to_0based(old_to_new_line(lhs.line_number + 1, hunks));
                             let old_line = difft.old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
-                            out.push_str(&format!("-{}\n", old_line));
+                            out.push_str(&fmt_line("-", n, old_line));
                         }
                         (None, Some(rhs)) => {
-                            let new_line = difft.new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
-                            out.push_str(&format!("+{}\n", new_line));
+                            let n = rhs.line_number as usize;
+                            let new_line = difft.new_lines.get(n).map(|s| s.as_str()).unwrap_or("");
+                            out.push_str(&fmt_line("+", n, new_line));
                         }
                         (None, None) => {}
                     }
                 }
                 TextItem::RemovedLine(old_0) => {
+                    let n = to_0based(old_to_new_line(*old_0 as u64 + 1, hunks));
                     let line = difft.old_lines.get(*old_0).map(|s| s.as_str()).unwrap_or("");
-                    out.push_str(&format!("-{}\n", line));
+                    out.push_str(&fmt_line("-", n, line));
                 }
                 TextItem::AddedLine(new_0) => {
                     let line = difft.new_lines.get(*new_0).map(|s| s.as_str()).unwrap_or("");
-                    out.push_str(&format!("+{}\n", line));
+                    out.push_str(&fmt_line("+", *new_0, line));
                 }
                 TextItem::PairedLine(old_0, new_0) => {
                     let old_line = difft.old_lines.get(*old_0).map(|s| s.as_str()).unwrap_or("");
                     let new_line = difft.new_lines.get(*new_0).map(|s| s.as_str()).unwrap_or("");
-                    out.push_str(&format!("-{}\n", old_line));
-                    out.push_str(&format!("+{}\n", new_line));
+                    out.push_str(&fmt_line("-", *new_0, old_line));
+                    out.push_str(&fmt_line("+", *new_0, new_line));
                 }
             }
 
@@ -994,8 +1023,9 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         let new_post_count = new_ctx_after.saturating_sub(new_post_start);
         let post_count = old_post_count.min(new_post_count);
         for i in 0..post_count {
-            let line = difft.new_lines.get(new_post_start + i).map(|s| s.as_str()).unwrap_or("");
-            out.push_str(&format!(" {}\n", line));
+            let new_idx = new_post_start + i;
+            let line = difft.new_lines.get(new_idx).map(|s| s.as_str()).unwrap_or("");
+            out.push_str(&fmt_line(" ", new_idx, line));
         }
 
         if post_count > 0 {

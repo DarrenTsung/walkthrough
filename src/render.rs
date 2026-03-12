@@ -926,6 +926,14 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
                 }
             }
             if items.is_empty() { continue; }
+
+            if old_first == usize::MAX && new_first != usize::MAX {
+                old_first = to_0based(new_to_old_line(new_first as u64 + 1, hunks));
+                old_last = to_0based(new_to_old_line(new_last as u64 + 1, hunks));
+            } else if new_first == usize::MAX && old_first != usize::MAX {
+                new_first = to_0based(old_to_new_line(old_first as u64 + 1, hunks));
+                new_last = to_0based(old_to_new_line(old_last as u64 + 1, hunks));
+            }
         }
 
         let mut prev_old: Option<usize> = None;
@@ -1241,6 +1249,15 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 }
             }
             if items.is_empty() { continue; }
+
+            // If one side has no entries, derive from the other via hunk mapping
+            if old_first == usize::MAX && new_first != usize::MAX {
+                old_first = to_0based(new_to_old_line(new_first as u64 + 1, hunks));
+                old_last = to_0based(new_to_old_line(new_last as u64 + 1, hunks));
+            } else if new_first == usize::MAX && old_first != usize::MAX {
+                new_first = to_0based(old_to_new_line(old_first as u64 + 1, hunks));
+                new_last = to_0based(old_to_new_line(old_last as u64 + 1, hunks));
+            }
         }
 
         // Compute context boundaries (after filter so they reflect the filtered range).

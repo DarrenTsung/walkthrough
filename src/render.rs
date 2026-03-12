@@ -707,7 +707,10 @@ fn to_0based(line_1: u64) -> usize {
 /// Produce a unified-diff-style text representation of selected chunks.
 /// Uses the same chunk processing logic as HTML rendering (context lines, hunk gap
 /// filling, consolidation) but outputs plain text with ` `/`-`/`+` prefixes.
-fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize]) -> String {
+/// Optional 0-based line range filter (inclusive on both ends, new-file lines).
+type LineFilter = Option<(usize, usize)>;
+
+fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter: LineFilter) -> String {
     let mut out = String::new();
     let hunks = &difft.hunks;
 
@@ -857,6 +860,34 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize]) -> String {
         }
         items.sort_by_key(|&(k, _)| k);
 
+        // Apply line filter if specified.
+        if let Some((filter_start, filter_end)) = line_filter {
+            items.retain(|&(k, _)| {
+                let n = k as usize;
+                n >= filter_start && n <= filter_end
+            });
+            // Recompute boundaries from filtered items
+            new_first = usize::MAX;
+            new_last = 0;
+            old_first = usize::MAX;
+            old_last = 0;
+            for &(_, ref item) in &items {
+                match item {
+                    TextItem::DifftRow(row) => {
+                        if let Some(lhs) = row.lhs { old_first = old_first.min(lhs.line_number as usize); old_last = old_last.max(lhs.line_number as usize); }
+                        if let Some(rhs) = row.rhs { new_first = new_first.min(rhs.line_number as usize); new_last = new_last.max(rhs.line_number as usize); }
+                    }
+                    TextItem::RemovedLine(o) => { old_first = old_first.min(*o); old_last = old_last.max(*o); }
+                    TextItem::AddedLine(n) => { new_first = new_first.min(*n); new_last = new_last.max(*n); }
+                    TextItem::PairedLine(o, n) => {
+                        old_first = old_first.min(*o); old_last = old_last.max(*o);
+                        new_first = new_first.min(*n); new_last = new_last.max(*n);
+                    }
+                }
+            }
+            if items.is_empty() { continue; }
+        }
+
         // Collect line numbers rendered by items to avoid duplicate context lines.
         let mut item_old_lines_t: std::collections::HashSet<usize> = std::collections::HashSet::new();
         let mut item_new_lines_t: std::collections::HashSet<usize> = std::collections::HashSet::new();
@@ -979,7 +1010,7 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize]) -> String {
     out
 }
 
-fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) -> String {
+fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter) -> String {
     let mut html = String::new();
     html.push_str(&format!(
         "<div class=\"diff-block\"><div class=\"diff-header\">{}</div>",
@@ -1180,6 +1211,33 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
         }
         items.sort_by_key(|&(k, _)| k);
 
+        // Apply line filter if specified.
+        if let Some((filter_start, filter_end)) = line_filter {
+            items.retain(|&(k, _)| {
+                let n = k as usize;
+                n >= filter_start && n <= filter_end
+            });
+            new_first = usize::MAX;
+            new_last = 0;
+            old_first = usize::MAX;
+            old_last = 0;
+            for &(_, ref item) in &items {
+                match item {
+                    RenderItem::DifftRow(row) => {
+                        if let Some(lhs) = row.lhs { old_first = old_first.min(lhs.line_number as usize); old_last = old_last.max(lhs.line_number as usize); }
+                        if let Some(rhs) = row.rhs { new_first = new_first.min(rhs.line_number as usize); new_last = new_last.max(rhs.line_number as usize); }
+                    }
+                    RenderItem::RemovedLine(o) => { old_first = old_first.min(*o); old_last = old_last.max(*o); }
+                    RenderItem::AddedLine(n) => { new_first = new_first.min(*n); new_last = new_last.max(*n); }
+                    RenderItem::PairedLine(o, n) => {
+                        old_first = old_first.min(*o); old_last = old_last.max(*o);
+                        new_first = new_first.min(*n); new_last = new_last.max(*n);
+                    }
+                }
+            }
+            if items.is_empty() { continue; }
+        }
+
         // Collect all line numbers that items will render, so gap filler skips them.
         let mut item_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
         let mut item_new_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
@@ -1313,7 +1371,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
     let md_content = fs::read_to_string(walkthrough_path)
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
 
-    let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)")?;
+    let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
 
     // Load all difft JSON data
     let mut data: HashMap<String, DifftOutput> = HashMap::new();
@@ -1348,6 +1406,19 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                     let file = caps[1].to_string();
                     let chunks_spec = caps[2].to_string();
 
+                    // Parse optional lines=START-END (1-based, converted to 0-based)
+                    let line_filter: LineFilter = caps.get(3).and_then(|m| {
+                        let s = m.as_str();
+                        let parts: Vec<&str> = s.split('-').collect();
+                        if parts.len() == 2 {
+                            let start: usize = parts[0].parse().ok()?;
+                            let end: usize = parts[1].parse().ok()?;
+                            Some((start.saturating_sub(1), end.saturating_sub(1)))
+                        } else {
+                            None
+                        }
+                    });
+
                     if let Some(difft) = data.get(&file) {
                         let indices: Vec<usize> = if chunks_spec == "all" {
                             (0..difft.chunks.len()).collect()
@@ -1361,14 +1432,14 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         for &idx in &indices {
                             referenced.insert((file.clone(), idx));
                         }
-                        let rendered_html = render_chunks(difft, &indices, &file);
+                        let rendered_html = render_chunks(difft, &indices, &file, line_filter);
                         let placeholder_id = diff_blocks.len();
                         diff_blocks.push(rendered_html);
                         processed_md
                             .push_str(&format!("<!-- DIFF_PLACEHOLDER_{} -->\n", placeholder_id));
 
                         // Write enriched markdown: opening fence + text diff + closing fence
-                        let text_diff = render_chunks_text(difft, &indices);
+                        let text_diff = render_chunks_text(difft, &indices, line_filter);
                         enriched_md.push_str(line);
                         enriched_md.push('\n');
                         enriched_md.push_str(&text_diff);
@@ -1628,7 +1699,7 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 317, old_count: 13, new_start: 407, new_count: 18 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts");
+        let html = render_chunks(&difft, &[0], "test.ts", None);
         let rows = extract_rows(&html);
 
         // Check no new-side line number appears more than once
@@ -1661,7 +1732,7 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 3, old_count: 0, new_start: 3, new_count: 1 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts");
+        let html = render_chunks(&difft, &[0], "test.ts", None);
 
         // The added-only row should NOT contain hl-add spans
         // (the row background is sufficient)
@@ -1688,7 +1759,7 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 3, old_count: 1, new_start: 3, new_count: 0 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts");
+        let html = render_chunks(&difft, &[0], "test.ts", None);
 
         let removed_row_re = Regex::new(r#"<tr class="line-removed">.*?</tr>"#).unwrap();
         for m in removed_row_re.find_iter(&html) {
@@ -1713,7 +1784,7 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 2, old_count: 1, new_start: 2, new_count: 1 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts");
+        let html = render_chunks(&difft, &[0], "test.ts", None);
 
         let paired_row_re = Regex::new(r#"<tr class="line-paired">.*?</tr>"#).unwrap();
         let matched: Vec<_> = paired_row_re.find_iter(&html).collect();
@@ -1726,5 +1797,51 @@ mod tests {
             assert!(row_html.contains("hl-add"),
                 "paired row should contain hl-add highlight: {}", row_html);
         }
+    }
+
+    #[test]
+    fn line_filter_restricts_output() {
+        // Chunk with changes at lines 5, 10, 15 (0-based new-side)
+        let old_lines: Vec<&str> = (0..20).map(|_| "old").collect();
+        let new_lines: Vec<&str> = (0..20).map(|_| "new").collect();
+
+        let chunk = vec![
+            LineEntry { lhs: Some(side(5, vec![])), rhs: Some(side(5, vec![])) },
+            LineEntry { lhs: Some(side(10, vec![])), rhs: Some(side(10, vec![])) },
+            LineEntry { lhs: Some(side(15, vec![])), rhs: Some(side(15, vec![])) },
+        ];
+
+        // Use per-line hunks so only the 3 changed lines are in the diff
+        let hunks = vec![
+            DiffHunk { old_start: 6, old_count: 1, new_start: 6, new_count: 1 },
+            DiffHunk { old_start: 11, old_count: 1, new_start: 11, new_count: 1 },
+            DiffHunk { old_start: 16, old_count: 1, new_start: 16, new_count: 1 },
+        ];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        // No filter: all 3 changed lines present
+        let html_all = render_chunks(&difft, &[0], "test.ts", None);
+        let rows_all = extract_rows(&html_all);
+        let changed_all: Vec<_> = rows_all.iter()
+            .filter(|(c, _, _)| c == "line-paired")
+            .collect();
+        assert_eq!(changed_all.len(), 3, "should have 3 paired rows without filter");
+
+        // Filter to 0-based 8-12. Only line 10 (new-side) should match.
+        let html_filtered = render_chunks(&difft, &[0], "test.ts", Some((8, 12)));
+        let rows_filtered = extract_rows(&html_filtered);
+        let changed_filtered: Vec<_> = rows_filtered.iter()
+            .filter(|(c, _, _)| c == "line-paired")
+            .collect();
+        assert_eq!(changed_filtered.len(), 1, "should have 1 paired row with filter");
+        assert_eq!(changed_filtered[0].2, Some(11), "filtered row should be new-side line 11 (1-based)");
+
+        // Lines outside any change should produce no changed rows
+        let html_empty = render_chunks(&difft, &[0], "test.ts", Some((0, 3)));
+        let rows_empty = extract_rows(&html_empty);
+        let changed_empty: Vec<_> = rows_empty.iter()
+            .filter(|(c, _, _)| c == "line-paired")
+            .collect();
+        assert_eq!(changed_empty.len(), 0, "should have 0 paired rows when filter misses all changes");
     }
 }

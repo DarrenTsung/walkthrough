@@ -35,7 +35,12 @@ Difft code blocks reference collected data by file path and chunk indices:
 
 ```difft src/bar.rs chunks=all
 ```
+
+```difft src/baz.rs chunks=1 lines=164-200
+```
 ````
+
+The optional `lines=START-END` parameter (1-based, inclusive) filters a chunk to only show changes within that new-file line range. This lets you split a large chunk across multiple sections with interleaved prose.
 
 ## External dependencies
 

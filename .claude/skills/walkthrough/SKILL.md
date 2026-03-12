@@ -91,6 +91,9 @@ Rules for writing the markdown:
 
 1. **Every code block** that references diffs uses the info string format:
    `difft <file-path> chunks=<spec>` where spec is comma-separated indices or `all`.
+   Optionally add `lines=START-END` (1-based, inclusive) to show only a portion of the
+   chunk. This is useful for splitting a large chunk (e.g. two new functions in one chunk)
+   across multiple sections with prose in between.
 
 2. **The block body** will be populated by the render step with a unified-diff-style text
    representation (` ` context, `-` removed, `+` added). You do not need to reconstruct

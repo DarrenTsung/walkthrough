@@ -1024,8 +1024,11 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         let post_count = old_post_count.min(new_post_count);
         for i in 0..post_count {
             let new_idx = new_post_start + i;
-            let line = difft.new_lines.get(new_idx).map(|s| s.as_str()).unwrap_or("");
-            out.push_str(&fmt_line(" ", new_idx, line));
+            let old_idx = old_post_start + i;
+            if !item_old_lines_t.contains(&old_idx) && !item_new_lines_t.contains(&new_idx) {
+                let line = difft.new_lines.get(new_idx).map(|s| s.as_str()).unwrap_or("");
+                out.push_str(&fmt_line(" ", new_idx, line));
+            }
         }
 
         if post_count > 0 {
@@ -1375,12 +1378,11 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         let post_count = old_post_count.min(new_post_count);
 
         for i in 0..post_count {
-            html.push_str(&render_context_row(
-                old_post_start + i,
-                new_post_start + i,
-                &difft.old_lines,
-                &difft.new_lines,
-            ));
+            let o = old_post_start + i;
+            let n = new_post_start + i;
+            if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
+                html.push_str(&render_context_row(o, n, &difft.old_lines, &difft.new_lines));
+            }
         }
 
         if post_count > 0 {

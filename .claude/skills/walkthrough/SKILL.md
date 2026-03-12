@@ -38,52 +38,25 @@ Run `which walkthrough`. If not found, install it:
 cargo install --path ~/Documents/walkthrough
 ```
 
-## Step 2: Collect and generate skeleton
+## Step 2: Collect diffs
 
 Run the collect command:
 ```bash
 walkthrough collect -o .walkthrough_data/ -- $DIFF_ARGS
 ```
 
-This produces one JSON file per changed file in `.walkthrough_data/`.
+This produces JSON files for the renderer and a `SUMMARY.md` with human-readable diffs.
+Read `.walkthrough_data/SUMMARY.md` to understand all the changes. It lists each file
+with its chunks as text diffs (` ` context, `-` removed, `+` added), including chunk
+indices and new-file line ranges you can reference in the walkthrough.
 
-**Do not read the JSON files.** They contain machine-readable token spans and byte offsets
-meant for the renderer, not for understanding changes. Instead, generate a skeleton markdown
-that references all chunks, render it to populate the text diffs, then read those.
-
-List the collected files and their chunk counts:
-```bash
-for f in .walkthrough_data/*.json; do
-  echo "$(python3 -c "import json; d=json.load(open('$f')); print(f\"{d.get('path','?')}: {len(d.get('chunks',[]))} chunks, status={d.get('status','?')}\")")"
-done
-```
-
-Write a skeleton markdown at `OUTPUT_PATH` with a placeholder title and all chunks referenced:
-
-````markdown
-# TODO: title
-
-TODO: overview
-
-```difft path/to/first-file.ts chunks=all
-```
-
-```difft path/to/second-file.ts chunks=all
-```
-````
-
-Then render to populate the text diffs:
-```bash
-walkthrough render "$OUTPUT_PATH" --data-dir .walkthrough_data/ -o "${OUTPUT_PATH%.md}.html"
-```
-
-Now re-read `OUTPUT_PATH`. The difft code blocks contain human-readable unified diffs
-(` ` context, `-` removed, `+` added). Use these to understand what changed.
+**Do not read the JSON files.** They contain machine-readable token spans meant for the
+renderer.
 
 ## Step 3: Plan the narrative
 
-Analyze the text diffs in the enriched markdown and decide how to organize the walkthrough.
-Group by narrative theme, not by file. Consider:
+Using the summary, decide how to organize the walkthrough. Group by narrative theme,
+not by file. Consider:
 
 - **Core logic changes**: chunks with substantive behavior changes. Lead with these.
 - **New modules/files**: introduce new concepts early, before their usage sites.

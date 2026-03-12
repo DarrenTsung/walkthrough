@@ -1367,6 +1367,56 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     html
 }
 
+/// Generate a human-readable summary of all collected diffs.
+/// Called by `collect` to produce a file the LLM can read to understand the changes.
+pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
+    let mut data: Vec<(String, DifftOutput)> = Vec::new();
+    for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
+        let entry = entry?;
+        if entry.path().extension().map_or(false, |e| e == "json") {
+            let json_str = fs::read_to_string(entry.path())?;
+            let difft: DifftOutput = serde_json::from_str(&json_str)
+                .with_context(|| format!("Failed to parse {}", entry.path().display()))?;
+            if let Some(ref path) = difft.path {
+                data.push((path.clone(), difft));
+            }
+        }
+    }
+    data.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut out = String::new();
+    for (file, difft) in &data {
+        let status = difft.status.as_deref().unwrap_or("changed");
+        let chunk_count = difft.chunks.len();
+        out.push_str(&format!("=== {} ({} chunks, {}) ===\n\n", file, chunk_count, status));
+
+        for (i, chunk) in difft.chunks.iter().enumerate() {
+            let (_, rhs_range) = chunk_line_range(chunk);
+            let line_range = match rhs_range {
+                Some((min, max)) => format!("new lines {}-{}", min + 1, max + 1),
+                None => {
+                    let (lhs_range, _) = chunk_line_range(chunk);
+                    match lhs_range {
+                        Some((min, max)) => format!("old lines {}-{}", min + 1, max + 1),
+                        None => "empty".to_string(),
+                    }
+                }
+            };
+            out.push_str(&format!("--- chunk {} ({}) ---\n", i, line_range));
+            let text = render_chunks_text(difft, &[i], None);
+            out.push_str(&text);
+            if !text.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push('\n');
+        }
+    }
+
+    fs::write(output, &out)
+        .with_context(|| format!("Failed to write summary to {}", output.display()))?;
+    Ok(())
+}
+
 pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Result<()> {
     let md_content = fs::read_to_string(walkthrough_path)
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;

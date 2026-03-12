@@ -272,5 +272,11 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
         files.len(),
         output_dir.display()
     );
+
+    // Write human-readable summary for LLM consumption
+    let summary_path = output_dir.join("SUMMARY.md");
+    crate::render::write_summary(output_dir, &summary_path)?;
+    eprintln!("Wrote summary to {}", summary_path.display());
+
     Ok(())
 }

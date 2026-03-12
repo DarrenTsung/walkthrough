@@ -17,22 +17,25 @@ const CONTEXT_LINES: usize = 3;
 
 const CSS: &str = r#"
 :root {
-    --bg: #ffffff;
-    --bg-secondary: #f6f7f8;
-    --border: #d0d4d9;
-    --text: #1a1e24;
-    --text-secondary: #474d57;
-    --text-muted: #7a8290;
+    --bg: #fff;
+    --bg-secondary: #f6f8fa;
+    --border: #d1d9e0;
+    --border-muted: #d1d9e0b3;
+    --text: #1f2328;
+    --text-secondary: #59636e;
+    --text-muted: #59636e;
     --primary: #0550ae;
-    --diff-header-bg: #f1f8ff;
-    --diff-header-fg: #0969da;
-    --ln-fg: #8b949e;
-    --added-bg: #e6ffec;
+    --diff-header-bg: #f6f8fa;
+    --diff-header-fg: #1f2328;
+    --ln-fg: #59636e;
+    --added-bg: #dafbe1;
     --added-hl: #aceebb;
+    --added-num-bg: #aceebb;
     --removed-bg: #ffebe9;
     --removed-hl: #ffcecb;
-    --sep-bg: #f6f7f8;
-    --empty-bg: #f6f7f8;
+    --removed-num-bg: #ffcecb;
+    --sep-bg: #f6f8fa;
+    --empty-bg: #f6f8fa;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -301,13 +304,12 @@ col.code-col { width: calc(50% - 5em); }
     user-select: none;
     white-space: nowrap;
     padding: 1px 0;
-    border-right: 1px solid var(--border);
 }
 
-tr.line-added .sign-rhs { color: #1a7f37; }
-tr.line-removed .sign-lhs { color: #c4232b; }
-tr.line-paired .sign-lhs { color: #c4232b; }
-tr.line-paired .sign-rhs { color: #1a7f37; }
+tr.line-added .sign-rhs { color: #1a7f37; font-weight: 600; }
+tr.line-removed .sign-lhs { color: #cf222e; font-weight: 600; }
+tr.line-paired .sign-lhs { color: #cf222e; font-weight: 600; }
+tr.line-paired .sign-rhs { color: #1a7f37; font-weight: 600; }
 
 .diff-table td.code-lhs {
     border-right: 1px solid var(--border);
@@ -317,28 +319,28 @@ tr.line-paired .sign-rhs { color: #1a7f37; }
 tr.line-context td { background: var(--bg); }
 
 /* Removed lines (lhs side highlighted, rhs side empty) */
-tr.line-removed td.code-lhs,
+tr.line-removed td.code-lhs { background: var(--removed-bg); }
 tr.line-removed .ln-lhs,
-tr.line-removed .sign-lhs { background: var(--removed-bg); }
+tr.line-removed .sign-lhs { background: var(--removed-num-bg); }
 tr.line-removed td.code-rhs,
 tr.line-removed .ln-rhs,
 tr.line-removed .sign-rhs { background: var(--empty-bg); }
 
 /* Added lines (rhs side highlighted, lhs side empty) */
-tr.line-added td.code-rhs,
+tr.line-added td.code-rhs { background: var(--added-bg); }
 tr.line-added .ln-rhs,
-tr.line-added .sign-rhs { background: var(--added-bg); }
+tr.line-added .sign-rhs { background: var(--added-num-bg); }
 tr.line-added td.code-lhs,
 tr.line-added .ln-lhs,
 tr.line-added .sign-lhs { background: var(--empty-bg); }
 
 /* Paired rows: removed on left, added on right */
-tr.line-paired td.code-lhs,
+tr.line-paired td.code-lhs { background: var(--removed-bg); }
 tr.line-paired .ln-lhs,
-tr.line-paired .sign-lhs { background: var(--removed-bg); }
-tr.line-paired td.code-rhs,
+tr.line-paired .sign-lhs { background: var(--removed-num-bg); }
+tr.line-paired td.code-rhs { background: var(--added-bg); }
 tr.line-paired .ln-rhs,
-tr.line-paired .sign-rhs { background: var(--added-bg); }
+tr.line-paired .sign-rhs { background: var(--added-num-bg); }
 
 .chunk-sep td {
     height: 0.5rem;

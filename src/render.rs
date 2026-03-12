@@ -483,12 +483,9 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
             ((max as usize) + 1 + CONTEXT_LINES).min(difft.new_lines.len())
         });
 
-        if !first_chunk {
-            html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
-        }
-        first_chunk = false;
-
-        // Render context lines BEFORE the chunk.
+        // Render context lines BEFORE the chunk, and decide whether to show a separator.
+        // If the previous chunk's post-context overlaps or is adjacent to this chunk's
+        // pre-context, just render continuous context lines with no separator.
         if let (Some(os), Some(ns)) = (old_start, new_start) {
             let old_ctx_start = match last_old_rendered {
                 Some(last) if last + 1 > os => last + 1,
@@ -505,6 +502,20 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
             let new_ctx_count = rhs_first.saturating_sub(new_ctx_start);
             let ctx_count = old_ctx_count.min(new_ctx_count);
 
+            // Show separator only if there's a gap between the last rendered line
+            // and this chunk's pre-context (i.e., the chunks aren't adjacent).
+            if !first_chunk {
+                let has_gap = match (last_old_rendered, old_start) {
+                    (Some(last), Some(start)) => last + 1 < start,
+                    _ => true,
+                };
+                if has_gap {
+                    html.push_str(
+                        "<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>",
+                    );
+                }
+            }
+
             for i in 0..ctx_count {
                 html.push_str(&render_context_row(
                     lhs_first - ctx_count + i,
@@ -513,11 +524,12 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
                     &difft.new_lines,
                 ));
             }
+        } else if !first_chunk {
+            html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
         }
+        first_chunk = false;
 
         // Render the diff rows, sorted by line number to avoid out-of-order display.
-        // difft's structural matching can produce entries where e.g. rhs L879 appears
-        // before rhs L878 because L878 is paired with an lhs entry.
         let mut rows = consolidate_chunk(chunk);
         rows.sort_by_key(|row| {
             row.rhs
@@ -525,8 +537,57 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
                 .or(row.lhs.map(|s| s.line_number))
                 .unwrap_or(u64::MAX)
         });
+
+        // Render rows, filling gaps between non-contiguous entries with context lines.
+        let mut prev_old: Option<usize> = None;
+        let mut prev_new: Option<usize> = None;
+
         for row in &rows {
+            let cur_old = row.lhs.map(|s| s.line_number as usize);
+            let cur_new = row.rhs.map(|s| s.line_number as usize);
+
+            // Determine the next expected line on each side
+            let expected_old = prev_old.map(|p| p + 1);
+            let expected_new = prev_new.map(|p| p + 1);
+
+            // Fill gap with context lines if there are missing lines between entries
+            if let (Some(exp_o), Some(cur_o)) = (expected_old, cur_old) {
+                if cur_o > exp_o {
+                    let exp_n = expected_new.unwrap_or(0);
+                    let gap = cur_o - exp_o;
+                    for i in 0..gap {
+                        html.push_str(&render_context_row(
+                            exp_o + i,
+                            exp_n + i,
+                            &difft.old_lines,
+                            &difft.new_lines,
+                        ));
+                    }
+                }
+            } else if let (Some(exp_n), Some(cur_n)) = (expected_new, cur_new) {
+                if cur_n > exp_n {
+                    let exp_o = expected_old.unwrap_or(0);
+                    let gap = cur_n - exp_n;
+                    for i in 0..gap {
+                        html.push_str(&render_context_row(
+                            exp_o + i,
+                            exp_n + i,
+                            &difft.old_lines,
+                            &difft.new_lines,
+                        ));
+                    }
+                }
+            }
+
             html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines));
+
+            // Track the last rendered line on each side
+            if let Some(o) = cur_old {
+                prev_old = Some(o);
+            }
+            if let Some(n) = cur_new {
+                prev_new = Some(n);
+            }
         }
 
         // Render context lines AFTER the chunk.

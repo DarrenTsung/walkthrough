@@ -240,6 +240,53 @@ fn render_side(side: &LineSide, full_lines: &[String], hl_class: &str) -> String
     }
 }
 
+/// Render a full line with only the region [change_start..change_end] highlighted.
+fn render_refined_line(full_line: &str, change_start: usize, change_end: usize, hl_class: &str) -> String {
+    let mut html = String::new();
+    let cs = change_start.min(full_line.len());
+    let ce = change_end.min(full_line.len());
+
+    if cs > 0 {
+        html.push_str(&html_escape(&full_line[..cs]));
+    }
+    if ce > cs {
+        html.push_str(&format!(
+            "<span class=\"{}\">{}</span>",
+            hl_class,
+            html_escape(&full_line[cs..ce])
+        ));
+    }
+    if ce < full_line.len() {
+        html.push_str(&html_escape(&full_line[ce..]));
+    }
+    html
+}
+
+/// Find the minimal differing region between two strings by trimming common prefix/suffix.
+fn find_change_bounds(old: &str, new: &str) -> (usize, usize, usize, usize) {
+    let prefix_len = old
+        .bytes()
+        .zip(new.bytes())
+        .take_while(|(a, b)| a == b)
+        .count();
+
+    let old_rest = &old[prefix_len..];
+    let new_rest = &new[prefix_len..];
+    let suffix_len = old_rest
+        .bytes()
+        .rev()
+        .zip(new_rest.bytes().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+
+    (
+        prefix_len,
+        old.len() - suffix_len,
+        prefix_len,
+        new.len() - suffix_len,
+    )
+}
+
 /// A row to render in the diff table.
 struct DiffRow<'a> {
     lhs: Option<&'a LineSide>,
@@ -324,24 +371,37 @@ fn render_diff_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) ->
 
     html.push_str(&format!("<tr class=\"{}\">", row_class));
 
-    if let Some(lhs) = row.lhs {
+    // For paired rows, use refined character-level diff instead of difft's structural spans.
+    // This gives GitHub-style highlights where only the actual differing characters are marked.
+    if let (Some(lhs), Some(rhs)) = (row.lhs, row.rhs) {
+        let old_line = old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let new_line = new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
+
+        html.push_str(&format!(
+            "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
+            lhs.line_number + 1,
+            render_refined_line(old_line, old_cs, old_ce, "hl-del")
+        ));
+        html.push_str(&format!(
+            "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
+            rhs.line_number + 1,
+            render_refined_line(new_line, new_cs, new_ce, "hl-add")
+        ));
+    } else if let Some(lhs) = row.lhs {
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
             lhs.line_number + 1,
             render_side(lhs, old_lines, "hl-del")
         ));
-    } else {
+        html.push_str("<td class=\"ln\"></td><td class=\"code-rhs\"></td>");
+    } else if let Some(rhs) = row.rhs {
         html.push_str("<td class=\"ln\"></td><td class=\"code-lhs\"></td>");
-    }
-
-    if let Some(rhs) = row.rhs {
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
             rhs.line_number + 1,
             render_side(rhs, new_lines, "hl-add")
         ));
-    } else {
-        html.push_str("<td class=\"ln\"></td><td class=\"code-rhs\"></td>");
     }
 
     html.push_str("</tr>");

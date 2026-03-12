@@ -7,7 +7,6 @@ use pulldown_cmark::{Options, Parser};
 use regex::Regex;
 
 use syntect::highlighting::ThemeSet;
-use syntect::html::highlighted_html_for_string;
 use syntect::parsing::SyntaxSet;
 
 use crate::difft_json::{DifftOutput, LineEntry, LineSide};
@@ -306,10 +305,10 @@ col.code-col { width: calc(50% - 5em); }
     padding: 1px 0;
 }
 
-tr.line-added .sign-rhs { color: #1a7f37; font-weight: 600; }
-tr.line-removed .sign-lhs { color: #cf222e; font-weight: 600; }
-tr.line-paired .sign-lhs { color: #cf222e; font-weight: 600; }
-tr.line-paired .sign-rhs { color: #1a7f37; font-weight: 600; }
+tr.line-added .sign-rhs { color: #1a7f37; }
+tr.line-removed .sign-lhs { color: #cf222e; }
+tr.line-paired .sign-lhs { color: #cf222e; }
+tr.line-paired .sign-rhs { color: #1a7f37; }
 
 .diff-table td.code-lhs {
     border-right: 1px solid var(--border);
@@ -469,22 +468,55 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// Syntax-highlight a single line of code.
-/// Returns HTML with `<span style="color:...">` tokens.
-/// Falls back to html_escape if highlighting fails.
-fn syntax_highlight_line(line: &str, ss: &SyntaxSet, syntax: &syntect::parsing::SyntaxReference, theme: &syntect::highlighting::Theme) -> String {
-    // highlighted_html_for_string wraps output in <pre style="...">...</pre>.
-    // Strip the wrapper and any leading/trailing whitespace.
-    match highlighted_html_for_string(line, ss, syntax, theme) {
-        Ok(html) => {
-            // syntect wraps output in <pre style="...">CONTENT\n</pre>
-            // Extract just the CONTENT.
-            let start = html.find('>').map(|p| p + 1).unwrap_or(0);
-            let end = html.rfind("</pre>").unwrap_or(html.len());
-            html[start..end].trim_matches('\n').to_string()
+/// Syntax-highlight all lines of a file, maintaining parser state across lines
+/// so multi-line constructs (comments, strings) are highlighted correctly.
+fn syntax_highlight_lines(
+    lines: &[String],
+    ss: &SyntaxSet,
+    syntax: &syntect::parsing::SyntaxReference,
+    theme: &syntect::highlighting::Theme,
+) -> Vec<String> {
+    use syntect::easy::HighlightLines;
+
+    let mut hl = HighlightLines::new(syntax, theme);
+    let mut result = Vec::with_capacity(lines.len());
+
+    for line in lines {
+        let line_nl = format!("{}\n", line);
+        let regions = match hl.highlight_line(&line_nl, ss) {
+            Ok(r) => r,
+            Err(_) => {
+                result.push(html_escape(line));
+                continue;
+            }
+        };
+
+        let mut html = String::new();
+        for (style, text) in &regions {
+            let text = text.trim_end_matches('\n');
+            if text.is_empty() { continue; }
+            let fg = style.foreground;
+            let escaped = html_escape(text);
+            let bold = style.font_style.contains(syntect::highlighting::FontStyle::BOLD);
+            let italic = style.font_style.contains(syntect::highlighting::FontStyle::ITALIC);
+            match (bold, italic) {
+                (true, true) => html.push_str(&format!(
+                    "<span style=\"font-weight:bold;font-style:italic;color:#{:02x}{:02x}{:02x}\">{}</span>",
+                    fg.r, fg.g, fg.b, escaped)),
+                (true, false) => html.push_str(&format!(
+                    "<span style=\"font-weight:bold;color:#{:02x}{:02x}{:02x}\">{}</span>",
+                    fg.r, fg.g, fg.b, escaped)),
+                (false, true) => html.push_str(&format!(
+                    "<span style=\"font-style:italic;color:#{:02x}{:02x}{:02x}\">{}</span>",
+                    fg.r, fg.g, fg.b, escaped)),
+                (false, false) => html.push_str(&format!(
+                    "<span style=\"color:#{:02x}{:02x}{:02x}\">{}</span>",
+                    fg.r, fg.g, fg.b, escaped)),
+            }
         }
-        Err(_) => html_escape(line),
+        result.push(html);
     }
+    result
 }
 
 /// Get the syntect syntax for a file path, falling back to plain text.
@@ -1157,13 +1189,10 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
 fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, ss: &SyntaxSet, theme: &syntect::highlighting::Theme) -> String {
     let syntax = get_syntax(ss, file_path);
 
-    // Pre-compute syntax-highlighted versions of all lines.
-    let old_hl: Vec<String> = difft.old_lines.iter()
-        .map(|line| syntax_highlight_line(line, ss, syntax, theme))
-        .collect();
-    let new_hl: Vec<String> = difft.new_lines.iter()
-        .map(|line| syntax_highlight_line(line, ss, syntax, theme))
-        .collect();
+    // Pre-compute syntax-highlighted versions of all lines (stateful, so
+    // multi-line comments/strings are highlighted correctly).
+    let old_hl = syntax_highlight_lines(&difft.old_lines, ss, syntax, theme);
+    let new_hl = syntax_highlight_lines(&difft.new_lines, ss, syntax, theme);
 
     let mut html = String::new();
     html.push_str(&format!(

@@ -473,61 +473,75 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
 
         let (lhs_range, rhs_range) = chunk_line_range(chunk);
 
-        // Determine context start lines (0-based indices into old/new files).
-        let old_start = lhs_range.map(|(min, _)| (min as usize).saturating_sub(CONTEXT_LINES));
-        let new_start = rhs_range.map(|(min, _)| (min as usize).saturating_sub(CONTEXT_LINES));
-        let old_end = lhs_range.map(|(_, max)| {
-            ((max as usize) + 1 + CONTEXT_LINES).min(difft.old_lines.len())
-        });
-        let new_end = rhs_range.map(|(_, max)| {
-            ((max as usize) + 1 + CONTEXT_LINES).min(difft.new_lines.len())
-        });
+        // Compute line offset between old/new files from last known positions.
+        // Used to estimate the missing side when a chunk only has entries on one side.
+        let line_offset: isize = match (last_old_rendered, last_new_rendered) {
+            (Some(o), Some(n)) => n as isize - o as isize,
+            _ => 0,
+        };
 
-        // Render context lines BEFORE the chunk, and decide whether to show a separator.
-        // If the previous chunk's post-context overlaps or is adjacent to this chunk's
-        // pre-context, just render continuous context lines with no separator.
-        if let (Some(os), Some(ns)) = (old_start, new_start) {
-            let old_ctx_start = match last_old_rendered {
-                Some(last) if last + 1 > os => last + 1,
-                _ => os,
-            };
-            let new_ctx_start = match last_new_rendered {
-                Some(last) if last + 1 > ns => last + 1,
-                _ => ns,
-            };
-            let lhs_first = lhs_range.map(|(min, _)| min as usize).unwrap_or(old_ctx_start);
-            let rhs_first = rhs_range.map(|(min, _)| min as usize).unwrap_or(new_ctx_start);
-
-            let old_ctx_count = lhs_first.saturating_sub(old_ctx_start);
-            let new_ctx_count = rhs_first.saturating_sub(new_ctx_start);
-            let ctx_count = old_ctx_count.min(new_ctx_count);
-
-            // Show separator only if there's a gap between the last rendered line
-            // and this chunk's pre-context (i.e., the chunks aren't adjacent).
-            if !first_chunk {
-                let has_gap = match (last_old_rendered, old_start) {
-                    (Some(last), Some(start)) => last + 1 < start,
-                    _ => true,
-                };
-                if has_gap {
-                    html.push_str(
-                        "<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>",
-                    );
-                }
+        // Resolve the first/last line on each side, estimating from the other side if missing.
+        let (old_first, old_last) = match lhs_range {
+            Some((min, max)) => (min as usize, max as usize),
+            None => {
+                let (rmin, rmax) = rhs_range.unwrap_or((0, 0));
+                let est = |r: u64| (r as isize - line_offset).max(0) as usize;
+                (est(rmin), est(rmax))
             }
-
-            for i in 0..ctx_count {
-                html.push_str(&render_context_row(
-                    lhs_first - ctx_count + i,
-                    rhs_first - ctx_count + i,
-                    &difft.old_lines,
-                    &difft.new_lines,
-                ));
+        };
+        let (new_first, new_last) = match rhs_range {
+            Some((min, max)) => (min as usize, max as usize),
+            None => {
+                let (lmin, lmax) = lhs_range.unwrap_or((0, 0));
+                let est = |l: u64| (l as isize + line_offset).max(0) as usize;
+                (est(lmin), est(lmax))
             }
-        } else if !first_chunk {
-            html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
+        };
+
+        let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
+        let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
+        let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
+        let new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+
+        // Clamp to avoid re-rendering lines already shown by the previous chunk.
+        let old_ctx_start = match last_old_rendered {
+            Some(last) if last + 1 > old_ctx_before => last + 1,
+            _ => old_ctx_before,
+        };
+        let new_ctx_start = match last_new_rendered {
+            Some(last) if last + 1 > new_ctx_before => last + 1,
+            _ => new_ctx_before,
+        };
+
+        // Show separator only if there's a gap between the last rendered line
+        // and this chunk's pre-context.
+        if !first_chunk {
+            let has_gap = match last_old_rendered {
+                Some(last) => last + 1 < old_ctx_before,
+                None => match last_new_rendered {
+                    Some(last) => last + 1 < new_ctx_before,
+                    None => true,
+                },
+            };
+            if has_gap {
+                html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
+            }
         }
         first_chunk = false;
+
+        // Render context lines BEFORE the chunk.
+        let old_pre_count = old_first.saturating_sub(old_ctx_start);
+        let new_pre_count = new_first.saturating_sub(new_ctx_start);
+        let pre_count = old_pre_count.min(new_pre_count);
+
+        for i in 0..pre_count {
+            html.push_str(&render_context_row(
+                old_first - pre_count + i,
+                new_first - pre_count + i,
+                &difft.old_lines,
+                &difft.new_lines,
+            ));
+        }
 
         // Render the diff rows, sorted by line number to avoid out-of-order display.
         let mut rows = consolidate_chunk(chunk);
@@ -591,25 +605,27 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
         }
 
         // Render context lines AFTER the chunk.
-        if let (Some(oe), Some(ne)) = (old_end, new_end) {
-            let lhs_last = lhs_range.map(|(_, max)| max as usize + 1).unwrap_or(0);
-            let rhs_last = rhs_range.map(|(_, max)| max as usize + 1).unwrap_or(0);
+        let old_post_start = old_last + 1;
+        let new_post_start = new_last + 1;
+        let old_post_count = old_ctx_after.saturating_sub(old_post_start);
+        let new_post_count = new_ctx_after.saturating_sub(new_post_start);
+        let post_count = old_post_count.min(new_post_count);
 
-            let old_ctx_count = oe.saturating_sub(lhs_last);
-            let new_ctx_count = ne.saturating_sub(rhs_last);
-            let ctx_count = old_ctx_count.min(new_ctx_count);
+        for i in 0..post_count {
+            html.push_str(&render_context_row(
+                old_post_start + i,
+                new_post_start + i,
+                &difft.old_lines,
+                &difft.new_lines,
+            ));
+        }
 
-            for i in 0..ctx_count {
-                html.push_str(&render_context_row(
-                    lhs_last + i,
-                    rhs_last + i,
-                    &difft.old_lines,
-                    &difft.new_lines,
-                ));
-            }
-
-            last_old_rendered = Some(lhs_last + ctx_count - 1);
-            last_new_rendered = Some(rhs_last + ctx_count - 1);
+        if post_count > 0 {
+            last_old_rendered = Some(old_post_start + post_count - 1);
+            last_new_rendered = Some(new_post_start + post_count - 1);
+        } else {
+            last_old_rendered = Some(old_last);
+            last_new_rendered = Some(new_last);
         }
     }
 

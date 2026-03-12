@@ -515,8 +515,16 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
             }
         }
 
-        // Render the diff rows.
-        let rows = consolidate_chunk(chunk);
+        // Render the diff rows, sorted by line number to avoid out-of-order display.
+        // difft's structural matching can produce entries where e.g. rhs L879 appears
+        // before rhs L878 because L878 is paired with an lhs entry.
+        let mut rows = consolidate_chunk(chunk);
+        rows.sort_by_key(|row| {
+            row.rhs
+                .map(|s| s.line_number)
+                .or(row.lhs.map(|s| s.line_number))
+                .unwrap_or(u64::MAX)
+        });
         for row in &rows {
             html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines));
         }

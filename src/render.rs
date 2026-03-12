@@ -1534,7 +1534,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
     let badge_html = if all_covered {
         format!(
-            "<div class=\"coverage-badge pass\">\u{2705} All {} chunks across {} files{} are covered</div>",
+            "<div class=\"coverage-badge pass\">\u{2705} All {} chunks across {} files{} are present</div>",
             total_chunks, file_count, source_text
         )
     } else {

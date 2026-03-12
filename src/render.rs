@@ -450,6 +450,54 @@ fn chunk_line_range(chunk: &[LineEntry]) -> (Option<(u64, u64)>, Option<(u64, u6
     (lhs_range, rhs_range)
 }
 
+/// Build a sorted list of (old_line, new_line) correspondences from all paired entries.
+/// Used to estimate old<->new line mapping for one-sided chunks.
+fn build_line_map(difft: &DifftOutput) -> Vec<(usize, usize)> {
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    for chunk in &difft.chunks {
+        for entry in chunk {
+            if let (Some(lhs), Some(rhs)) = (&entry.lhs, &entry.rhs) {
+                pairs.push((lhs.line_number as usize, rhs.line_number as usize));
+            }
+        }
+    }
+    pairs.sort();
+    pairs.dedup();
+    pairs
+}
+
+/// Estimate the old line corresponding to a new line using the line map.
+fn estimate_old_line(new_line: usize, line_map: &[(usize, usize)]) -> usize {
+    // Find the nearest pair where new <= new_line
+    let idx = line_map.partition_point(|&(_, n)| n <= new_line);
+    if idx == 0 {
+        // Before any known pair: assume same offset as first pair, or 1:1
+        if let Some(&(o, n)) = line_map.first() {
+            (new_line as isize - n as isize + o as isize).max(0) as usize
+        } else {
+            new_line
+        }
+    } else {
+        let &(o, n) = &line_map[idx - 1];
+        (new_line as isize - n as isize + o as isize).max(0) as usize
+    }
+}
+
+/// Estimate the new line corresponding to an old line using the line map.
+fn estimate_new_line(old_line: usize, line_map: &[(usize, usize)]) -> usize {
+    let idx = line_map.partition_point(|&(o, _)| o <= old_line);
+    if idx == 0 {
+        if let Some(&(o, n)) = line_map.first() {
+            (old_line as isize - o as isize + n as isize).max(0) as usize
+        } else {
+            old_line
+        }
+    } else {
+        let &(o, n) = &line_map[idx - 1];
+        (old_line as isize - o as isize + n as isize).max(0) as usize
+    }
+}
+
 fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) -> String {
     let mut html = String::new();
     html.push_str(&format!(
@@ -463,6 +511,9 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
          </colgroup><tbody>",
     );
 
+    // Build a line map from ALL chunks for accurate old<->new estimation.
+    let line_map = build_line_map(difft);
+
     // Track the last rendered line indices to avoid duplicating context between chunks.
     let mut last_old_rendered: Option<usize> = None;
     let mut last_new_rendered: Option<usize> = None;
@@ -473,28 +524,26 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
 
         let (lhs_range, rhs_range) = chunk_line_range(chunk);
 
-        // Compute line offset between old/new files from last known positions.
-        // Used to estimate the missing side when a chunk only has entries on one side.
-        let line_offset: isize = match (last_old_rendered, last_new_rendered) {
-            (Some(o), Some(n)) => n as isize - o as isize,
-            _ => 0,
-        };
-
-        // Resolve the first/last line on each side, estimating from the other side if missing.
+        // Resolve the first/last line on each side, estimating from the other side
+        // using the line map when one side has no entries in this chunk.
         let (old_first, old_last) = match lhs_range {
             Some((min, max)) => (min as usize, max as usize),
             None => {
                 let (rmin, rmax) = rhs_range.unwrap_or((0, 0));
-                let est = |r: u64| (r as isize - line_offset).max(0) as usize;
-                (est(rmin), est(rmax))
+                (
+                    estimate_old_line(rmin as usize, &line_map),
+                    estimate_old_line(rmax as usize, &line_map),
+                )
             }
         };
         let (new_first, new_last) = match rhs_range {
             Some((min, max)) => (min as usize, max as usize),
             None => {
                 let (lmin, lmax) = lhs_range.unwrap_or((0, 0));
-                let est = |l: u64| (l as isize + line_offset).max(0) as usize;
-                (est(lmin), est(lmax))
+                (
+                    estimate_new_line(lmin as usize, &line_map),
+                    estimate_new_line(lmax as usize, &line_map),
+                )
             }
         };
 

@@ -110,6 +110,10 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
         let _ = fs::write(&gitignore_path, "*\n");
     }
 
+    // Write metadata about this collection (diff source)
+    let meta = serde_json::json!({ "diff_args": diff_args });
+    let _ = fs::write(output_dir.join(".meta.json"), serde_json::to_string_pretty(&meta)?);
+
     // Clean any previous JSON files in the output dir
     if let Ok(entries) = fs::read_dir(output_dir) {
         for entry in entries.flatten() {

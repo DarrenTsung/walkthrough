@@ -119,31 +119,21 @@ Rules for writing the markdown:
    a section covers a feature flag addition and a new dependency, explain the flag, show the
    flag diff, explain the dependency, show the dependency diff.
 
-## Step 5: Verify coverage
-
-Run the verify command:
-```bash
-walkthrough verify "$OUTPUT_PATH" --data-dir .walkthrough_data/
-```
-
-This checks that every chunk in every JSON file is referenced by at least one
-`difft <file> chunks=...` annotation in the walkthrough.
-
-If verification fails, it prints the uncovered chunks. Add sections referencing them and
-re-verify. Repeat up to 3 times.
-
-## Step 6: Render and enrich
+## Step 5: Render and enrich
 
 Run the render command:
 ```bash
 walkthrough render "$OUTPUT_PATH" --data-dir .walkthrough_data/ -o "${OUTPUT_PATH%.md}.html"
 ```
 
-This does two things:
+This does three things:
 1. Produces the HTML file with side-by-side diffs
 2. Writes text diff representations back into each difft code block in the markdown file
+3. Verifies coverage and adds a badge below the title showing whether all chunks are covered
 
-## Step 7: Review and revise the narrative
+If the render output reports uncovered chunks, add sections referencing them and re-render.
+
+## Step 6: Review and revise the narrative
 
 Re-read the markdown file (`OUTPUT_PATH`). The difft code blocks now contain the actual text
 diffs that correspond to what the HTML renders. For each section:
@@ -157,7 +147,7 @@ If revisions are needed, edit the narrative text (not the code block bodies) and
 render command. The code block bodies will be repopulated, so edits there are overwritten.
 Repeat until the narrative is coherent.
 
-## Step 8: Present
+## Step 7: Present
 
 Open the HTML file:
 ```bash

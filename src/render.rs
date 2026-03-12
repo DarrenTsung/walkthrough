@@ -174,6 +174,29 @@ hr {
 
 img { max-width: 100%; }
 
+/* Coverage badge */
+.coverage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8em;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 0.5em;
+}
+
+.coverage-badge.pass {
+    background: #e6ffec;
+    color: #1a7f37;
+    border: 1px solid #aceebb;
+}
+
+.coverage-badge.fail {
+    background: #ffebe9;
+    color: #c4232b;
+    border: 1px solid #ffcecb;
+}
+
 /* Floating table of contents */
 .toc {
     position: fixed;
@@ -1361,10 +1384,12 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
     // First pass: replace difft code blocks with HTML placeholders,
     // and build the enriched markdown with text diffs in code block bodies.
+    // Also track which (file, chunk) pairs are referenced for verification.
     let mut processed_md = String::new();
     let mut enriched_md = String::new();
     let mut diff_blocks: Vec<String> = Vec::new();
     let mut in_difft_block = false;
+    let mut referenced: std::collections::HashSet<(String, usize)> = std::collections::HashSet::new();
 
     for line in md_content.lines() {
         if !in_difft_block {
@@ -1386,6 +1411,9 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                                 .collect()
                         };
 
+                        for &idx in &indices {
+                            referenced.insert((file.clone(), idx));
+                        }
                         let rendered_html = render_chunks(difft, &indices, &file);
                         let placeholder_id = diff_blocks.len();
                         diff_blocks.push(rendered_html);
@@ -1468,6 +1496,67 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
             .join("-");
         format!("<{tag} id=\"{slug}\">{content}</{tag}>")
     }).to_string();
+
+    // Verify coverage: check all chunks in all files are referenced.
+    let mut total_chunks: usize = 0;
+    let mut uncovered: Vec<(String, usize)> = Vec::new();
+    for (file, difft) in &data {
+        let chunk_count = difft.chunks.len();
+        total_chunks += chunk_count;
+        for i in 0..chunk_count {
+            if !referenced.contains(&(file.clone(), i)) {
+                uncovered.push((file.clone(), i));
+            }
+        }
+    }
+    let all_covered = uncovered.is_empty();
+    let file_count = data.len();
+
+    // Read diff source from .meta.json if available
+    let diff_source = fs::read_to_string(data_dir.join(".meta.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| {
+            v.get("diff_args")?.as_array().map(|args| {
+                args.iter()
+                    .filter_map(|a| a.as_str().map(String::from))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+        })
+        .unwrap_or_default();
+
+    let source_text = if diff_source.is_empty() {
+        String::new()
+    } else {
+        format!(" in <code>{}</code>", html_escape(&diff_source))
+    };
+
+    let badge_html = if all_covered {
+        format!(
+            "<div class=\"coverage-badge pass\">\u{2705} All {} chunks across {} files{} are covered</div>",
+            total_chunks, file_count, source_text
+        )
+    } else {
+        format!(
+            "<div class=\"coverage-badge fail\">\u{274c} {} uncovered chunks (out of {} across {} files{})</div>",
+            uncovered.len(), total_chunks, file_count, source_text
+        )
+    };
+
+    if !all_covered {
+        eprintln!("{} uncovered chunks:", uncovered.len());
+        for (file, idx) in &uncovered {
+            eprintln!("  {} chunk {}", file, idx);
+        }
+    }
+
+    // Inject badge after the first h1 closing tag
+    let badge_anchor = "</h1>";
+    if let Some(pos) = html_body.find(badge_anchor) {
+        let insert_at = pos + badge_anchor.len();
+        html_body.insert_str(insert_at, &format!("\n{}", badge_html));
+    }
 
     let full_html = format!(
         r#"<!DOCTYPE html>

@@ -145,16 +145,9 @@ If revisions are needed, edit the narrative text (not the code block bodies) and
 render command. The code block bodies will be repopulated, so edits there are overwritten.
 Repeat until the narrative is coherent.
 
-## Step 7: Publish and present
+## Step 7: Present
 
-Publish the HTML file:
-```bash
-walkthrough publish "${OUTPUT_PATH%.md}.html"
-```
-
-This copies the HTML to `$WALKTHROUGH_PUBLISH_PATH`, commits, and pushes.
-
-Then open it:
+Open the HTML file:
 ```bash
 open "${OUTPUT_PATH%.md}.html"
 ```
@@ -163,3 +156,8 @@ Print a summary:
 - Number of files covered
 - Number of chunks covered
 - Output file path
+
+If the user asks to publish, run:
+```bash
+walkthrough publish "${OUTPUT_PATH%.md}.html"
+```

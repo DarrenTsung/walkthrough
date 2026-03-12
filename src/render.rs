@@ -74,8 +74,8 @@ article {
 }
 
 .diff-block {
-    width: 95vw;
-    max-width: 1400px;
+    width: 90vw;
+    max-width: 1300px;
     margin-left: 50%;
     transform: translateX(-50%);
     margin-top: 1rem;
@@ -184,6 +184,12 @@ img { max-width: 100%; }
     overflow-y: auto;
     font-size: 12px;
     line-height: 1.5;
+    opacity: 0.25;
+    transition: opacity 0.2s ease;
+}
+
+.toc:hover {
+    opacity: 1;
 }
 
 .toc a {

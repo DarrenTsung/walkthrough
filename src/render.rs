@@ -276,7 +276,8 @@ img { max-width: 100%; }
 }
 
 col.ln-col { width: 3.5em; }
-col.code-col { width: calc(50% - 3.5em); }
+col.sign-col { width: 1.5em; }
+col.code-col { width: calc(50% - 5em); }
 
 .diff-table td {
     padding: 1px 0.6rem;
@@ -290,10 +291,23 @@ col.code-col { width: calc(50% - 3.5em); }
     color: var(--ln-fg);
     user-select: none;
     white-space: nowrap;
-    border-right: 1px solid var(--border);
     padding-right: 0.4rem;
     min-width: 3em;
 }
+
+.diff-table .sign {
+    text-align: center;
+    color: var(--ln-fg);
+    user-select: none;
+    white-space: nowrap;
+    padding: 1px 0;
+    border-right: 1px solid var(--border);
+}
+
+tr.line-added .sign-rhs { color: #1a7f37; }
+tr.line-removed .sign-lhs { color: #c4232b; }
+tr.line-paired .sign-lhs { color: #c4232b; }
+tr.line-paired .sign-rhs { color: #1a7f37; }
 
 .diff-table td.code-lhs {
     border-right: 1px solid var(--border);
@@ -302,23 +316,29 @@ col.code-col { width: calc(50% - 3.5em); }
 /* Context lines (unchanged) */
 tr.line-context td { background: var(--bg); }
 
-/* Removed lines */
-tr.line-removed td.code-lhs { background: var(--removed-bg); }
-tr.line-removed td.ln:first-child { background: var(--removed-bg); }
-tr.line-removed td.code-rhs { background: var(--empty-bg); }
-tr.line-removed td.ln:nth-child(3) { background: var(--empty-bg); }
+/* Removed lines (lhs side highlighted, rhs side empty) */
+tr.line-removed td.code-lhs,
+tr.line-removed .ln-lhs,
+tr.line-removed .sign-lhs { background: var(--removed-bg); }
+tr.line-removed td.code-rhs,
+tr.line-removed .ln-rhs,
+tr.line-removed .sign-rhs { background: var(--empty-bg); }
 
-/* Added lines */
-tr.line-added td.code-rhs { background: var(--added-bg); }
-tr.line-added td.ln:nth-child(3) { background: var(--added-bg); }
-tr.line-added td.code-lhs { background: var(--empty-bg); }
-tr.line-added td.ln:first-child { background: var(--empty-bg); }
+/* Added lines (rhs side highlighted, lhs side empty) */
+tr.line-added td.code-rhs,
+tr.line-added .ln-rhs,
+tr.line-added .sign-rhs { background: var(--added-bg); }
+tr.line-added td.code-lhs,
+tr.line-added .ln-lhs,
+tr.line-added .sign-lhs { background: var(--empty-bg); }
 
 /* Paired rows: removed on left, added on right */
-tr.line-paired td.code-lhs { background: var(--removed-bg); }
-tr.line-paired td.ln:first-child { background: var(--removed-bg); }
-tr.line-paired td.code-rhs { background: var(--added-bg); }
-tr.line-paired td.ln:nth-child(3) { background: var(--added-bg); }
+tr.line-paired td.code-lhs,
+tr.line-paired .ln-lhs,
+tr.line-paired .sign-lhs { background: var(--removed-bg); }
+tr.line-paired td.code-rhs,
+tr.line-paired .ln-rhs,
+tr.line-paired .sign-rhs { background: var(--added-bg); }
 
 .chunk-sep td {
     height: 0.5rem;
@@ -664,27 +684,27 @@ fn render_diff_row(
         let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
 
         html.push_str(&format!(
-            "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
+            "<td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>",
             lhs.line_number + 1,
             insert_diff_highlight(old_highlighted, old_cs, old_ce, "hl-del")
         ));
         html.push_str(&format!(
-            "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
+            "<td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td>",
             rhs.line_number + 1,
             insert_diff_highlight(new_highlighted, new_cs, new_ce, "hl-add")
         ));
     } else if let Some(lhs) = row.lhs {
         let content = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         html.push_str(&format!(
-            "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
+            "<td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>",
             lhs.line_number + 1, content
         ));
-        html.push_str("<td class=\"ln\"></td><td class=\"code-rhs\"></td>");
+        html.push_str("<td class=\"ln ln-rhs\"></td><td class=\"sign sign-rhs\"></td><td class=\"code-rhs\"></td>");
     } else if let Some(rhs) = row.rhs {
         let content = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
-        html.push_str("<td class=\"ln\"></td><td class=\"code-lhs\"></td>");
+        html.push_str("<td class=\"ln ln-lhs\"></td><td class=\"sign sign-lhs\"></td><td class=\"code-lhs\"></td>");
         html.push_str(&format!(
-            "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
+            "<td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td>",
             rhs.line_number + 1, content
         ));
     }
@@ -699,8 +719,8 @@ fn render_context_row(old_idx: usize, new_idx: usize, old_hl: &[String], new_hl:
     let old_content = old_hl.get(old_idx).map(|s| s.as_str()).unwrap_or("");
     let new_content = new_hl.get(new_idx).map(|s| s.as_str()).unwrap_or("");
     format!(
-        "<tr class=\"line-context\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
-         <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
+        "<tr class=\"line-context\"><td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\"></td><td class=\"code-lhs\">{}</td>\
+         <td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\"></td><td class=\"code-rhs\">{}</td></tr>",
         old_idx + 1, old_content, new_idx + 1, new_content
     )
 }
@@ -1150,8 +1170,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     ));
     html.push_str(
         "<table class=\"diff-table\"><colgroup>\
-         <col class=\"ln-col\"><col class=\"code-col\">\
-         <col class=\"ln-col\"><col class=\"code-col\">\
+         <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
+         <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
          </colgroup><tbody>",
     );
 
@@ -1375,7 +1395,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 },
             };
             if has_gap {
-                html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
+                html.push_str("<tr class=\"chunk-sep\"><td colspan=\"6\"></td></tr>");
             }
         }
         first_chunk = false;
@@ -1448,16 +1468,16 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 RenderItem::RemovedLine(old_0) => {
                     let content = old_hl.get(*old_0).map(|s| s.as_str()).unwrap_or("");
                     html.push_str(&format!(
-                        "<tr class=\"line-removed\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
-                         <td class=\"ln\"></td><td class=\"code-rhs\"></td></tr>",
+                        "<tr class=\"line-removed\"><td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>\
+                         <td class=\"ln ln-rhs\"></td><td class=\"sign sign-rhs\"></td><td class=\"code-rhs\"></td></tr>",
                         old_0 + 1, content
                     ));
                 }
                 RenderItem::AddedLine(new_0) => {
                     let content = new_hl.get(*new_0).map(|s| s.as_str()).unwrap_or("");
                     html.push_str(&format!(
-                        "<tr class=\"line-added\"><td class=\"ln\"></td><td class=\"code-lhs\"></td>\
-                         <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
+                        "<tr class=\"line-added\"><td class=\"ln ln-lhs\"></td><td class=\"sign sign-lhs\"></td><td class=\"code-lhs\"></td>\
+                         <td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td></tr>",
                         new_0 + 1, content
                     ));
                 }
@@ -1468,8 +1488,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                     let new_highlighted = new_hl.get(*new_0).map(|s| s.as_str()).unwrap_or("");
                     let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
                     html.push_str(&format!(
-                        "<tr class=\"line-paired\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
-                         <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
+                        "<tr class=\"line-paired\"><td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>\
+                         <td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td></tr>",
                         old_0 + 1, insert_diff_highlight(old_highlighted, old_cs, old_ce, "hl-del"),
                         new_0 + 1, insert_diff_highlight(new_highlighted, new_cs, new_ce, "hl-add"),
                     ));
@@ -1881,7 +1901,7 @@ mod tests {
     /// Extract all (class, old_ln, new_ln) tuples from rendered HTML table rows.
     fn extract_rows(html: &str) -> Vec<(String, Option<u64>, Option<u64>)> {
         let row_re = Regex::new(r#"<tr class="([^"]+)">"#).unwrap();
-        let td_re = Regex::new(r#"<td class="ln">(\d*)</td>"#).unwrap();
+        let td_re = Regex::new(r#"<td class="ln[^"]*">(\d*)</td>"#).unwrap();
 
         let mut rows = Vec::new();
         for row_cap in row_re.captures_iter(html) {

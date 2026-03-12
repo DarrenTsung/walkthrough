@@ -1,5 +1,6 @@
 mod collect;
 mod difft_json;
+mod publish;
 mod render;
 mod verify;
 
@@ -52,6 +53,12 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+
+    /// Publish walkthrough HTML to $WALKTHROUGH_PUBLISH_PATH
+    Publish {
+        /// HTML file to publish
+        html: PathBuf,
+    },
 }
 
 fn main() {
@@ -77,6 +84,8 @@ fn main() {
             let output_path = output.unwrap_or_else(|| walkthrough.with_extension("html"));
             render::run(&walkthrough, &data_dir, &output_path)
         }
+
+        Commands::Publish { html } => publish::run(&html),
     };
 
     if let Err(e) = result {

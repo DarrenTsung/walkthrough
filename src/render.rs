@@ -179,9 +179,8 @@ img { max-width: 100%; }
     position: fixed;
     top: 24px;
     left: 16px;
-    width: 200px;
     max-height: calc(100vh - 48px);
-    overflow-y: auto;
+    overflow: visible;
     font-size: 12px;
     line-height: 1.5;
     mask-image: linear-gradient(to right, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0) 70%);

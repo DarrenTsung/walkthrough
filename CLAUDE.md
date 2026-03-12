@@ -40,7 +40,7 @@ Difft code blocks reference collected data by file path and chunk indices:
 ```
 ````
 
-The optional `lines=START-END` parameter (1-based, inclusive) filters a chunk to only show changes within that new-file line range. This lets you split a large chunk across multiple sections with interleaved prose.
+The optional `lines=START-END` parameter (1-based, inclusive, relative to the chunk) filters a chunk to only show a portion. Line 1 is the first changed line in the chunk. This lets you split a large chunk across multiple sections with interleaved prose.
 
 ## External dependencies
 

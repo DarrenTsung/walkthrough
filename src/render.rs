@@ -1469,17 +1469,37 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                     let file = caps[1].to_string();
                     let chunks_spec = caps[2].to_string();
 
-                    // Parse optional lines=START-END (1-based, converted to 0-based)
+                    // Parse optional lines=START-END (1-based, relative to chunk).
+                    // Convert to absolute 0-based new-file line numbers using the
+                    // chunk's first new-file line as the base.
                     let line_filter: LineFilter = caps.get(3).and_then(|m| {
                         let s = m.as_str();
                         let parts: Vec<&str> = s.split('-').collect();
-                        if parts.len() == 2 {
-                            let start: usize = parts[0].parse().ok()?;
-                            let end: usize = parts[1].parse().ok()?;
-                            Some((start.saturating_sub(1), end.saturating_sub(1)))
+                        if parts.len() != 2 { return None; }
+                        let rel_start: usize = parts[0].parse().ok()?;
+                        let rel_end: usize = parts[1].parse().ok()?;
+                        let difft_ref = data.get(&file)?;
+                        // Find the earliest new-file line across the selected chunks
+                        let mut base = usize::MAX;
+                        let chunk_indices_for_base: Vec<usize> = if chunks_spec == "all" {
+                            (0..difft_ref.chunks.len()).collect()
                         } else {
-                            None
+                            chunks_spec.split(',')
+                                .filter_map(|s| s.trim().parse().ok())
+                                .collect()
+                        };
+                        for &ci in &chunk_indices_for_base {
+                            if let Some(chunk) = difft_ref.chunks.get(ci) {
+                                for entry in chunk {
+                                    if let Some(rhs) = &entry.rhs {
+                                        base = base.min(rhs.line_number as usize);
+                                    }
+                                }
+                            }
                         }
+                        if base == usize::MAX { return None; }
+                        // relative 1-based -> absolute 0-based
+                        Some((base + rel_start - 1, base + rel_end - 1))
                     });
 
                     if let Some(difft) = data.get(&file) {
@@ -1906,5 +1926,68 @@ mod tests {
             .filter(|(c, _, _)| c == "line-paired")
             .collect();
         assert_eq!(changed_empty.len(), 0, "should have 0 paired rows when filter misses all changes");
+    }
+
+    #[test]
+    fn relative_line_filter_via_run() {
+        // Test the full run() path: relative lines= in markdown get converted
+        // to absolute new-file lines using the chunk's first new-file line.
+        //
+        // Chunk has changes at 0-based new lines 100, 110, 120.
+        // Relative line 1 = new line 100, so lines=1-5 should show only line 100,
+        // and lines=8-15 should show only line 110.
+        let old_lines: Vec<&str> = (0..130).map(|_| "old").collect();
+        let new_lines: Vec<&str> = (0..130).map(|_| "new").collect();
+
+        let chunk = vec![
+            LineEntry { lhs: Some(side(100, vec![])), rhs: Some(side(100, vec![])) },
+            LineEntry { lhs: Some(side(110, vec![])), rhs: Some(side(110, vec![])) },
+            LineEntry { lhs: Some(side(120, vec![])), rhs: Some(side(120, vec![])) },
+        ];
+
+        let hunks = vec![
+            DiffHunk { old_start: 101, old_count: 1, new_start: 101, new_count: 1 },
+            DiffHunk { old_start: 111, old_count: 1, new_start: 111, new_count: 1 },
+            DiffHunk { old_start: 121, old_count: 1, new_start: 121, new_count: 1 },
+        ];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        // Write JSON to a temp data dir
+        let data_dir = std::env::temp_dir().join("walkthrough_test_relative");
+        let _ = fs::remove_dir_all(&data_dir);
+        fs::create_dir_all(&data_dir).unwrap();
+        let json = serde_json::to_string_pretty(&difft).unwrap();
+        fs::write(data_dir.join("test.ts.json"), &json).unwrap();
+
+        // Write markdown with relative lines=1-5 (should resolve to 0-based 100-104)
+        let md_path = data_dir.join("test.md");
+        fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=1-5\n```\n").unwrap();
+
+        let html_path = data_dir.join("test.html");
+        run(&md_path, &data_dir, &html_path).unwrap();
+
+        let html = fs::read_to_string(&html_path).unwrap();
+        let rows = extract_rows(&html);
+        let changed: Vec<_> = rows.iter()
+            .filter(|(c, _, _)| c == "line-paired")
+            .collect();
+
+        // Only the first change (new line 101, 1-based) should be present
+        assert_eq!(changed.len(), 1, "relative lines=1-5 should include only 1 changed line");
+        assert_eq!(changed[0].2, Some(101), "should be new-side line 101 (1-based)");
+
+        // Now test lines=8-15 which should hit only line 110 (relative 11)
+        fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=8-15\n```\n").unwrap();
+        run(&md_path, &data_dir, &html_path).unwrap();
+
+        let html = fs::read_to_string(&html_path).unwrap();
+        let rows = extract_rows(&html);
+        let changed: Vec<_> = rows.iter()
+            .filter(|(c, _, _)| c == "line-paired")
+            .collect();
+        assert_eq!(changed.len(), 1, "relative lines=8-15 should include only 1 changed line");
+        assert_eq!(changed[0].2, Some(111), "should be new-side line 111 (1-based)");
+
+        let _ = fs::remove_dir_all(&data_dir);
     }
 }

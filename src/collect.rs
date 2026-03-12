@@ -4,6 +4,67 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
+/// Get old and new file content by reading blob SHAs from `git diff --raw`.
+fn get_file_contents(
+    diff_args: &[String],
+    file_path: &str,
+) -> Result<(Vec<String>, Vec<String>)> {
+    let raw_output = Command::new("git")
+        .arg("diff")
+        .args(diff_args)
+        .arg("--raw")
+        .arg("--")
+        .arg(file_path)
+        .output()
+        .context("Failed to run git diff --raw")?;
+
+    let raw_str = String::from_utf8_lossy(&raw_output.stdout);
+    let Some(line) = raw_str.lines().next() else {
+        return Ok((Vec::new(), Vec::new()));
+    };
+
+    // Format: ":old_mode new_mode old_sha new_sha status\tpath"
+    // The status+path part is tab-separated from the mode/sha part
+    let meta = line.split('\t').next().unwrap_or("");
+    let parts: Vec<&str> = meta.split_whitespace().collect();
+    if parts.len() < 5 {
+        return Ok((Vec::new(), Vec::new()));
+    }
+
+    let old_sha = parts[2];
+    let new_sha = parts[3];
+
+    let old_content = if old_sha.chars().all(|c| c == '0') {
+        String::new()
+    } else {
+        let out = Command::new("git")
+            .arg("cat-file")
+            .arg("blob")
+            .arg(old_sha)
+            .output()
+            .context("Failed to read old blob")?;
+        String::from_utf8_lossy(&out.stdout).to_string()
+    };
+
+    let new_content = if new_sha.chars().all(|c| c == '0') {
+        // Working tree: read from disk
+        fs::read_to_string(file_path).unwrap_or_default()
+    } else {
+        let out = Command::new("git")
+            .arg("cat-file")
+            .arg("blob")
+            .arg(new_sha)
+            .output()
+            .context("Failed to read new blob")?;
+        String::from_utf8_lossy(&out.stdout).to_string()
+    };
+
+    let old_lines: Vec<String> = old_content.lines().map(|s| s.to_string()).collect();
+    let new_lines: Vec<String> = new_content.lines().map(|s| s.to_string()).collect();
+
+    Ok((old_lines, new_lines))
+}
+
 pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
     fs::create_dir_all(output_dir)
         .with_context(|| format!("Failed to create output dir: {}", output_dir.display()))?;
@@ -38,9 +99,7 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
         .filter_map(|line| {
             let parts: Vec<&str> = line.split('\t').collect();
             match parts.len() {
-                // Normal: "M\tpath"
                 2 => Some((parts[0].to_string(), parts[1].to_string())),
-                // Rename: "R100\told\tnew"
                 3 if parts[0].starts_with('R') => {
                     Some((parts[0].to_string(), parts[2].to_string()))
                 }
@@ -82,7 +141,7 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
             continue;
         }
 
-        // Parse JSON and inject/override path and status
+        // Parse JSON and inject path, status, and file contents
         let mut json: serde_json::Value = serde_json::from_str(&json_str).with_context(|| {
             format!(
                 "Failed to parse difft JSON for {}: {}",
@@ -105,9 +164,35 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
             };
             obj.entry("status".to_string())
                 .or_insert_with(|| serde_json::Value::String(difft_status.to_string()));
+
+            // Embed old/new file contents for full-line rendering
+            match get_file_contents(diff_args, file_path) {
+                Ok((old_lines, new_lines)) => {
+                    obj.insert(
+                        "old_lines".to_string(),
+                        serde_json::Value::Array(
+                            old_lines
+                                .into_iter()
+                                .map(serde_json::Value::String)
+                                .collect(),
+                        ),
+                    );
+                    obj.insert(
+                        "new_lines".to_string(),
+                        serde_json::Value::Array(
+                            new_lines
+                                .into_iter()
+                                .map(serde_json::Value::String)
+                                .collect(),
+                        ),
+                    );
+                }
+                Err(e) => {
+                    eprintln!("(warning: could not get file contents: {})", e);
+                }
+            }
         }
 
-        // Count chunks
         let chunk_count = json
             .get("chunks")
             .and_then(|c| c.as_array())
@@ -115,7 +200,6 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
             .unwrap_or(0);
         total_chunks += chunk_count;
 
-        // Save to output dir with safe filename
         let safe_name = file_path.replace('/', "__");
         let output_path = output_dir.join(format!("{}.json", safe_name));
         fs::write(&output_path, serde_json::to_string_pretty(&json)?)

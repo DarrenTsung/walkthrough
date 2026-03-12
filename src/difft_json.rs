@@ -38,4 +38,10 @@ pub struct DifftOutput {
     pub path: Option<String>,
     #[serde(default)]
     pub status: Option<String>,
+    /// Full lines of the old file version (for rendering full-line context).
+    #[serde(default)]
+    pub old_lines: Vec<String>,
+    /// Full lines of the new file version (for rendering full-line context).
+    #[serde(default)]
+    pub new_lines: Vec<String>,
 }

@@ -2087,4 +2087,156 @@ mod tests {
             );
         }
     }
+
+    /// Helper: extract changed (non-context) new-side line numbers from rendered HTML.
+    fn extract_changed_new_lines(html: &str) -> std::collections::HashSet<u64> {
+        let rows = extract_rows(html);
+        rows.iter()
+            .filter(|(c, _, _)| c != "line-context" && c != "chunk-sep")
+            .filter_map(|(_, _, n)| *n)
+            .collect()
+    }
+
+    #[test]
+    fn split_union_covers_all_changed_lines() {
+        // A chunk with 10 consecutive changed lines (0-based 20-29).
+        // Split into three blocks: 20-22, 23-26, 27-29.
+        // The union of changed lines across all blocks must equal the
+        // unsplit chunk's changed lines.
+        let old_lines: Vec<&str> = (0..40).map(|_| "old").collect();
+        let mut new_lines_vec: Vec<String> = (0..40).map(|_| "old".to_string()).collect();
+        for i in 20..30 {
+            new_lines_vec[i] = format!("new line {}", i);
+        }
+        let new_lines: Vec<&str> = new_lines_vec.iter().map(|s| s.as_str()).collect();
+
+        let chunk = vec![
+            LineEntry { lhs: Some(side(20, vec![])), rhs: Some(side(20, vec![])) },
+            LineEntry { lhs: Some(side(21, vec![])), rhs: Some(side(21, vec![])) },
+            LineEntry { lhs: Some(side(22, vec![])), rhs: Some(side(22, vec![])) },
+            LineEntry { lhs: Some(side(23, vec![])), rhs: Some(side(23, vec![])) },
+            LineEntry { lhs: Some(side(24, vec![])), rhs: Some(side(24, vec![])) },
+            LineEntry { lhs: Some(side(25, vec![])), rhs: Some(side(25, vec![])) },
+            LineEntry { lhs: Some(side(26, vec![])), rhs: Some(side(26, vec![])) },
+            LineEntry { lhs: Some(side(27, vec![])), rhs: Some(side(27, vec![])) },
+            LineEntry { lhs: Some(side(28, vec![])), rhs: Some(side(28, vec![])) },
+            LineEntry { lhs: Some(side(29, vec![])), rhs: Some(side(29, vec![])) },
+        ];
+
+        let hunks = vec![DiffHunk { old_start: 21, old_count: 10, new_start: 21, new_count: 10 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        // Unsplit: all changed lines
+        let all_lines = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", None)
+        );
+
+        // Split into three non-overlapping ranges
+        let split1 = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", Some((20, 22)))
+        );
+        let split2 = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", Some((23, 26)))
+        );
+        let split3 = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", Some((27, 29)))
+        );
+
+        let union: std::collections::HashSet<u64> = split1.iter()
+            .chain(split2.iter())
+            .chain(split3.iter())
+            .copied()
+            .collect();
+
+        assert_eq!(union, all_lines,
+            "union of splits must equal unsplit changed lines.\n  unsplit: {:?}\n  union: {:?}\n  split1: {:?}\n  split2: {:?}\n  split3: {:?}",
+            all_lines, union, split1, split2, split3);
+    }
+
+    #[test]
+    fn overlapping_splits_still_cover_all_lines() {
+        // Same chunk but with overlapping split ranges.
+        let old_lines: Vec<&str> = (0..40).map(|_| "old").collect();
+        let mut new_lines_vec: Vec<String> = (0..40).map(|_| "old".to_string()).collect();
+        for i in 20..30 {
+            new_lines_vec[i] = format!("new line {}", i);
+        }
+        let new_lines: Vec<&str> = new_lines_vec.iter().map(|s| s.as_str()).collect();
+
+        let chunk = vec![
+            LineEntry { lhs: Some(side(20, vec![])), rhs: Some(side(20, vec![])) },
+            LineEntry { lhs: Some(side(21, vec![])), rhs: Some(side(21, vec![])) },
+            LineEntry { lhs: Some(side(22, vec![])), rhs: Some(side(22, vec![])) },
+            LineEntry { lhs: Some(side(23, vec![])), rhs: Some(side(23, vec![])) },
+            LineEntry { lhs: Some(side(24, vec![])), rhs: Some(side(24, vec![])) },
+            LineEntry { lhs: Some(side(25, vec![])), rhs: Some(side(25, vec![])) },
+            LineEntry { lhs: Some(side(26, vec![])), rhs: Some(side(26, vec![])) },
+            LineEntry { lhs: Some(side(27, vec![])), rhs: Some(side(27, vec![])) },
+            LineEntry { lhs: Some(side(28, vec![])), rhs: Some(side(28, vec![])) },
+            LineEntry { lhs: Some(side(29, vec![])), rhs: Some(side(29, vec![])) },
+        ];
+
+        let hunks = vec![DiffHunk { old_start: 21, old_count: 10, new_start: 21, new_count: 10 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let all_lines = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", None)
+        );
+
+        // Overlapping ranges: 20-25, 23-29
+        let split1 = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", Some((20, 25)))
+        );
+        let split2 = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", Some((23, 29)))
+        );
+
+        let union: std::collections::HashSet<u64> = split1.iter()
+            .chain(split2.iter())
+            .copied()
+            .collect();
+
+        assert_eq!(union, all_lines,
+            "overlapping union must cover all.\n  unsplit: {:?}\n  union: {:?}", all_lines, union);
+    }
+
+    #[test]
+    fn single_line_splits_cover_all() {
+        // Extreme: split every changed line into its own block.
+        let old_lines: Vec<&str> = (0..20).map(|_| "old").collect();
+        let mut new_lines_vec: Vec<String> = (0..20).map(|_| "old".to_string()).collect();
+        for i in 5..10 {
+            new_lines_vec[i] = format!("changed {}", i);
+        }
+        let new_lines: Vec<&str> = new_lines_vec.iter().map(|s| s.as_str()).collect();
+
+        let chunk = vec![
+            LineEntry { lhs: Some(side(5, vec![])), rhs: Some(side(5, vec![])) },
+            LineEntry { lhs: Some(side(6, vec![])), rhs: Some(side(6, vec![])) },
+            LineEntry { lhs: Some(side(7, vec![])), rhs: Some(side(7, vec![])) },
+            LineEntry { lhs: Some(side(8, vec![])), rhs: Some(side(8, vec![])) },
+            LineEntry { lhs: Some(side(9, vec![])), rhs: Some(side(9, vec![])) },
+        ];
+
+        let hunks = vec![DiffHunk { old_start: 6, old_count: 5, new_start: 6, new_count: 5 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let all_lines = extract_changed_new_lines(
+            &render_chunks(&difft, &[0], "test.ts", None)
+        );
+
+        // One block per line
+        let mut union = std::collections::HashSet::new();
+        for line_0 in 5..10 {
+            let lines = extract_changed_new_lines(
+                &render_chunks(&difft, &[0], "test.ts", Some((line_0, line_0)))
+            );
+            assert_eq!(lines.len(), 1,
+                "single-line filter at {} should produce 1 changed line, got {:?}", line_0, lines);
+            union.extend(lines);
+        }
+
+        assert_eq!(union, all_lines,
+            "single-line splits union must cover all.\n  unsplit: {:?}\n  union: {:?}", all_lines, union);
+    }
 }

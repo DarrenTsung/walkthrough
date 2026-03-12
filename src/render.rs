@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use pulldown_cmark::{Options, Parser};
 use regex::Regex;
 
-use crate::difft_json::{ChangeSpan, DifftOutput, LineEntry, LineSide};
+use crate::difft_json::{DifftOutput, LineEntry, LineSide};
 
 /// Number of unchanged context lines to show before/after each chunk.
 const CONTEXT_LINES: usize = 3;
@@ -443,103 +443,6 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// Merge adjacent change spans that are only separated by whitespace.
-/// Returns a list of (start, end) byte ranges.
-fn merge_whitespace_spans(spans: &[ChangeSpan], full_line: &str) -> Vec<(usize, usize)> {
-    if spans.is_empty() {
-        return Vec::new();
-    }
-    let line_len = full_line.len();
-    let mut merged: Vec<(usize, usize)> = Vec::new();
-    let mut cur_start = spans[0].start.min(line_len);
-    let mut cur_end = spans[0].end.min(line_len);
-
-    for span in &spans[1..] {
-        let next_start = span.start.min(line_len);
-        let next_end = span.end.min(line_len);
-        let gap = full_line.get(cur_end..next_start).unwrap_or("");
-        if gap.is_empty() || gap.bytes().all(|b| b == b' ' || b == b'\t') {
-            cur_end = next_end;
-        } else {
-            merged.push((cur_start, cur_end));
-            cur_start = next_start;
-            cur_end = next_end;
-        }
-    }
-    merged.push((cur_start, cur_end));
-    merged
-}
-
-/// Render a full source line, highlighting changed spans with the given CSS class.
-/// Merges adjacent spans separated only by whitespace into single highlight regions.
-fn render_full_line(full_line: &str, spans: &[ChangeSpan], hl_class: &str) -> String {
-    if spans.is_empty() {
-        return html_escape(full_line);
-    }
-
-    let line_len = full_line.len();
-    let merged = merge_whitespace_spans(spans, full_line);
-
-    let mut html = String::new();
-    let mut pos: usize = 0;
-
-    for &(start, end) in &merged {
-        if start > pos {
-            if let Some(text) = full_line.get(pos..start) {
-                html.push_str(&html_escape(text));
-            }
-        }
-        if let Some(text) = full_line.get(start..end) {
-            html.push_str(&format!(
-                "<span class=\"{}\">{}</span>",
-                hl_class,
-                html_escape(text)
-            ));
-        }
-        pos = end;
-    }
-
-    if pos < line_len {
-        if let Some(text) = full_line.get(pos..) {
-            html.push_str(&html_escape(text));
-        }
-    }
-
-    html
-}
-
-/// Render a side using only the span data (fallback when full lines unavailable).
-fn render_spans_only(side: &LineSide) -> String {
-    let mut html = String::new();
-    let mut pos = 0;
-    let mut is_leading = true;
-
-    for span in &side.changes {
-        if span.start > pos {
-            let gap = span.start - pos;
-            if is_leading {
-                html.push_str(&" ".repeat(gap));
-            } else {
-                html.push_str(&" ".repeat(gap.min(4)));
-            }
-        }
-        is_leading = false;
-        html.push_str(&html_escape(&span.content));
-        pos = span.end;
-    }
-    html
-}
-
-/// Render one side of a diff line with the given highlight class for changed spans.
-fn render_side(side: &LineSide, full_lines: &[String], hl_class: &str) -> String {
-    let line_idx = side.line_number as usize; // 0-based
-    if let Some(full_line) = full_lines.get(line_idx) {
-        render_full_line(full_line, &side.changes, hl_class)
-    } else {
-        render_spans_only(side)
-    }
-}
-
 /// Render a full line with only the region [change_start..change_end] highlighted.
 fn render_refined_line(full_line: &str, change_start: usize, change_end: usize, hl_class: &str) -> String {
     let cs = change_start.min(full_line.len());
@@ -689,18 +592,20 @@ fn render_diff_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) ->
             render_refined_line(new_line, new_cs, new_ce, "hl-add")
         ));
     } else if let Some(lhs) = row.lhs {
+        let content = old_lines.get(lhs.line_number as usize)
+            .map(|s| html_escape(s)).unwrap_or_default();
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
-            lhs.line_number + 1,
-            render_side(lhs, old_lines, "hl-del")
+            lhs.line_number + 1, content
         ));
         html.push_str("<td class=\"ln\"></td><td class=\"code-rhs\"></td>");
     } else if let Some(rhs) = row.rhs {
+        let content = new_lines.get(rhs.line_number as usize)
+            .map(|s| html_escape(s)).unwrap_or_default();
         html.push_str("<td class=\"ln\"></td><td class=\"code-lhs\"></td>");
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
-            rhs.line_number + 1,
-            render_side(rhs, new_lines, "hl-add")
+            rhs.line_number + 1, content
         ));
     }
 
@@ -934,7 +839,9 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize]) -> String {
         let mut items: Vec<(u64, TextItem)> = Vec::new();
         for row in &rows {
             let sort_key = row.rhs.map(|s| s.line_number)
-                .or(row.lhs.map(|s| s.line_number))
+                .or(row.lhs.map(|s| {
+                    old_to_new_line(s.line_number + 1, hunks) - 1
+                }))
                 .unwrap_or(u64::MAX);
             items.push((sort_key, TextItem::DifftRow(row)));
         }
@@ -1232,7 +1139,10 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
 
         for row in &rows {
             let sort_key = row.rhs.map(|s| s.line_number)
-                .or(row.lhs.map(|s| s.line_number))
+                .or(row.lhs.map(|s| {
+                    // Map old-file line to new-file position for consistent sorting
+                    old_to_new_line(s.line_number + 1, hunks) - 1
+                }))
                 .unwrap_or(u64::MAX);
             items.push((sort_key, RenderItem::DifftRow(row)));
         }

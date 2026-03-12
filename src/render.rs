@@ -451,27 +451,15 @@ fn html_escape(s: &str) -> String {
 /// Returns HTML with `<span style="color:...">` tokens.
 /// Falls back to html_escape if highlighting fails.
 fn syntax_highlight_line(line: &str, ss: &SyntaxSet, syntax: &syntect::parsing::SyntaxReference, theme: &syntect::highlighting::Theme) -> String {
-    // highlighted_html_for_string wraps output in <pre><code>; strip that.
+    // highlighted_html_for_string wraps output in <pre style="...">...</pre>.
+    // Strip the wrapper and any leading/trailing whitespace.
     match highlighted_html_for_string(line, ss, syntax, theme) {
         Ok(html) => {
-            let stripped = html
-                .trim_start_matches("<pre style=\"background-color:#ffffff;\">")
-                .trim_start_matches("<pre style=\"background-color:#fafafa;\">")
-                .trim_start_matches(|c: char| c != '<' && c != '>' || false);
-            // More robust: find the first > after <pre, then strip to there
-            let s = if let Some(idx) = html.find("</pre>") {
-                let inner = &html[..idx];
-                // Strip <pre ...> prefix
-                if let Some(start) = inner.find('>') {
-                    &inner[start + 1..]
-                } else {
-                    inner
-                }
-            } else {
-                &html
-            };
-            let _ = stripped; // unused, using s instead
-            s.trim_end_matches('\n').to_string()
+            // syntect wraps output in <pre style="...">CONTENT\n</pre>
+            // Extract just the CONTENT.
+            let start = html.find('>').map(|p| p + 1).unwrap_or(0);
+            let end = html.rfind("</pre>").unwrap_or(html.len());
+            html[start..end].trim_matches('\n').to_string()
         }
         Err(_) => html_escape(line),
     }
@@ -481,6 +469,12 @@ fn syntax_highlight_line(line: &str, ss: &SyntaxSet, syntax: &syntect::parsing::
 fn get_syntax<'a>(ss: &'a SyntaxSet, file_path: &str) -> &'a syntect::parsing::SyntaxReference {
     let ext = file_path.rsplit('.').next().unwrap_or("");
     ss.find_syntax_by_extension(ext)
+        // TypeScript/TSX: fall back to JavaScript since syntect's default set
+        // doesn't include TypeScript
+        .or_else(|| match ext {
+            "ts" | "tsx" | "mts" | "cts" => ss.find_syntax_by_extension("js"),
+            _ => None,
+        })
         .unwrap_or_else(|| ss.find_syntax_plain_text())
 }
 

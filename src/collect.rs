@@ -104,6 +104,12 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
     fs::create_dir_all(output_dir)
         .with_context(|| format!("Failed to create output dir: {}", output_dir.display()))?;
 
+    // Ensure the data dir is gitignored
+    let gitignore_path = output_dir.join(".gitignore");
+    if !gitignore_path.exists() {
+        let _ = fs::write(&gitignore_path, "*\n");
+    }
+
     // Clean any previous JSON files in the output dir
     if let Ok(entries) = fs::read_dir(output_dir) {
         for entry in entries.flatten() {

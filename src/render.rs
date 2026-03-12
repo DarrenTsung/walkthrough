@@ -14,9 +14,12 @@ const CONTEXT_LINES: usize = 3;
 const CSS: &str = r#"
 :root {
     --bg: #ffffff;
-    --fg: #24292f;
-    --bg-code: #f6f8fa;
-    --border: #d0d7de;
+    --bg-secondary: #f6f7f8;
+    --border: #d0d4d9;
+    --text: #1a1e24;
+    --text-secondary: #474d57;
+    --text-muted: #7a8290;
+    --primary: #0550ae;
     --diff-header-bg: #f1f8ff;
     --diff-header-fg: #0969da;
     --ln-fg: #8b949e;
@@ -24,16 +27,19 @@ const CSS: &str = r#"
     --added-hl: #aceebb;
     --removed-bg: #ffebe9;
     --removed-hl: #ffcecb;
-    --sep-bg: #f6f8fa;
-    --empty-bg: #f6f8fa;
+    --sep-bg: #f6f7f8;
+    --empty-bg: #f6f7f8;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: #0d1117;
-        --fg: #e6edf3;
-        --bg-code: #161b22;
+        --bg-secondary: #161b22;
         --border: #30363d;
+        --text: #e6edf3;
+        --text-secondary: #9ba4b0;
+        --text-muted: #8b949e;
+        --primary: #58a6ff;
         --diff-header-bg: #161b22;
         --diff-header-fg: #58a6ff;
         --ln-fg: #8b949e;
@@ -46,46 +52,129 @@ const CSS: &str = r#"
     }
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+}
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    color: var(--fg);
+    color: var(--text);
     background: var(--bg);
-    line-height: 1.6;
-    max-width: 1200px;
-    margin: 2rem auto;
-    padding: 0 1rem;
+    line-height: 1.55;
 }
 
-article > * + * { margin-top: 1rem; }
-h1 { font-size: 1.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
-h2 { font-size: 1.4rem; margin-top: 2rem; }
-h3 { font-size: 1.15rem; }
-p { margin-top: 0.5rem; }
-ul, ol { margin-top: 0.5rem; padding-left: 1.5rem; }
-code {
-    background: var(--bg-code);
-    padding: 0.15em 0.4em;
-    border-radius: 3px;
-    font-size: 0.9em;
-    font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+article {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 24px 28px 60px;
+    line-height: 1.6;
 }
-pre {
-    background: var(--bg-code);
-    padding: 1rem;
-    border-radius: 6px;
-    overflow-x: auto;
-}
-pre code { background: none; padding: 0; }
 
 .diff-block {
-    margin: 1rem 0;
+    width: 95vw;
+    max-width: 1400px;
+    margin-left: 50%;
+    transform: translateX(-50%);
+    margin-top: 1rem;
+    margin-bottom: 1rem;
     border: 1px solid var(--border);
     border-radius: 6px;
     max-height: 80vh;
     overflow: hidden;
 }
+
+h1 {
+    font-size: 1.75em;
+    font-weight: 700;
+    margin: 0.5em 0 0.4em;
+    padding-bottom: 0.2em;
+    border-bottom: 1px solid var(--border);
+}
+
+h2 {
+    font-size: 1.35em;
+    font-weight: 650;
+    margin: 0.8em 0 0.3em;
+    padding-bottom: 0.2em;
+    border-bottom: 1px solid var(--border);
+}
+
+h3 {
+    font-size: 1.15em;
+    font-weight: 650;
+    margin: 0.7em 0 0.25em;
+}
+
+h4, h5, h6 {
+    font-weight: 650;
+    margin: 0.6em 0 0.2em;
+}
+
+p { margin: 0 0 0.75em; }
+
+ul, ol {
+    margin: 0 0 0.75em;
+    padding-left: 1.75em;
+}
+
+li { margin: 0.15em 0; }
+
+code {
+    background: var(--bg-secondary);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    font-size: 0.84em;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+pre {
+    background: var(--bg-secondary);
+    padding: 12px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    margin: 0 0 0.75em;
+}
+
+pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.84em;
+    line-height: 1.45;
+}
+
+blockquote {
+    border-left: 3px solid var(--text-muted);
+    padding: 0 0.9em;
+    color: var(--text-secondary);
+    margin: 0 0 0.75em;
+}
+
+a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-decoration-color: rgba(5, 80, 174, 0.3);
+    text-underline-offset: 2px;
+}
+
+a:hover {
+    text-decoration-color: var(--primary);
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.5em 0;
+}
+
+img { max-width: 100%; }
+
+/* (diff-block styles consolidated above) */
 
 .diff-header {
     position: sticky;
@@ -93,7 +182,7 @@ pre code { background: none; padding: 0; }
     background: var(--diff-header-bg);
     color: var(--diff-header-fg);
     padding: 0.4rem 0.8rem;
-    font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.82rem;
     font-weight: 600;
     border-bottom: 1px solid var(--border);
@@ -103,7 +192,7 @@ pre code { background: none; padding: 0; }
 .diff-table {
     width: 100%;
     border-collapse: collapse;
-    font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.8rem;
     line-height: 1.5;
     table-layout: fixed;
@@ -595,6 +684,257 @@ fn to_0based(line_1: u64) -> usize {
     (line_1 as usize).saturating_sub(1)
 }
 
+/// Produce a unified-diff-style text representation of selected chunks.
+/// Uses the same chunk processing logic as HTML rendering (context lines, hunk gap
+/// filling, consolidation) but outputs plain text with ` `/`-`/`+` prefixes.
+fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize]) -> String {
+    let mut out = String::new();
+    let hunks = &difft.hunks;
+
+    let mut last_old_rendered: Option<usize> = None;
+    let mut last_new_rendered: Option<usize> = None;
+
+    let mut first_chunk = true;
+    for &idx in chunk_indices {
+        let Some(chunk) = difft.chunks.get(idx) else { continue };
+
+        let (lhs_range, rhs_range) = chunk_line_range(chunk);
+
+        let (old_first, old_last) = match lhs_range {
+            Some((min, max)) => (min as usize, max as usize),
+            None => {
+                let (rmin, rmax) = rhs_range.unwrap_or((0, 0));
+                let o_min = to_0based(new_to_old_line(rmin + 1, hunks));
+                let o_max = to_0based(new_to_old_line(rmax + 1, hunks));
+                (o_min, o_max)
+            }
+        };
+        let (new_first, new_last) = match rhs_range {
+            Some((min, max)) => (min as usize, max as usize),
+            None => {
+                let (lmin, lmax) = lhs_range.unwrap_or((0, 0));
+                let n_min = to_0based(old_to_new_line(lmin + 1, hunks));
+                let n_max = to_0based(old_to_new_line(lmax + 1, hunks));
+                (n_min, n_max)
+            }
+        };
+
+        let mut difft_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut difft_new_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        for entry in chunk {
+            if let Some(lhs) = &entry.lhs { difft_old_lines.insert(lhs.line_number as usize); }
+            if let Some(rhs) = &entry.rhs { difft_new_lines.insert(rhs.line_number as usize); }
+        }
+
+        let mut extra_removed: Vec<usize> = Vec::new();
+        let mut extra_added: Vec<usize> = Vec::new();
+        let mut extra_paired: Vec<(usize, usize)> = Vec::new();
+
+        for h in hunks {
+            let h_old_start_0 = (h.old_start as usize).saturating_sub(1);
+            let h_old_end_0 = h_old_start_0 + h.old_count as usize;
+            let h_new_start_0 = (h.new_start as usize).saturating_sub(1);
+            let h_new_end_0 = h_new_start_0 + h.new_count as usize;
+
+            let overlaps_old = h_old_end_0 > old_first.saturating_sub(1) && h_old_start_0 <= old_last + 1;
+            let overlaps_new = h_new_end_0 > new_first.saturating_sub(1) && h_new_start_0 <= new_last + 1;
+
+            if overlaps_old || overlaps_new {
+                let mut hunk_removed: Vec<usize> = Vec::new();
+                let mut hunk_added: Vec<usize> = Vec::new();
+                for line_0 in h_old_start_0..h_old_end_0 {
+                    if !difft_old_lines.contains(&line_0) { hunk_removed.push(line_0); }
+                }
+                for line_0 in h_new_start_0..h_new_end_0 {
+                    if !difft_new_lines.contains(&line_0) { hunk_added.push(line_0); }
+                }
+                let pair_count = hunk_removed.len().min(hunk_added.len());
+                for i in 0..pair_count {
+                    extra_paired.push((hunk_removed[i], hunk_added[i]));
+                }
+                for &r in &hunk_removed[pair_count..] { extra_removed.push(r); }
+                for &a in &hunk_added[pair_count..] { extra_added.push(a); }
+            }
+        }
+
+        let mut old_first = old_first;
+        let mut old_last = old_last;
+        let mut new_first = new_first;
+        let mut new_last = new_last;
+        for &old_0 in &extra_removed { old_first = old_first.min(old_0); old_last = old_last.max(old_0); }
+        for &new_0 in &extra_added { new_first = new_first.min(new_0); new_last = new_last.max(new_0); }
+        for &(old_0, new_0) in &extra_paired {
+            old_first = old_first.min(old_0); old_last = old_last.max(old_0);
+            new_first = new_first.min(new_0); new_last = new_last.max(new_0);
+        }
+
+        let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
+        let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
+        let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
+        let new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+
+        let old_ctx_start = match last_old_rendered {
+            Some(last) if last + 1 > old_ctx_before => last + 1,
+            _ => old_ctx_before,
+        };
+        let new_ctx_start = match last_new_rendered {
+            Some(last) if last + 1 > new_ctx_before => last + 1,
+            _ => new_ctx_before,
+        };
+
+        if !first_chunk {
+            let has_gap = match last_old_rendered {
+                Some(last) => last + 1 < old_ctx_before,
+                None => match last_new_rendered {
+                    Some(last) => last + 1 < new_ctx_before,
+                    None => true,
+                },
+            };
+            if has_gap {
+                out.push_str("  ...\n");
+            }
+        }
+        first_chunk = false;
+
+        // Context lines before
+        let old_pre_count = old_first.saturating_sub(old_ctx_start);
+        let new_pre_count = new_first.saturating_sub(new_ctx_start);
+        let pre_count = old_pre_count.min(new_pre_count);
+        for i in 0..pre_count {
+            let new_idx = new_first - pre_count + i;
+            let line = difft.new_lines.get(new_idx).map(|s| s.as_str()).unwrap_or("");
+            out.push_str(&format!(" {}\n", line));
+        }
+
+        // Build unified item list (same logic as HTML renderer)
+        #[derive(Clone, Copy)]
+        enum TextItem<'a> {
+            DifftRow(&'a DiffRow<'a>),
+            RemovedLine(usize),
+            AddedLine(usize),
+            PairedLine(usize, usize),
+        }
+
+        let rows = consolidate_chunk(chunk);
+        let mut items: Vec<(u64, TextItem)> = Vec::new();
+        for row in &rows {
+            let sort_key = row.rhs.map(|s| s.line_number)
+                .or(row.lhs.map(|s| s.line_number))
+                .unwrap_or(u64::MAX);
+            items.push((sort_key, TextItem::DifftRow(row)));
+        }
+        for &(old_0, new_0) in &extra_paired {
+            items.push((new_0 as u64, TextItem::PairedLine(old_0, new_0)));
+        }
+        for &old_0 in &extra_removed {
+            let new_1 = old_to_new_line(old_0 as u64 + 1, hunks);
+            items.push((new_1 - 1, TextItem::RemovedLine(old_0)));
+        }
+        for &new_0 in &extra_added {
+            items.push((new_0 as u64, TextItem::AddedLine(new_0)));
+        }
+        items.sort_by_key(|&(k, _)| k);
+
+        let mut prev_old: Option<usize> = None;
+        let mut prev_new: Option<usize> = None;
+
+        for &(_, ref item) in &items {
+            let (cur_old, cur_new) = match item {
+                TextItem::DifftRow(row) => (
+                    row.lhs.map(|s| s.line_number as usize),
+                    row.rhs.map(|s| s.line_number as usize),
+                ),
+                TextItem::RemovedLine(o) => (Some(*o), None),
+                TextItem::AddedLine(n) => (None, Some(*n)),
+                TextItem::PairedLine(o, n) => (Some(*o), Some(*n)),
+            };
+
+            // Fill gaps with context
+            let expected_old = prev_old.map(|p| p + 1);
+            let expected_new = prev_new.map(|p| p + 1);
+            if let (Some(exp_o), Some(cur_o)) = (expected_old, cur_old) {
+                if cur_o > exp_o {
+                    let exp_n = expected_new.unwrap_or_else(|| to_0based(old_to_new_line(exp_o as u64 + 1, hunks)));
+                    for i in 0..(cur_o - exp_o) {
+                        let line = difft.new_lines.get(exp_n + i).map(|s| s.as_str()).unwrap_or("");
+                        out.push_str(&format!(" {}\n", line));
+                    }
+                }
+            } else if let (Some(exp_n), Some(cur_n)) = (expected_new, cur_new) {
+                if cur_n > exp_n {
+                    let exp_o = expected_old.unwrap_or_else(|| to_0based(new_to_old_line(exp_n as u64 + 1, hunks)));
+                    for i in 0..(cur_n - exp_n) {
+                        let line = difft.new_lines.get(exp_n + i).map(|s| s.as_str()).unwrap_or("");
+                        let _ = exp_o; // context from new side is sufficient
+                        out.push_str(&format!(" {}\n", line));
+                    }
+                }
+            }
+
+            // Render the item
+            match item {
+                TextItem::DifftRow(row) => {
+                    match (row.lhs, row.rhs) {
+                        (Some(lhs), Some(rhs)) => {
+                            let old_line = difft.old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+                            let new_line = difft.new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+                            out.push_str(&format!("-{}\n", old_line));
+                            out.push_str(&format!("+{}\n", new_line));
+                        }
+                        (Some(lhs), None) => {
+                            let old_line = difft.old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+                            out.push_str(&format!("-{}\n", old_line));
+                        }
+                        (None, Some(rhs)) => {
+                            let new_line = difft.new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+                            out.push_str(&format!("+{}\n", new_line));
+                        }
+                        (None, None) => {}
+                    }
+                }
+                TextItem::RemovedLine(old_0) => {
+                    let line = difft.old_lines.get(*old_0).map(|s| s.as_str()).unwrap_or("");
+                    out.push_str(&format!("-{}\n", line));
+                }
+                TextItem::AddedLine(new_0) => {
+                    let line = difft.new_lines.get(*new_0).map(|s| s.as_str()).unwrap_or("");
+                    out.push_str(&format!("+{}\n", line));
+                }
+                TextItem::PairedLine(old_0, new_0) => {
+                    let old_line = difft.old_lines.get(*old_0).map(|s| s.as_str()).unwrap_or("");
+                    let new_line = difft.new_lines.get(*new_0).map(|s| s.as_str()).unwrap_or("");
+                    out.push_str(&format!("-{}\n", old_line));
+                    out.push_str(&format!("+{}\n", new_line));
+                }
+            }
+
+            if let Some(o) = cur_old { prev_old = Some(o); }
+            if let Some(n) = cur_new { prev_new = Some(n); }
+        }
+
+        // Context lines after
+        let old_post_start = old_last + 1;
+        let new_post_start = new_last + 1;
+        let old_post_count = old_ctx_after.saturating_sub(old_post_start);
+        let new_post_count = new_ctx_after.saturating_sub(new_post_start);
+        let post_count = old_post_count.min(new_post_count);
+        for i in 0..post_count {
+            let line = difft.new_lines.get(new_post_start + i).map(|s| s.as_str()).unwrap_or("");
+            out.push_str(&format!(" {}\n", line));
+        }
+
+        if post_count > 0 {
+            last_old_rendered = Some(old_post_start + post_count - 1);
+            last_new_rendered = Some(new_post_start + post_count - 1);
+        } else {
+            last_old_rendered = Some(old_last);
+            last_new_rendered = Some(new_last);
+        }
+    }
+
+    out
+}
+
 fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) -> String {
     let mut html = String::new();
     html.push_str(&format!(
@@ -642,6 +982,82 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
             }
         };
 
+        // Collect 0-based line numbers that difft already covers in this chunk.
+        let mut difft_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut difft_new_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        for entry in chunk {
+            if let Some(lhs) = &entry.lhs {
+                difft_old_lines.insert(lhs.line_number as usize);
+            }
+            if let Some(rhs) = &entry.rhs {
+                difft_new_lines.insert(rhs.line_number as usize);
+            }
+        }
+
+        // Find unified diff hunk lines that overlap this chunk's range but difft missed.
+        // These are removed/added lines that difft's structural matching didn't flag.
+        // Must be computed BEFORE context so we can extend boundaries to include hunk lines.
+        let mut extra_removed: Vec<usize> = Vec::new(); // 0-based old line indices
+        let mut extra_added: Vec<usize> = Vec::new(); // 0-based new line indices
+        let mut extra_paired: Vec<(usize, usize)> = Vec::new(); // (old_0, new_0)
+
+        for h in hunks {
+            let h_old_start_0 = (h.old_start as usize).saturating_sub(1); // 0-based
+            let h_old_end_0 = h_old_start_0 + h.old_count as usize;
+            let h_new_start_0 = (h.new_start as usize).saturating_sub(1);
+            let h_new_end_0 = h_new_start_0 + h.new_count as usize;
+
+            let overlaps_old = h_old_end_0 > old_first.saturating_sub(1) && h_old_start_0 <= old_last + 1;
+            let overlaps_new = h_new_end_0 > new_first.saturating_sub(1) && h_new_start_0 <= new_last + 1;
+
+            if overlaps_old || overlaps_new {
+                let mut hunk_removed: Vec<usize> = Vec::new();
+                let mut hunk_added: Vec<usize> = Vec::new();
+                for line_0 in h_old_start_0..h_old_end_0 {
+                    if !difft_old_lines.contains(&line_0) {
+                        hunk_removed.push(line_0);
+                    }
+                }
+                for line_0 in h_new_start_0..h_new_end_0 {
+                    if !difft_new_lines.contains(&line_0) {
+                        hunk_added.push(line_0);
+                    }
+                }
+                // Pair removed/added lines from the same hunk together
+                let pair_count = hunk_removed.len().min(hunk_added.len());
+                for i in 0..pair_count {
+                    extra_paired.push((hunk_removed[i], hunk_added[i]));
+                }
+                for &r in &hunk_removed[pair_count..] {
+                    extra_removed.push(r);
+                }
+                for &a in &hunk_added[pair_count..] {
+                    extra_added.push(a);
+                }
+            }
+        }
+
+        // Extend chunk boundaries to include hunk-only lines so context doesn't
+        // overlap with changed lines.
+        let mut old_first = old_first;
+        let mut old_last = old_last;
+        let mut new_first = new_first;
+        let mut new_last = new_last;
+        for &old_0 in &extra_removed {
+            old_first = old_first.min(old_0);
+            old_last = old_last.max(old_0);
+        }
+        for &new_0 in &extra_added {
+            new_first = new_first.min(new_0);
+            new_last = new_last.max(new_0);
+        }
+        for &(old_0, new_0) in &extra_paired {
+            old_first = old_first.min(old_0);
+            old_last = old_last.max(old_0);
+            new_first = new_first.min(new_0);
+            new_last = new_last.max(new_0);
+        }
+
         let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
         let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
         let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
@@ -685,60 +1101,6 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str) 
                 &difft.old_lines,
                 &difft.new_lines,
             ));
-        }
-
-        // Collect 0-based line numbers that difft already covers in this chunk.
-        let mut difft_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        let mut difft_new_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        for entry in chunk {
-            if let Some(lhs) = &entry.lhs {
-                difft_old_lines.insert(lhs.line_number as usize);
-            }
-            if let Some(rhs) = &entry.rhs {
-                difft_new_lines.insert(rhs.line_number as usize);
-            }
-        }
-
-        // Find unified diff hunk lines that overlap this chunk's range but difft missed.
-        // These are removed/added lines that difft's structural matching didn't flag.
-        let mut extra_removed: Vec<usize> = Vec::new(); // 0-based old line indices
-        let mut extra_added: Vec<usize> = Vec::new(); // 0-based new line indices
-        let mut extra_paired: Vec<(usize, usize)> = Vec::new(); // (old_0, new_0)
-
-        for h in hunks {
-            let h_old_start_0 = (h.old_start as usize).saturating_sub(1); // 0-based
-            let h_old_end_0 = h_old_start_0 + h.old_count as usize;
-            let h_new_start_0 = (h.new_start as usize).saturating_sub(1);
-            let h_new_end_0 = h_new_start_0 + h.new_count as usize;
-
-            let overlaps_old = h_old_end_0 > old_first.saturating_sub(1) && h_old_start_0 <= old_last + 1;
-            let overlaps_new = h_new_end_0 > new_first.saturating_sub(1) && h_new_start_0 <= new_last + 1;
-
-            if overlaps_old || overlaps_new {
-                let mut hunk_removed: Vec<usize> = Vec::new();
-                let mut hunk_added: Vec<usize> = Vec::new();
-                for line_0 in h_old_start_0..h_old_end_0 {
-                    if !difft_old_lines.contains(&line_0) {
-                        hunk_removed.push(line_0);
-                    }
-                }
-                for line_0 in h_new_start_0..h_new_end_0 {
-                    if !difft_new_lines.contains(&line_0) {
-                        hunk_added.push(line_0);
-                    }
-                }
-                // Pair removed/added lines from the same hunk together
-                let pair_count = hunk_removed.len().min(hunk_added.len());
-                for i in 0..pair_count {
-                    extra_paired.push((hunk_removed[i], hunk_added[i]));
-                }
-                for &r in &hunk_removed[pair_count..] {
-                    extra_removed.push(r);
-                }
-                for &a in &hunk_added[pair_count..] {
-                    extra_added.push(a);
-                }
-            }
         }
 
         // Build a unified list of render items: difft rows + hunk-only lines.
@@ -905,8 +1267,10 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
         }
     }
 
-    // First pass: replace difft code blocks with HTML placeholders.
+    // First pass: replace difft code blocks with HTML placeholders,
+    // and build the enriched markdown with text diffs in code block bodies.
     let mut processed_md = String::new();
+    let mut enriched_md = String::new();
     let mut diff_blocks: Vec<String> = Vec::new();
     let mut in_difft_block = false;
 
@@ -935,10 +1299,20 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         diff_blocks.push(rendered_html);
                         processed_md
                             .push_str(&format!("<!-- DIFF_PLACEHOLDER_{} -->\n", placeholder_id));
+
+                        // Write enriched markdown: opening fence + text diff + closing fence
+                        let text_diff = render_chunks_text(difft, &indices);
+                        enriched_md.push_str(line);
+                        enriched_md.push('\n');
+                        enriched_md.push_str(&text_diff);
+                        enriched_md.push_str(&"`".repeat(backtick_count));
+                        enriched_md.push('\n');
                     } else {
                         eprintln!("Warning: no data for file '{}', passing through", file);
                         processed_md.push_str(line);
                         processed_md.push('\n');
+                        enriched_md.push_str(line);
+                        enriched_md.push('\n');
                     }
                     in_difft_block = true;
                     continue;
@@ -946,12 +1320,18 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
             }
             processed_md.push_str(line);
             processed_md.push('\n');
-        } else {
-            if line.trim_start().starts_with("```") {
-                in_difft_block = false;
-            }
+            enriched_md.push_str(line);
+            enriched_md.push('\n');
+        } else if line.trim_start().starts_with("```") {
+            in_difft_block = false;
+            // Don't emit the closing fence to enriched_md; we already wrote it above
         }
     }
+
+    // Write enriched markdown back to the walkthrough file
+    fs::write(walkthrough_path, &enriched_md)
+        .with_context(|| format!("Failed to write enriched markdown to {}", walkthrough_path.display()))?;
+    eprintln!("Wrote enriched markdown back to {}", walkthrough_path.display());
 
     // Second pass: convert markdown (with placeholders) to HTML
     let options = Options::empty();

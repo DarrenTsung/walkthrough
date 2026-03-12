@@ -7,7 +7,7 @@ Rust CLI that generates narrative walkthroughs of code changes with difftastic d
 - `src/main.rs` - CLI entry point with three subcommands via clap
 - `src/collect.rs` - Runs `difft --display json` via `GIT_EXTERNAL_DIFF` on each changed file, enriches the JSON with file contents and unified diff hunks, writes per-file JSON to an output directory
 - `src/difft_json.rs` - Serde types for difftastic's JSON output (`DifftOutput`, `LineEntry`, `LineSide`, `ChangeSpan`, `DiffHunk`)
-- `src/render.rs` - Parses walkthrough markdown, replaces `` ```difft `` code blocks with rendered HTML diff tables, converts the rest via pulldown-cmark
+- `src/render.rs` - Parses walkthrough markdown, replaces `` ```difft `` code blocks with rendered HTML diff tables, converts the rest via pulldown-cmark. Also writes enriched markdown back to the input file with text diffs in the code block bodies.
 - `src/verify.rs` - Checks that every chunk in the collected data is referenced by at least one difft code block in the walkthrough
 
 ## Commands
@@ -23,7 +23,7 @@ cargo run -- verify walkthrough.md
 cargo run -- render walkthrough.md -o walkthrough.html
 ```
 
-Default data directory for all commands: `/tmp/walkthrough_data`
+Default data directory for all commands: `.walkthrough_data` (in the current directory)
 
 ## Walkthrough markdown syntax
 
@@ -48,6 +48,28 @@ cargo build
 cargo check
 cargo clippy
 ```
+
+## Rendering details
+
+### Highlight span merging
+
+Adjacent difft highlight spans that are directly adjacent or separated only by whitespace are merged into single `<span>` regions (`merge_whitespace_spans` in render.rs). Without this, difft's structural matching produces separate spans for each token (e.g. `meta:`, `{`, `level`, `},`), leaving unhighlighted gaps between them.
+
+### Hunk gap filling
+
+Difft's structural matching can miss lines that `git diff` considers changed. The renderer cross-references unified diff hunks with difft's output to find these gaps and renders them as extra removed/added/paired lines. Hunk analysis runs before context line computation to ensure context lines don't overlap with changed lines.
+
+### Scroll-pinned diff blocks
+
+Diff blocks have `max-height: 80vh` with `overflow: hidden` (no scrollbar). A JS script intercepts `wheel` events at the window level: when a diff block's top reaches near the viewport top, page scroll is captured and redirected to scroll the block internally. The page's `scrollY` is pinned via a `scroll` event listener to prevent trackpad momentum from pushing surrounding text off-screen. The sticky `.diff-header` stays pinned at the top of the block. When the diff content reaches its end, the pin releases and normal page scrolling resumes.
+
+### Markdown enrichment
+
+The render command writes back to the input markdown file, replacing each difft code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, hunk gap filling, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs. This enables an LLM workflow where the narrative is written first, then refined after seeing the actual diffs inline.
+
+### Line mapping
+
+`new_to_old_line` and `old_to_new_line` map between old/new file lines using unified diff hunk boundaries. Used to compute context line correspondence and resolve one-sided chunks (e.g. added-only) to the correct old-file position.
 
 ## Testing rendered HTML with playwright-cli
 

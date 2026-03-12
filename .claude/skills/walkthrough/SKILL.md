@@ -20,27 +20,32 @@ Parse `$ARGUMENTS` to determine the diff source and output path:
 - A commit SHA (e.g. `abc123`): that commit (`git diff abc123~1 abc123`)
 - A range `A..B`: that range (`git diff A..B`)
 - `HEAD~N`: last N commits (`git diff HEAD~N HEAD`)
-- `--output <path>`: output path for the walkthrough markdown (default: `/tmp/walkthrough-{timestamp}.md`)
+- `--output <path>`: output path for the walkthrough markdown (default: `walkthrough-{timestamp}.md`)
 
 Derive two values from this:
 - `DIFF_ARGS`: the arguments to pass after `git diff` (e.g. `--cached`, `HEAD~1 HEAD`, etc.)
 - `OUTPUT_PATH`: where to write the walkthrough markdown
 
-## Step 1: Check difft
+## Step 1: Check prerequisites
 
 Run `which difft`. If not found, ask the user if they want to install via `brew install difftastic`.
 If they decline, stop with: "difft is required for walkthrough generation."
 
 Verify the version supports JSON output (0.67.0+): `difft --version`.
 
-## Step 2: Collect difft JSON
-
-The walkthrough CLI is at `~/Documents/walkthrough`. Build and run the collect command:
+Run `which walkthrough`. If not found, install it:
 ```bash
-cargo run --manifest-path ~/Documents/walkthrough/Cargo.toml -- collect -o /tmp/walkthrough_data/ -- $DIFF_ARGS
+cargo install --path ~/Documents/walkthrough
 ```
 
-This produces one JSON file per changed file in `/tmp/walkthrough_data/`.
+## Step 2: Collect difft JSON
+
+Run the collect command:
+```bash
+walkthrough collect -o .walkthrough_data/ -- $DIFF_ARGS
+```
+
+This produces one JSON file per changed file in `.walkthrough_data/`.
 
 After collecting, read each JSON file to understand the chunks. For each file, note:
 - How many chunks it has
@@ -60,9 +65,10 @@ not by file. Consider:
 
 Plan the section titles and which (file, chunk) pairs go in each section.
 
-## Step 4: Write the walkthrough markdown
+## Step 4: Write the initial walkthrough markdown
 
-Write the markdown file at `OUTPUT_PATH`. Use this structure:
+Write the markdown file at `OUTPUT_PATH`. The difft code block bodies can be empty or contain
+rough notes at this stage. The render step will populate them with the actual text diffs.
 
 ````markdown
 # Walkthrough: <concise title describing the change>
@@ -74,7 +80,6 @@ Write the markdown file at `OUTPUT_PATH`. Use this structure:
 <Narrative explaining what this group of changes does and why.>
 
 ```difft path/to/file.rs chunks=0,1
-<paste the actual code from those chunks here, so you stay grounded in what you're narrating>
 ```
 
 ## 2. <Next section>
@@ -87,9 +92,9 @@ Rules for writing the markdown:
 1. **Every code block** that references diffs uses the info string format:
    `difft <file-path> chunks=<spec>` where spec is comma-separated indices or `all`.
 
-2. **The block body** must contain the actual changed code from those chunks. Reconstruct
-   readable code from the change spans in the JSON. This is for YOUR context while narrating.
-   The `render` step replaces it with properly formatted side-by-side HTML.
+2. **The block body** will be populated by the render step with a unified-diff-style text
+   representation (` ` context, `-` removed, `+` added). You do not need to reconstruct
+   code manually from the JSON.
 
 3. **Group by narrative**, not by file. A single section can reference chunks from multiple
    files. A single file's chunks can appear across multiple sections.
@@ -102,11 +107,17 @@ Rules for writing the markdown:
 6. **Narrative style**: explain WHY the change was made, not just what changed. Be concise.
    Use present tense ("This extracts..." not "This extracted...").
 
+7. **Explain terms inline, not upfront.** Do not create a glossary or "key terms" section.
+   Instead, define domain-specific terms, service names, and jargon the first time they
+   naturally appear in the narrative. Anchor explanations with concrete use-cases or examples
+   when possible (e.g. "a **sandbox** is an isolated container where user code runs; each
+   Figma file gets its own"). Assume the reader may be unfamiliar with the codebase.
+
 ## Step 5: Verify coverage
 
 Run the verify command:
 ```bash
-cargo run --manifest-path ~/Documents/walkthrough/Cargo.toml -- verify "$OUTPUT_PATH" --data-dir /tmp/walkthrough_data/
+walkthrough verify "$OUTPUT_PATH" --data-dir .walkthrough_data/
 ```
 
 This checks that every chunk in every JSON file is referenced by at least one
@@ -115,14 +126,32 @@ This checks that every chunk in every JSON file is referenced by at least one
 If verification fails, it prints the uncovered chunks. Add sections referencing them and
 re-verify. Repeat up to 3 times.
 
-## Step 6: Render HTML
+## Step 6: Render and enrich
 
 Run the render command:
 ```bash
-cargo run --manifest-path ~/Documents/walkthrough/Cargo.toml -- render "$OUTPUT_PATH" --data-dir /tmp/walkthrough_data/ -o "${OUTPUT_PATH%.md}.html"
+walkthrough render "$OUTPUT_PATH" --data-dir .walkthrough_data/ -o "${OUTPUT_PATH%.md}.html"
 ```
 
-## Step 7: Present
+This does two things:
+1. Produces the HTML file with side-by-side diffs
+2. Writes text diff representations back into each difft code block in the markdown file
+
+## Step 7: Review and revise the narrative
+
+Re-read the markdown file (`OUTPUT_PATH`). The difft code blocks now contain the actual text
+diffs that correspond to what the HTML renders. For each section:
+
+1. Read the diff in the code block carefully
+2. Check that the surrounding narrative accurately describes what the diff shows
+3. Look for mismatches: narrative claims that don't match the code, missing context about
+   why a change matters, or sections that would be clearer in a different order
+
+If revisions are needed, edit the narrative text (not the code block bodies) and re-run the
+render command. The code block bodies will be repopulated, so edits there are overwritten.
+Repeat until the narrative is coherent.
+
+## Step 8: Present
 
 Open the HTML file:
 ```bash

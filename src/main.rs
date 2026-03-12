@@ -21,7 +21,7 @@ enum Commands {
     /// Collect difft JSON for all changed files
     Collect {
         /// Output directory for JSON files
-        #[arg(short, long, default_value = "/tmp/walkthrough_data")]
+        #[arg(short, long, default_value = ".walkthrough_data")]
         output: PathBuf,
 
         /// Arguments to pass to git diff (put after --)
@@ -35,7 +35,7 @@ enum Commands {
         walkthrough: PathBuf,
 
         /// Directory containing difft JSON files
-        #[arg(long, default_value = "/tmp/walkthrough_data")]
+        #[arg(long, default_value = ".walkthrough_data")]
         data_dir: PathBuf,
     },
 
@@ -45,7 +45,7 @@ enum Commands {
         walkthrough: PathBuf,
 
         /// Directory containing difft JSON files
-        #[arg(long, default_value = "/tmp/walkthrough_data")]
+        #[arg(long, default_value = ".walkthrough_data")]
         data_dir: PathBuf,
 
         /// Output HTML file path

@@ -885,13 +885,28 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         }
         items.sort_by_key(|&(k, _)| k);
 
-        // Apply line filter if specified.
+        // Collect ALL item line numbers before filtering so filtered-out
+        // changed lines don't become context rows.
+        let mut item_old_lines_t: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut item_new_lines_t: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        for &(_, ref item) in &items {
+            match item {
+                TextItem::DifftRow(row) => {
+                    if let Some(lhs) = row.lhs { item_old_lines_t.insert(lhs.line_number as usize); }
+                    if let Some(rhs) = row.rhs { item_new_lines_t.insert(rhs.line_number as usize); }
+                }
+                TextItem::RemovedLine(o) => { item_old_lines_t.insert(*o); }
+                TextItem::AddedLine(n) => { item_new_lines_t.insert(*n); }
+                TextItem::PairedLine(o, n) => { item_old_lines_t.insert(*o); item_new_lines_t.insert(*n); }
+            }
+        }
+
+        // Apply line filter after collecting skip sets.
         if let Some((filter_start, filter_end)) = line_filter {
             items.retain(|&(k, _)| {
                 let n = k as usize;
                 n >= filter_start && n <= filter_end
             });
-            // Recompute boundaries from filtered items
             new_first = usize::MAX;
             new_last = 0;
             old_first = usize::MAX;
@@ -911,21 +926,6 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
                 }
             }
             if items.is_empty() { continue; }
-        }
-
-        // Collect line numbers rendered by items to avoid duplicate context lines.
-        let mut item_old_lines_t: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        let mut item_new_lines_t: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        for &(_, ref item) in &items {
-            match item {
-                TextItem::DifftRow(row) => {
-                    if let Some(lhs) = row.lhs { item_old_lines_t.insert(lhs.line_number as usize); }
-                    if let Some(rhs) = row.rhs { item_new_lines_t.insert(rhs.line_number as usize); }
-                }
-                TextItem::RemovedLine(o) => { item_old_lines_t.insert(*o); }
-                TextItem::AddedLine(n) => { item_new_lines_t.insert(*n); }
-                TextItem::PairedLine(o, n) => { item_old_lines_t.insert(*o); item_new_lines_t.insert(*n); }
-            }
         }
 
         let mut prev_old: Option<usize> = None;
@@ -1163,51 +1163,6 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             new_last = new_last.max(new_0);
         }
 
-        let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
-        let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
-        let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
-        let new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
-
-        // Clamp to avoid re-rendering lines already shown by the previous chunk.
-        let old_ctx_start = match last_old_rendered {
-            Some(last) if last + 1 > old_ctx_before => last + 1,
-            _ => old_ctx_before,
-        };
-        let new_ctx_start = match last_new_rendered {
-            Some(last) if last + 1 > new_ctx_before => last + 1,
-            _ => new_ctx_before,
-        };
-
-        // Show separator only if there's a gap between the last rendered line
-        // and this chunk's pre-context.
-        if !first_chunk {
-            let has_gap = match last_old_rendered {
-                Some(last) => last + 1 < old_ctx_before,
-                None => match last_new_rendered {
-                    Some(last) => last + 1 < new_ctx_before,
-                    None => true,
-                },
-            };
-            if has_gap {
-                html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
-            }
-        }
-        first_chunk = false;
-
-        // Render context lines BEFORE the chunk.
-        let old_pre_count = old_first.saturating_sub(old_ctx_start);
-        let new_pre_count = new_first.saturating_sub(new_ctx_start);
-        let pre_count = old_pre_count.min(new_pre_count);
-
-        for i in 0..pre_count {
-            html.push_str(&render_context_row(
-                old_first - pre_count + i,
-                new_first - pre_count + i,
-                &difft.old_lines,
-                &difft.new_lines,
-            ));
-        }
-
         // Build a unified list of render items: difft rows + hunk-only lines.
         #[derive(Clone, Copy)]
         enum RenderItem<'a> {
@@ -1241,7 +1196,24 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         }
         items.sort_by_key(|&(k, _)| k);
 
-        // Apply line filter if specified.
+        // Collect ALL item line numbers before filtering, so the gap filler
+        // never renders filtered-out changed lines as context rows.
+        let mut item_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut item_new_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        for &(_, ref item) in &items {
+            match item {
+                RenderItem::DifftRow(row) => {
+                    if let Some(lhs) = row.lhs { item_old_lines.insert(lhs.line_number as usize); }
+                    if let Some(rhs) = row.rhs { item_new_lines.insert(rhs.line_number as usize); }
+                }
+                RenderItem::RemovedLine(o) => { item_old_lines.insert(*o); }
+                RenderItem::AddedLine(n) => { item_new_lines.insert(*n); }
+                RenderItem::PairedLine(o, n) => { item_old_lines.insert(*o); item_new_lines.insert(*n); }
+            }
+        }
+
+        // Apply line filter: remove items outside the range but keep their
+        // line numbers in the skip sets so they don't become context rows.
         if let Some((filter_start, filter_end)) = line_filter {
             items.retain(|&(k, _)| {
                 let n = k as usize;
@@ -1268,18 +1240,45 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             if items.is_empty() { continue; }
         }
 
-        // Collect all line numbers that items will render, so gap filler skips them.
-        let mut item_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        let mut item_new_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        for &(_, ref item) in &items {
-            match item {
-                RenderItem::DifftRow(row) => {
-                    if let Some(lhs) = row.lhs { item_old_lines.insert(lhs.line_number as usize); }
-                    if let Some(rhs) = row.rhs { item_new_lines.insert(rhs.line_number as usize); }
-                }
-                RenderItem::RemovedLine(o) => { item_old_lines.insert(*o); }
-                RenderItem::AddedLine(n) => { item_new_lines.insert(*n); }
-                RenderItem::PairedLine(o, n) => { item_old_lines.insert(*o); item_new_lines.insert(*n); }
+        // Compute context boundaries (after filter so they reflect the filtered range).
+        let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
+        let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
+        let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
+        let new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+
+        let old_ctx_start = match last_old_rendered {
+            Some(last) if last + 1 > old_ctx_before => last + 1,
+            _ => old_ctx_before,
+        };
+        let new_ctx_start = match last_new_rendered {
+            Some(last) if last + 1 > new_ctx_before => last + 1,
+            _ => new_ctx_before,
+        };
+
+        if !first_chunk {
+            let has_gap = match last_old_rendered {
+                Some(last) => last + 1 < old_ctx_before,
+                None => match last_new_rendered {
+                    Some(last) => last + 1 < new_ctx_before,
+                    None => true,
+                },
+            };
+            if has_gap {
+                html.push_str("<tr class=\"chunk-sep\"><td colspan=\"4\"></td></tr>");
+            }
+        }
+        first_chunk = false;
+
+        // Render context lines BEFORE the chunk.
+        let old_pre_count = old_first.saturating_sub(old_ctx_start);
+        let new_pre_count = new_first.saturating_sub(new_ctx_start);
+        let pre_count = old_pre_count.min(new_pre_count);
+
+        for i in 0..pre_count {
+            let o = old_first - pre_count + i;
+            let n = new_first - pre_count + i;
+            if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
+                html.push_str(&render_context_row(o, n, &difft.old_lines, &difft.new_lines));
             }
         }
 
@@ -2019,5 +2018,54 @@ mod tests {
         assert_eq!(changed[0].2, Some(111), "should be new-side line 111 (1-based)");
 
         let _ = fs::remove_dir_all(&data_dir);
+    }
+
+    #[test]
+    fn line_filter_excludes_out_of_range_changes_from_context() {
+        // A chunk with changes at lines 50, 60, 70 (0-based new-side).
+        // When filtering to only line 60, lines 50 and 70 should NOT appear
+        // as context rows (they're changed lines outside the filter).
+        let old_lines: Vec<&str> = (0..80).map(|_| "old").collect();
+        let new_lines: Vec<&str> = (0..80).map(|_| "new").collect();
+
+        let chunk = vec![
+            LineEntry { lhs: Some(side(50, vec![])), rhs: Some(side(50, vec![])) },
+            LineEntry { lhs: Some(side(60, vec![])), rhs: Some(side(60, vec![])) },
+            LineEntry { lhs: Some(side(70, vec![])), rhs: Some(side(70, vec![])) },
+        ];
+
+        let hunks = vec![
+            DiffHunk { old_start: 51, old_count: 1, new_start: 51, new_count: 1 },
+            DiffHunk { old_start: 61, old_count: 1, new_start: 61, new_count: 1 },
+            DiffHunk { old_start: 71, old_count: 1, new_start: 71, new_count: 1 },
+        ];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        // Filter to 0-based 58-62 (only line 60 is a change)
+        let html = render_chunks(&difft, &[0], "test.ts", Some((58, 62)));
+        let rows = extract_rows(&html);
+
+        // Should have exactly 1 paired row (line 60)
+        let changed: Vec<_> = rows.iter()
+            .filter(|(c, _, _)| c == "line-paired")
+            .collect();
+        assert_eq!(changed.len(), 1, "should have 1 paired row");
+        assert_eq!(changed[0].2, Some(61), "should be new-side line 61 (1-based)");
+
+        // Context rows should NOT include lines 50 or 70
+        let context_new_lns: Vec<u64> = rows.iter()
+            .filter(|(c, _, _)| c == "line-context")
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+        assert!(!context_new_lns.contains(&51), "line 51 (changed, out of range) should not appear as context");
+        assert!(!context_new_lns.contains(&71), "line 71 (changed, out of range) should not appear as context");
+
+        // Context should be within CONTEXT_LINES of line 60
+        for ln in &context_new_lns {
+            assert!(
+                (*ln as i64 - 61).unsigned_abs() <= CONTEXT_LINES as u64,
+                "context line {} is too far from filtered change at 61", ln
+            );
+        }
     }
 }

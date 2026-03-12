@@ -1,0 +1,453 @@
+- article [ref=e2]:
+  - 'heading "cortex: Call workspace/create RPC instead of /api/ready for bootstrap" [level=1] [ref=e3]'
+  - generic [ref=e4]: ✅ All 9 chunks across 5 files are present
+  - paragraph [ref=e5]:
+    - text: Today, when cortex needs to bootstrap a sandbox (set up git repos, agent templates, plugins, credentials), it sends a flat bag of environment variables to sboxd's
+    - code [ref=e6]: /api/ready
+    - text: HTTP endpoint. This is untyped, only runs for reused sandboxes, and requires nimbus as a middleman for newly provisioned ones.
+  - paragraph [ref=e7]:
+    - text: "This change introduces an alternative path: cortex calls sboxd's"
+    - code [ref=e8]: workspace/create
+    - text: WebSocket RPC with a structured
+    - code [ref=e9]: BootstrapConfig
+    - text: . A Statsig feature flag (
+    - code [ref=e10]: cortex_workspace_create_bootstrap
+    - text: ) switches between the two paths, so we can roll out incrementally. The old /api/ready path is preserved as the default fallback.
+  - 'heading "1. New types: BootstrapConfig on the wire protocol" [level=2] [ref=e11]'
+  - paragraph [ref=e12]:
+    - text: The Go sboxd proto already defines
+    - code [ref=e13]: BootstrapConfig
+    - text: and
+    - code [ref=e14]: GitConfig
+    - text: (added in a prior sboxd PR). The TypeScript stream-protocol types need to mirror them so the TS client can send them over the wire.
+  - paragraph [ref=e15]:
+    - code [ref=e16]: GitConfig
+    - text: holds ugit server credentials.
+    - code [ref=e17]: BootstrapConfig
+    - text: "carries everything sboxd needs to set up a workspace: which workload to run, who owns it, git access, and an opaque"
+    - code [ref=e18]: env
+    - text: map for feature flags that sboxd passes through to foundry controller hooks.
+  - paragraph [ref=e19]:
+    - text: The key addition is
+    - code [ref=e20]: "bootstrap?: BootstrapConfig"
+    - text: "on"
+    - code [ref=e21]: WorkspaceCreateRequest
+    - text: . When present, sboxd runs bootstrap inline after creating the workspace directory. When absent, the existing behavior (create an empty directory) is unchanged.
+  - generic [ref=e22]:
+    - generic [ref=e23]: services/agentplat/stream-protocol/src/types.ts
+    - table [ref=e24]:
+      - rowgroup [ref=e30]:
+        - 'row "318 authorEmail?: string 319 workingDirectory?: string" [ref=e31]':
+          - cell "318" [ref=e32]
+          - 'cell "authorEmail?: string" [ref=e33]'
+          - cell "319" [ref=e34]
+          - 'cell "workingDirectory?: string" [ref=e35]'
+        - 'row "319 workingDirectory?: string 320 }" [ref=e36]':
+          - cell "319" [ref=e37]
+          - 'cell "workingDirectory?: string" [ref=e38]'
+          - cell "320" [ref=e39]
+          - 'cell "}" [ref=e40]'
+        - 'row "320 } 321" [ref=e41]':
+          - cell "320" [ref=e42]
+          - 'cell "}" [ref=e43]'
+          - cell "321" [ref=e44]
+          - cell [ref=e45]
+        - row "322 // --- Bootstrap Config (proto/workspace.go) ---" [ref=e46]:
+          - cell [ref=e47]
+          - cell [ref=e48]
+          - cell "322" [ref=e49]
+          - cell "// --- Bootstrap Config (proto/workspace.go) ---" [ref=e50]
+        - row "323" [ref=e51]:
+          - cell [ref=e52]
+          - cell [ref=e53]
+          - cell "323" [ref=e54]
+          - cell [ref=e55]
+        - 'row "324 export interface GitConfig {" [ref=e56]':
+          - cell [ref=e57]
+          - cell [ref=e58]
+          - cell "324" [ref=e59]
+          - 'cell "export interface GitConfig {" [ref=e60]'
+        - 'row "325 baseUrl: string" [ref=e61]':
+          - cell [ref=e62]
+          - cell [ref=e63]
+          - cell "325" [ref=e64]
+          - 'cell "baseUrl: string" [ref=e65]'
+        - 'row "326 username: string" [ref=e66]':
+          - cell [ref=e67]
+          - cell [ref=e68]
+          - cell "326" [ref=e69]
+          - 'cell "username: string" [ref=e70]'
+        - 'row "327 password: string" [ref=e71]':
+          - cell [ref=e72]
+          - cell [ref=e73]
+          - cell "327" [ref=e74]
+          - 'cell "password: string" [ref=e75]'
+        - 'row "328 }" [ref=e76]':
+          - cell [ref=e77]
+          - cell [ref=e78]
+          - cell "328" [ref=e79]
+          - 'cell "}" [ref=e80]'
+        - row "329" [ref=e81]:
+          - cell [ref=e82]
+          - cell [ref=e83]
+          - cell "329" [ref=e84]
+          - cell [ref=e85]
+        - 'row "330 export interface BootstrapConfig {" [ref=e86]':
+          - cell [ref=e87]
+          - cell [ref=e88]
+          - cell "330" [ref=e89]
+          - 'cell "export interface BootstrapConfig {" [ref=e90]'
+        - 'row "331 workloadName: string" [ref=e91]':
+          - cell [ref=e92]
+          - cell [ref=e93]
+          - cell "331" [ref=e94]
+          - 'cell "workloadName: string" [ref=e95]'
+        - 'row "332 workloadOwnerType: string" [ref=e96]':
+          - cell [ref=e97]
+          - cell [ref=e98]
+          - cell "332" [ref=e99]
+          - 'cell "workloadOwnerType: string" [ref=e100]'
+        - 'row "333 workloadOwnerID: string" [ref=e101]':
+          - cell [ref=e102]
+          - cell [ref=e103]
+          - cell "333" [ref=e104]
+          - 'cell "workloadOwnerID: string" [ref=e105]'
+        - 'row "334 agentType?: string" [ref=e106]':
+          - cell [ref=e107]
+          - cell [ref=e108]
+          - cell "334" [ref=e109]
+          - 'cell "agentType?: string" [ref=e110]'
+        - 'row "335 agentConfigID?: string" [ref=e111]':
+          - cell [ref=e112]
+          - cell [ref=e113]
+          - cell "335" [ref=e114]
+          - 'cell "agentConfigID?: string" [ref=e115]'
+        - 'row "336 sandboxGitEnabled?: boolean" [ref=e116]':
+          - cell [ref=e117]
+          - cell [ref=e118]
+          - cell "336" [ref=e119]
+          - 'cell "sandboxGitEnabled?: boolean" [ref=e120]'
+        - 'row "337 git: GitConfig" [ref=e121]':
+          - cell [ref=e122]
+          - cell [ref=e123]
+          - cell "337" [ref=e124]
+          - 'cell "git: GitConfig" [ref=e125]'
+        - 'row "338 env?: Record<string, string>" [ref=e126]':
+          - cell [ref=e127]
+          - cell [ref=e128]
+          - cell "338" [ref=e129]
+          - 'cell "env?: Record<string, string>" [ref=e130]'
+        - 'row "339 }" [ref=e131]':
+          - cell [ref=e132]
+          - cell [ref=e133]
+          - cell "339" [ref=e134]
+          - 'cell "}" [ref=e135]'
+        - row "340" [ref=e136]:
+          - cell [ref=e137]
+          - cell [ref=e138]
+          - cell "340" [ref=e139]
+          - cell [ref=e140]
+        - 'row "322 export interface WorkspaceCreateRequest { 341 export interface WorkspaceCreateRequest {" [ref=e141]':
+          - cell "322" [ref=e142]
+          - 'cell "export interface WorkspaceCreateRequest {" [ref=e143]'
+          - cell "341" [ref=e144]
+          - 'cell "export interface WorkspaceCreateRequest {" [ref=e145]'
+        - 'row "323 rootPath?: string 342 rootPath?: string" [ref=e146]':
+          - cell "323" [ref=e147]
+          - 'cell "rootPath?: string" [ref=e148]'
+          - cell "342" [ref=e149]
+          - 'cell "rootPath?: string" [ref=e150]'
+        - 'row "324 workspaceId?: WorkspaceID 343 workspaceId?: WorkspaceID" [ref=e151]':
+          - cell "324" [ref=e152]
+          - 'cell "workspaceId?: WorkspaceID" [ref=e153]'
+          - cell "343" [ref=e154]
+          - 'cell "workspaceId?: WorkspaceID" [ref=e155]'
+        - 'row "345 bootstrap?: BootstrapConfig" [ref=e156]':
+          - cell [ref=e157]
+          - cell [ref=e158]
+          - cell "345" [ref=e159]
+          - 'cell "bootstrap?: BootstrapConfig" [ref=e160]'
+        - 'row "326 } 346 }" [ref=e161]':
+          - cell "326" [ref=e162]
+          - 'cell "}" [ref=e163]'
+          - cell "346" [ref=e164]
+          - 'cell "}" [ref=e165]'
+        - row "327 347" [ref=e166]:
+          - cell "327" [ref=e167]
+          - cell [ref=e168]
+          - cell "347" [ref=e169]
+          - cell [ref=e170]
+        - 'row "328 export interface WorkspaceCreateResponse { 348 export interface WorkspaceCreateResponse {" [ref=e171]':
+          - cell "328" [ref=e172]
+          - 'cell "export interface WorkspaceCreateResponse {" [ref=e173]'
+          - cell "348" [ref=e174]
+          - 'cell "export interface WorkspaceCreateResponse {" [ref=e175]'
+  - heading "2. Threading bootstrap through the TS client" [level=2] [ref=e176]
+  - paragraph [ref=e177]:
+    - text: The
+    - code [ref=e178]: AgentPlatClient.createWorkspace()
+    - text: method already spreads an options object into the RPC payload (
+    - code [ref=e179]: "{ rootPath, ...opts }"
+    - text: ), so the only change is widening the type to include
+    - code [ref=e180]: bootstrap
+    - text: ":"
+  - generic [ref=e181]:
+    - generic [ref=e182]: services/agentplat/ts-client/src/client.ts
+    - table [ref=e183]:
+      - rowgroup [ref=e189]:
+        - row "53 Repository, 54 RepositoryStatus," [ref=e190]:
+          - cell "53" [ref=e191]
+          - cell "Repository," [ref=e192]
+          - cell "54" [ref=e193]
+          - cell "RepositoryStatus," [ref=e194]
+        - row "54 RepositoryStatus, 55 RepoSaveResult," [ref=e195]:
+          - cell "54" [ref=e196]
+          - cell "RepositoryStatus," [ref=e197]
+          - cell "55" [ref=e198]
+          - cell "RepoSaveResult," [ref=e199]
+        - row "55 RepoSaveResult, 56 GitCredentials," [ref=e200]:
+          - cell "55" [ref=e201]
+          - cell "RepoSaveResult," [ref=e202]
+          - cell "56" [ref=e203]
+          - cell "GitCredentials," [ref=e204]
+        - row "57 BootstrapConfig," [ref=e205]:
+          - cell [ref=e206]
+          - cell [ref=e207]
+          - cell "57" [ref=e208]
+          - cell "BootstrapConfig," [ref=e209]
+        - row "57 FileMetadata, 58 FileMetadata," [ref=e210]:
+          - cell "57" [ref=e211]
+          - cell "FileMetadata," [ref=e212]
+          - cell "58" [ref=e213]
+          - cell "FileMetadata," [ref=e214]
+        - row "58 FileExistsResponse, 59 FileExistsResponse," [ref=e215]:
+          - cell "58" [ref=e216]
+          - cell "FileExistsResponse," [ref=e217]
+          - cell "59" [ref=e218]
+          - cell "FileExistsResponse," [ref=e219]
+        - row "59 FileWriteRequest, 60 FileWriteRequest," [ref=e220]:
+          - cell "59" [ref=e221]
+          - cell "FileWriteRequest," [ref=e222]
+          - cell "60" [ref=e223]
+          - cell "FileWriteRequest," [ref=e224]
+        - row [ref=e225]:
+          - cell [ref=e226]
+        - row "281 282" [ref=e227]:
+          - cell "281" [ref=e228]
+          - cell [ref=e229]
+          - cell "282" [ref=e230]
+          - cell [ref=e231]
+        - row "282 createWorkspace( 283 createWorkspace(" [ref=e232]:
+          - cell "282" [ref=e233]
+          - cell "createWorkspace(" [ref=e234]
+          - cell "283" [ref=e235]
+          - cell "createWorkspace(" [ref=e236]
+        - 'row "283 rootPath: string, 284 rootPath: string," [ref=e237]':
+          - cell "283" [ref=e238]
+          - 'cell "rootPath: string," [ref=e239]'
+          - cell "284" [ref=e240]
+          - 'cell "rootPath: string," [ref=e241]'
+        - 'row "284 cbOrOpts?: Callback<WorkspaceMetadata | undefined> | { workspaceId?: WorkspaceID }, 285 cbOrOpts?:" [ref=e242]':
+          - cell "284" [ref=e243]
+          - 'cell "cbOrOpts?: Callback<WorkspaceMetadata | undefined> | { workspaceId?: WorkspaceID }," [ref=e244]'
+          - cell "285" [ref=e245]
+          - cell "cbOrOpts?:" [ref=e246]
+        - row "286 | Callback<WorkspaceMetadata | undefined>" [ref=e247]:
+          - cell [ref=e248]
+          - cell [ref=e249]
+          - cell "286" [ref=e250]
+          - cell "| Callback<WorkspaceMetadata | undefined>" [ref=e251]
+        - 'row "287 | { workspaceId?: WorkspaceID; bootstrap?: BootstrapConfig }," [ref=e252]':
+          - cell [ref=e253]
+          - cell [ref=e254]
+          - cell "287" [ref=e255]
+          - 'cell "| { workspaceId?: WorkspaceID; bootstrap?: BootstrapConfig }," [ref=e256]'
+        - 'row "285 cb?: Callback<WorkspaceMetadata | undefined>, 288 cb?: Callback<WorkspaceMetadata | undefined>," [ref=e257]':
+          - cell "285" [ref=e258]
+          - 'cell "cb?: Callback<WorkspaceMetadata | undefined>," [ref=e259]'
+          - cell "288" [ref=e260]
+          - 'cell "cb?: Callback<WorkspaceMetadata | undefined>," [ref=e261]'
+        - 'row "286 ): void { 289 ): void {" [ref=e262]':
+          - cell "286" [ref=e263]
+          - 'cell "): void {" [ref=e264]'
+          - cell "289" [ref=e265]
+          - 'cell "): void {" [ref=e266]'
+        - 'row "287 let opts: { workspaceId?: WorkspaceID } = {} 290 let opts: { workspaceId?: WorkspaceID; bootstrap?: BootstrapConfig } = {}" [ref=e267]':
+          - cell "287" [ref=e268]
+          - 'cell "let opts: { workspaceId?: WorkspaceID } = {}" [ref=e269]'
+          - cell "290" [ref=e270]
+          - 'cell "let opts: { workspaceId?: WorkspaceID; bootstrap?: BootstrapConfig } = {}" [ref=e271]'
+        - 'row "288 let callback: Callback<WorkspaceMetadata | undefined> 291 let callback: Callback<WorkspaceMetadata | undefined>" [ref=e272]':
+          - cell "288" [ref=e273]
+          - 'cell "let callback: Callback<WorkspaceMetadata | undefined>" [ref=e274]'
+          - cell "291" [ref=e275]
+          - 'cell "let callback: Callback<WorkspaceMetadata | undefined>" [ref=e276]'
+        - 'row "289 if (typeof cbOrOpts === ''function'') { 292 if (typeof cbOrOpts === ''function'') {" [ref=e277]':
+          - cell "289" [ref=e278]
+          - 'cell "if (typeof cbOrOpts === ''function'') {" [ref=e279]'
+          - cell "292" [ref=e280]
+          - 'cell "if (typeof cbOrOpts === ''function'') {" [ref=e281]'
+        - row "290 callback = cbOrOpts 293 callback = cbOrOpts" [ref=e282]:
+          - cell "290" [ref=e283]
+          - cell "callback = cbOrOpts" [ref=e284]
+          - cell "293" [ref=e285]
+          - cell "callback = cbOrOpts" [ref=e286]
+  - paragraph [ref=e287]:
+    - text: No logic changes. Callers that don't pass
+    - code [ref=e288]: bootstrap
+    - text: are unaffected.
+  - heading "3. The new bootstrap path in cortex" [level=2] [ref=e289]
+  - paragraph [ref=e290]:
+    - text: This is the core of the change. Two new functions in
+    - code [ref=e291]: foundry_api.ts
+    - text: .
+  - paragraph [ref=e292]:
+    - code [ref=e293]: buildBootstrapEnv()
+    - text: extracts the feature-flag-to-env-var mapping that previously only lived inside
+    - code [ref=e294]: sandboxEnvVars()
+    - text: . These env vars (CSS_IMPORT_HOISTING, ALLOW_NPM_SCRIPTS, etc.) are opaque to sboxd and consumed by foundry controller or workload hooks. The function gates them the same way
+    - code [ref=e295]: sandboxEnvVars
+    - text: "does: only for Make workloads."
+  - generic [ref=e296]:
+    - generic [ref=e297]: services/cortex/lib/support/foundry_api.ts
+    - table [ref=e298]:
+      - rowgroup [ref=e304]:
+        - 'row "157 clearTimeout(timeout) 161 }" [ref=e305]':
+          - cell "157" [ref=e306]
+          - cell "clearTimeout(timeout)" [ref=e307]
+          - cell "161" [ref=e308]
+          - 'cell "}" [ref=e309]'
+        - 'row "158 } 162 }" [ref=e310]':
+          - cell "158" [ref=e311]
+          - 'cell "}" [ref=e312]'
+          - cell "162" [ref=e313]
+          - 'cell "}" [ref=e314]'
+        - 'row "159 } 163" [ref=e315]':
+          - cell "159" [ref=e316]
+          - 'cell "}" [ref=e317]'
+          - cell "163" [ref=e318]
+          - cell [ref=e319]
+  - paragraph [ref=e320]: "} }"
+  - paragraph [ref=e321]: +/**
+  - list [ref=e322]:
+    - listitem [ref=e323]:
+      - list [ref=e324]:
+        - listitem [ref=e325]: Builds feature flag env vars for bootstrap config. These are opaque to sboxd
+    - listitem [ref=e326]:
+      - list [ref=e327]:
+        - listitem [ref=e328]: and consumed by foundry controller or workload hooks.
+    - listitem [ref=e329]: "*/ +function buildBootstrapEnv("
+    - listitem [ref=e330]: "context: RequestContext,"
+    - listitem [ref=e331]: "workloadConfig: WorkloadConfig, +): Record<string, string> {"
+    - listitem [ref=e332]: "const env: Record<string, string> = {}"
+    - listitem [ref=e333]: "if (workloadConfig.workloadName === SboxWorkloadName.Make || !workloadConfig.workloadName) {"
+    - listitem [ref=e334]: "if (CortexStatsig.checkGate(context, 'make_foundry_css_import_hoisting', false)) {"
+    - listitem [ref=e335]:
+      - code [ref=e337]: env['CSS_IMPORT_HOISTING'] = 'true'
+    - listitem [ref=e338]: "}"
+    - listitem [ref=e339]: "if (CortexStatsig.checkGate(context, 'make_foundry_remove_invalid_css_fonts', false)) {"
+    - listitem [ref=e340]:
+      - code [ref=e342]: env['REMOVE_INVALID_CSS_FONTS'] = 'true'
+    - listitem [ref=e343]: "}"
+    - listitem [ref=e344]: "if (CortexStatsig.checkGate(context, 'make_foundry_allow_npm_scripts', false)) {"
+    - listitem [ref=e345]:
+      - code [ref=e347]: env['ALLOW_NPM_SCRIPTS'] = 'true'
+    - listitem [ref=e348]: "}"
+    - listitem [ref=e349]: "if (CortexStatsig.checkGate(context, 'bake_point_and_edit', false)) {"
+    - listitem [ref=e350]:
+      - code [ref=e352]: env['FF_BAKE_POINT_AND_EDIT'] = 'true'
+    - listitem [ref=e353]: "}"
+    - listitem [ref=e354]: "if (CortexStatsig.checkGate(context, 'make_permissive_tsx_loader', false)) {"
+    - listitem [ref=e355]:
+      - code [ref=e357]: env['FF_MAKE_PERMISSIVE_TSX_LOADER'] = 'true'
+    - listitem [ref=e358]: "}"
+    - listitem [ref=e359]: "}"
+    - listitem [ref=e360]: "return env +}"
+    - listitem [ref=e361]
+  - paragraph [ref=e362]: +/**
+  - list [ref=e363]:
+    - listitem [ref=e364]:
+      - list [ref=e365]:
+        - listitem [ref=e366]: Calls sboxd workspace/create with structured BootstrapConfig via WebSocket.
+    - listitem [ref=e367]:
+      - list [ref=e368]:
+        - listitem [ref=e369]: Replaces the env-var-based /api/ready bootstrap path. Bootstrap is idempotent,
+    - listitem [ref=e370]:
+      - list [ref=e371]:
+        - listitem [ref=e372]: so this is safe to call on every sandbox access (new, warm, or reused).
+    - listitem [ref=e373]: "*/ +async function bootstrapViaWorkspaceCreate("
+    - listitem [ref=e374]: "sboxdUrl: string,"
+    - listitem [ref=e375]: "context: RequestContext,"
+    - listitem [ref=e376]: "workloadConfig: WorkloadConfig, +): Promise {"
+    - listitem [ref=e377]: const apiUrl = getSettings().ugit_base_url || hardcodedApiUrls[getEnv()]
+    - listitem [ref=e378]
+    - listitem [ref=e379]: "const bootstrap: BootstrapConfig = {"
+    - listitem [ref=e380]: "workloadName: workloadConfig.workloadName,"
+    - listitem [ref=e381]: "workloadOwnerType: 'file',"
+    - listitem [ref=e382]: "workloadOwnerID: context.fileId!,"
+    - listitem [ref=e383]: "git: {"
+    - listitem [ref=e384]:
+      - code [ref=e386]: "baseUrl: `${apiUrl}/git`,"
+    - listitem [ref=e387]:
+      - code [ref=e389]: "username: context.fileId!,"
+    - listitem [ref=e390]:
+      - code [ref=e392]: "password: await generateUgitJwt(context, workloadConfig.workloadName),"
+    - listitem [ref=e393]: "},"
+    - listitem [ref=e394]: "agentType: 'claude',"
+    - listitem [ref=e395]: "sandboxGitEnabled: CortexStatsig.checkGate(context, 'make_sandbox_git_persistence', false),"
+    - listitem [ref=e396]: "env: buildBootstrapEnv(context, workloadConfig),"
+    - listitem [ref=e397]: "}"
+    - listitem [ref=e398]
+    - listitem [ref=e399]: "logger.info('Bootstrapping workspace via workspace/create', { sboxd_url: sboxdUrl })"
+    - listitem [ref=e400]
+    - listitem [ref=e401]: const client = new AgentPlatClient(sboxdUrl)
+    - listitem [ref=e402]
+    - listitem [ref=e403]: "try {"
+    - listitem [ref=e404]: "await new Promise((resolve, reject) => {"
+    - listitem [ref=e405]:
+      - code [ref=e407]: "const timeout = setTimeout(() => {"
+    - listitem [ref=e408]:
+      - code [ref=e410]: reject(new Error('sboxd workspace/create timed out after 30s'))
+    - listitem [ref=e411]:
+      - code [ref=e413]: "}, 30_000)"
+    - listitem [ref=e414]
+    - listitem [ref=e415]:
+      - code [ref=e417]: "client.connect(undefined, (connectErr) => {"
+    - listitem [ref=e418]:
+      - code [ref=e420]: "if (connectErr) {"
+    - listitem [ref=e421]:
+      - code [ref=e423]: clearTimeout(timeout)
+    - listitem [ref=e424]:
+      - code [ref=e426]: return reject(connectErr)
+    - listitem [ref=e427]:
+      - code [ref=e429]: "}"
+    - listitem [ref=e430]
+    - listitem [ref=e431]:
+      - code [ref=e433]: client.createWorkspace(
+    - listitem [ref=e434]:
+      - code [ref=e436]: DEFAULT_WORKSPACE_PATH,
+    - listitem [ref=e437]:
+      - code [ref=e439]: "{ workspaceId: DEFAULT_WORKSPACE_ID, bootstrap },"
+    - listitem [ref=e440]:
+      - code [ref=e442]: "(createErr) => {"
+    - listitem [ref=e443]:
+      - code [ref=e445]: clearTimeout(timeout)
+    - listitem [ref=e446]:
+      - code [ref=e448]: if (createErr) return reject(createErr)
+    - listitem [ref=e449]:
+      - code [ref=e451]: resolve()
+    - listitem [ref=e452]:
+      - code [ref=e454]: "},"
+    - listitem [ref=e455]:
+      - code [ref=e457]: )
+    - listitem [ref=e458]:
+      - code [ref=e460]: "})"
+    - listitem [ref=e461]: "})"
+    - listitem [ref=e462]: "} finally {"
+    - listitem [ref=e463]: client.close()
+    - listitem [ref=e464]: "} +}"
+    - listitem [ref=e465]
+  - paragraph [ref=e466]: /**
+  - list [ref=e467]:
+    - listitem [ref=e468]: Client for interacting with the Foundry controller API */
+  - code [ref=e470]: "## 4. Feature-flag switchover at the call site The original code in `ensureSandbox()` only called `reconcileSboxdReady()` for reused sandboxes (not newly provisioned, not from warm pool). The new path widens this: when the `cortex_workspace_create_bootstrap` gate is on, `bootstrapViaWorkspaceCreate()` runs for ALL workload-configured sandboxes (new, warm, reused) since bootstrap is idempotent. When the gate is off, the `else if` branch preserves the old behavior exactly. Note the outer condition also adds a `context.fileId` check. The old code checked `workloadConfig && rewrittenSboxdUrl`; the new code adds `context.fileId` because the bootstrap config requires it (workload owner ID, git username). This is safe because `sandboxEnvVars()` already gates its workload block on `context.fileId`. <!-- DIFF_PLACEHOLDER_3 --> `sandboxEnvVars()` and the nimbus call above this block are untouched. Env vars still flow to nimbus so that old cortex instances (during rollout) and nimbus's own /api/ready calls keep working. That gets cleaned up in a later PR once all instances are on the new path. ## 5. Wiring: gate registration, imports, and dependency The new Statsig gate `cortex_workspace_create_bootstrap` is registered in the gates array. This is what `CortexStatsig.checkGate()` validates against at compile time, so adding the string here is required before it can be referenced in code. <!-- DIFF_PLACEHOLDER_4 --> The new imports bring in `AgentPlatClient` (the WebSocket client for sboxd RPCs), `DEFAULT_WORKSPACE_ID` and `DEFAULT_WORKSPACE_PATH` (well-known constants for the default workspace), and the `BootstrapConfig` type. <!-- DIFF_PLACEHOLDER_5 --> Cortex already depended on `@figma/agentplat-stream-protocol` for types. This adds `@figma/agentplat-client` for the WebSocket client class. Both are workspace-linked monorepo packages. <!-- DIFF_PLACEHOLDER_6 -->"

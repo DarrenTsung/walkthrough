@@ -6,6 +6,10 @@ use anyhow::{Context, Result};
 use pulldown_cmark::{Options, Parser};
 use regex::Regex;
 
+use syntect::highlighting::ThemeSet;
+use syntect::html::highlighted_html_for_string;
+use syntect::parsing::SyntaxSet;
+
 use crate::difft_json::{DifftOutput, LineEntry, LineSide};
 
 /// Number of unchanged context lines to show before/after each chunk.
@@ -74,8 +78,8 @@ article {
 }
 
 .diff-block {
-    width: 85vw;
-    max-width: 1200px;
+    width: calc(100vw - 260px);
+    max-width: 1400px;
     margin-left: 50%;
     transform: translateX(-50%);
     margin-top: 1rem;
@@ -443,26 +447,105 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// Render a full line with only the region [change_start..change_end] highlighted.
-fn render_refined_line(full_line: &str, change_start: usize, change_end: usize, hl_class: &str) -> String {
-    let cs = change_start.min(full_line.len());
-    let ce = change_end.min(full_line.len());
+/// Syntax-highlight a single line of code.
+/// Returns HTML with `<span style="color:...">` tokens.
+/// Falls back to html_escape if highlighting fails.
+fn syntax_highlight_line(line: &str, ss: &SyntaxSet, syntax: &syntect::parsing::SyntaxReference, theme: &syntect::highlighting::Theme) -> String {
+    // highlighted_html_for_string wraps output in <pre><code>; strip that.
+    match highlighted_html_for_string(line, ss, syntax, theme) {
+        Ok(html) => {
+            let stripped = html
+                .trim_start_matches("<pre style=\"background-color:#ffffff;\">")
+                .trim_start_matches("<pre style=\"background-color:#fafafa;\">")
+                .trim_start_matches(|c: char| c != '<' && c != '>' || false);
+            // More robust: find the first > after <pre, then strip to there
+            let s = if let Some(idx) = html.find("</pre>") {
+                let inner = &html[..idx];
+                // Strip <pre ...> prefix
+                if let Some(start) = inner.find('>') {
+                    &inner[start + 1..]
+                } else {
+                    inner
+                }
+            } else {
+                &html
+            };
+            let _ = stripped; // unused, using s instead
+            s.trim_end_matches('\n').to_string()
+        }
+        Err(_) => html_escape(line),
+    }
+}
 
-    let mut html = String::new();
-    if cs > 0 {
-        html.push_str(&html_escape(&full_line[..cs]));
+/// Get the syntect syntax for a file path, falling back to plain text.
+fn get_syntax<'a>(ss: &'a SyntaxSet, file_path: &str) -> &'a syntect::parsing::SyntaxReference {
+    let ext = file_path.rsplit('.').next().unwrap_or("");
+    ss.find_syntax_by_extension(ext)
+        .unwrap_or_else(|| ss.find_syntax_plain_text())
+}
+
+/// Insert a diff highlight span into syntax-highlighted HTML at the given
+/// text-character positions (byte offsets into the original plain text).
+/// Walks the HTML, tracking the text position, and injects opening/closing tags.
+fn insert_diff_highlight(highlighted_html: &str, change_start: usize, change_end: usize, hl_class: &str) -> String {
+    if change_start >= change_end {
+        return highlighted_html.to_string();
     }
-    if ce > cs {
-        html.push_str(&format!(
-            "<span class=\"{}\">{}</span>",
-            hl_class,
-            html_escape(&full_line[cs..ce])
-        ));
+
+    let mut out = String::new();
+    let mut text_pos: usize = 0; // position in original text
+    let mut opened = false;
+    let bytes = highlighted_html.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] == b'<' {
+            // HTML tag: copy verbatim, doesn't advance text_pos
+            let tag_end = highlighted_html[i..].find('>').map(|p| i + p + 1).unwrap_or(len);
+            out.push_str(&highlighted_html[i..tag_end]);
+            i = tag_end;
+        } else if bytes[i] == b'&' {
+            // HTML entity: counts as 1 text character
+            let ent_end = highlighted_html[i..].find(';').map(|p| i + p + 1).unwrap_or(i + 1);
+            if !opened && text_pos >= change_start && text_pos < change_end {
+                out.push_str(&format!("<span class=\"{}\">", hl_class));
+                opened = true;
+            }
+            if opened && text_pos >= change_end {
+                out.push_str("</span>");
+                opened = false;
+            }
+            if !opened && text_pos == change_start {
+                out.push_str(&format!("<span class=\"{}\">", hl_class));
+                opened = true;
+            }
+            out.push_str(&highlighted_html[i..ent_end]);
+            text_pos += 1;
+            if opened && text_pos >= change_end {
+                out.push_str("</span>");
+                opened = false;
+            }
+            i = ent_end;
+        } else {
+            // Regular character
+            if !opened && text_pos == change_start {
+                out.push_str(&format!("<span class=\"{}\">", hl_class));
+                opened = true;
+            }
+            out.push(highlighted_html.as_bytes()[i] as char);
+            text_pos += 1;
+            if opened && text_pos >= change_end {
+                out.push_str("</span>");
+                opened = false;
+            }
+            i += 1;
+        }
     }
-    if ce < full_line.len() {
-        html.push_str(&html_escape(&full_line[ce..]));
+    if opened {
+        out.push_str("</span>");
     }
-    html
+    out
 }
 
 /// Find the minimal differing region between two strings by trimming common prefix/suffix.
@@ -560,7 +643,11 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
     rows
 }
 
-fn render_diff_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) -> String {
+fn render_diff_row(
+    row: &DiffRow,
+    old_lines: &[String], new_lines: &[String],
+    old_hl: &[String], new_hl: &[String],
+) -> String {
     let mut html = String::new();
     let has_lhs = row.lhs.is_some();
     let has_rhs = row.rhs.is_some();
@@ -574,34 +661,33 @@ fn render_diff_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) ->
 
     html.push_str(&format!("<tr class=\"{}\">", row_class));
 
-    // For paired rows, use refined character-level diff instead of difft's structural spans.
-    // This gives GitHub-style highlights where only the actual differing characters are marked.
+    // For paired rows, syntax-highlight the line then overlay the diff highlight.
     if let (Some(lhs), Some(rhs)) = (row.lhs, row.rhs) {
         let old_line = old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         let new_line = new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let old_highlighted = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let new_highlighted = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
 
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
             lhs.line_number + 1,
-            render_refined_line(old_line, old_cs, old_ce, "hl-del")
+            insert_diff_highlight(old_highlighted, old_cs, old_ce, "hl-del")
         ));
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
             rhs.line_number + 1,
-            render_refined_line(new_line, new_cs, new_ce, "hl-add")
+            insert_diff_highlight(new_highlighted, new_cs, new_ce, "hl-add")
         ));
     } else if let Some(lhs) = row.lhs {
-        let content = old_lines.get(lhs.line_number as usize)
-            .map(|s| html_escape(s)).unwrap_or_default();
+        let content = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>",
             lhs.line_number + 1, content
         ));
         html.push_str("<td class=\"ln\"></td><td class=\"code-rhs\"></td>");
     } else if let Some(rhs) = row.rhs {
-        let content = new_lines.get(rhs.line_number as usize)
-            .map(|s| html_escape(s)).unwrap_or_default();
+        let content = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         html.push_str("<td class=\"ln\"></td><td class=\"code-lhs\"></td>");
         html.push_str(&format!(
             "<td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td>",
@@ -614,9 +700,10 @@ fn render_diff_row(row: &DiffRow, old_lines: &[String], new_lines: &[String]) ->
 }
 
 /// Render a context (unchanged) line showing both old and new sides.
-fn render_context_row(old_idx: usize, new_idx: usize, old_lines: &[String], new_lines: &[String]) -> String {
-    let old_content = old_lines.get(old_idx).map(|s| html_escape(s)).unwrap_or_default();
-    let new_content = new_lines.get(new_idx).map(|s| html_escape(s)).unwrap_or_default();
+/// Expects pre-highlighted HTML content in the line arrays.
+fn render_context_row(old_idx: usize, new_idx: usize, old_hl: &[String], new_hl: &[String]) -> String {
+    let old_content = old_hl.get(old_idx).map(|s| s.as_str()).unwrap_or("");
+    let new_content = new_hl.get(new_idx).map(|s| s.as_str()).unwrap_or("");
     format!(
         "<tr class=\"line-context\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
          <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
@@ -1051,7 +1138,17 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
     out
 }
 
-fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter) -> String {
+fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, ss: &SyntaxSet, theme: &syntect::highlighting::Theme) -> String {
+    let syntax = get_syntax(ss, file_path);
+
+    // Pre-compute syntax-highlighted versions of all lines.
+    let old_hl: Vec<String> = difft.old_lines.iter()
+        .map(|line| syntax_highlight_line(line, ss, syntax, theme))
+        .collect();
+    let new_hl: Vec<String> = difft.new_lines.iter()
+        .map(|line| syntax_highlight_line(line, ss, syntax, theme))
+        .collect();
+
     let mut html = String::new();
     html.push_str(&format!(
         "<div class=\"diff-block\"><div class=\"diff-header\">{}</div>",
@@ -1298,7 +1395,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             let o = old_first - pre_count + i;
             let n = new_first - pre_count + i;
             if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
-                html.push_str(&render_context_row(o, n, &difft.old_lines, &difft.new_lines));
+                html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
             }
         }
 
@@ -1330,7 +1427,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                         let o = exp_o + i;
                         let n = exp_n + i;
                         if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
-                            html.push_str(&render_context_row(o, n, &difft.old_lines, &difft.new_lines));
+                            html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
                         }
                     }
                 }
@@ -1343,7 +1440,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                         let o = exp_o + i;
                         let n = exp_n + i;
                         if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
-                            html.push_str(&render_context_row(o, n, &difft.old_lines, &difft.new_lines));
+                            html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
                         }
                     }
                 }
@@ -1352,10 +1449,10 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             // Render the item
             match item {
                 RenderItem::DifftRow(row) => {
-                    html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines));
+                    html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines, &old_hl, &new_hl));
                 }
                 RenderItem::RemovedLine(old_0) => {
-                    let content = difft.old_lines.get(*old_0).map(|s| html_escape(s)).unwrap_or_default();
+                    let content = old_hl.get(*old_0).map(|s| s.as_str()).unwrap_or("");
                     html.push_str(&format!(
                         "<tr class=\"line-removed\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
                          <td class=\"ln\"></td><td class=\"code-rhs\"></td></tr>",
@@ -1363,7 +1460,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                     ));
                 }
                 RenderItem::AddedLine(new_0) => {
-                    let content = difft.new_lines.get(*new_0).map(|s| html_escape(s)).unwrap_or_default();
+                    let content = new_hl.get(*new_0).map(|s| s.as_str()).unwrap_or("");
                     html.push_str(&format!(
                         "<tr class=\"line-added\"><td class=\"ln\"></td><td class=\"code-lhs\"></td>\
                          <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
@@ -1373,12 +1470,14 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 RenderItem::PairedLine(old_0, new_0) => {
                     let old_line = difft.old_lines.get(*old_0).map(|s| s.as_str()).unwrap_or("");
                     let new_line = difft.new_lines.get(*new_0).map(|s| s.as_str()).unwrap_or("");
+                    let old_highlighted = old_hl.get(*old_0).map(|s| s.as_str()).unwrap_or("");
+                    let new_highlighted = new_hl.get(*new_0).map(|s| s.as_str()).unwrap_or("");
                     let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
                     html.push_str(&format!(
                         "<tr class=\"line-paired\"><td class=\"ln\">{}</td><td class=\"code-lhs\">{}</td>\
                          <td class=\"ln\">{}</td><td class=\"code-rhs\">{}</td></tr>",
-                        old_0 + 1, render_refined_line(old_line, old_cs, old_ce, "hl-del"),
-                        new_0 + 1, render_refined_line(new_line, new_cs, new_ce, "hl-add"),
+                        old_0 + 1, insert_diff_highlight(old_highlighted, old_cs, old_ce, "hl-del"),
+                        new_0 + 1, insert_diff_highlight(new_highlighted, new_cs, new_ce, "hl-add"),
                     ));
                 }
             }
@@ -1398,7 +1497,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             let o = old_post_start + i;
             let n = new_post_start + i;
             if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
-                html.push_str(&render_context_row(o, n, &difft.old_lines, &difft.new_lines));
+                html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
             }
         }
 
@@ -1484,6 +1583,11 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
     let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
 
+    // Syntax highlighting setup
+    let ss = SyntaxSet::load_defaults_newlines();
+    let ts = ThemeSet::load_defaults();
+    let theme = &ts.themes["InspiredGitHub"];
+
     // Load all difft JSON data
     let mut data: HashMap<String, DifftOutput> = HashMap::new();
     for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
@@ -1563,7 +1667,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         for &idx in &indices {
                             referenced.insert((file.clone(), idx));
                         }
-                        let rendered_html = render_chunks(difft, &indices, &file, line_filter);
+                        let rendered_html = render_chunks(difft, &indices, &file, line_filter, &ss, theme);
                         let placeholder_id = diff_blocks.len();
                         diff_blocks.push(rendered_html);
                         processed_md
@@ -1755,6 +1859,14 @@ mod tests {
     }
 
     /// Build a DifftOutput from old/new lines, chunks, and hunks.
+    /// Helper to call render_chunks with default syntax highlighting.
+    fn test_render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter) -> String {
+        let ss = SyntaxSet::load_defaults_newlines();
+        let ts = ThemeSet::load_defaults();
+        let theme = &ts.themes["InspiredGitHub"];
+        render_chunks(difft, chunk_indices, file_path, line_filter, &ss, theme)
+    }
+
     fn make_difft(
         old_lines: Vec<&str>,
         new_lines: Vec<&str>,
@@ -1830,7 +1942,7 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 317, old_count: 13, new_start: 407, new_count: 18 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts", None);
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
         let rows = extract_rows(&html);
 
         // Check no new-side line number appears more than once
@@ -1863,11 +1975,11 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 3, old_count: 0, new_start: 3, new_count: 1 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts", None);
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
         // The added-only row should NOT contain hl-add spans
         // (the row background is sufficient)
-        let added_row_re = Regex::new(r#"<tr class="line-added">.*?</tr>"#).unwrap();
+        let added_row_re = Regex::new(r#"(?s)<tr class="line-added">.*?</tr>"#).unwrap();
         for m in added_row_re.find_iter(&html) {
             let row_html = m.as_str();
             assert!(!row_html.contains("hl-add"),
@@ -1890,9 +2002,9 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 3, old_count: 1, new_start: 3, new_count: 0 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts", None);
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
-        let removed_row_re = Regex::new(r#"<tr class="line-removed">.*?</tr>"#).unwrap();
+        let removed_row_re = Regex::new(r#"(?s)<tr class="line-removed">.*?</tr>"#).unwrap();
         for m in removed_row_re.find_iter(&html) {
             let row_html = m.as_str();
             assert!(!row_html.contains("hl-del"),
@@ -1915,9 +2027,10 @@ mod tests {
         let hunks = vec![DiffHunk { old_start: 2, old_count: 1, new_start: 2, new_count: 1 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
-        let html = render_chunks(&difft, &[0], "test.ts", None);
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
-        let paired_row_re = Regex::new(r#"<tr class="line-paired">.*?</tr>"#).unwrap();
+        assert!(html.contains("line-paired"), "HTML should contain line-paired row");
+        let paired_row_re = Regex::new(r#"(?s)<tr class="line-paired">.*?</tr>"#).unwrap();
         let matched: Vec<_> = paired_row_re.find_iter(&html).collect();
         assert!(!matched.is_empty(), "should have at least one paired row");
 
@@ -1951,7 +2064,7 @@ mod tests {
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
         // No filter: all 3 changed lines present
-        let html_all = render_chunks(&difft, &[0], "test.ts", None);
+        let html_all = test_render_chunks(&difft, &[0], "test.ts", None);
         let rows_all = extract_rows(&html_all);
         let changed_all: Vec<_> = rows_all.iter()
             .filter(|(c, _, _)| c == "line-paired")
@@ -1959,7 +2072,7 @@ mod tests {
         assert_eq!(changed_all.len(), 3, "should have 3 paired rows without filter");
 
         // Filter to 0-based 8-12. Only line 10 (new-side) should match.
-        let html_filtered = render_chunks(&difft, &[0], "test.ts", Some((8, 12)));
+        let html_filtered = test_render_chunks(&difft, &[0], "test.ts", Some((8, 12)));
         let rows_filtered = extract_rows(&html_filtered);
         let changed_filtered: Vec<_> = rows_filtered.iter()
             .filter(|(c, _, _)| c == "line-paired")
@@ -1968,7 +2081,7 @@ mod tests {
         assert_eq!(changed_filtered[0].2, Some(11), "filtered row should be new-side line 11 (1-based)");
 
         // Lines outside any change should produce no changed rows
-        let html_empty = render_chunks(&difft, &[0], "test.ts", Some((0, 3)));
+        let html_empty = test_render_chunks(&difft, &[0], "test.ts", Some((0, 3)));
         let rows_empty = extract_rows(&html_empty);
         let changed_empty: Vec<_> = rows_empty.iter()
             .filter(|(c, _, _)| c == "line-paired")
@@ -2061,7 +2174,7 @@ mod tests {
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
         // Filter to 0-based 58-62 (only line 60 is a change)
-        let html = render_chunks(&difft, &[0], "test.ts", Some((58, 62)));
+        let html = test_render_chunks(&difft, &[0], "test.ts", Some((58, 62)));
         let rows = extract_rows(&html);
 
         // Should have exactly 1 paired row (line 60)
@@ -2128,18 +2241,18 @@ mod tests {
 
         // Unsplit: all changed lines
         let all_lines = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", None)
+            &test_render_chunks(&difft, &[0], "test.ts", None)
         );
 
         // Split into three non-overlapping ranges
         let split1 = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", Some((20, 22)))
+            &test_render_chunks(&difft, &[0], "test.ts", Some((20, 22)))
         );
         let split2 = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", Some((23, 26)))
+            &test_render_chunks(&difft, &[0], "test.ts", Some((23, 26)))
         );
         let split3 = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", Some((27, 29)))
+            &test_render_chunks(&difft, &[0], "test.ts", Some((27, 29)))
         );
 
         let union: std::collections::HashSet<u64> = split1.iter()
@@ -2180,15 +2293,15 @@ mod tests {
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
         let all_lines = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", None)
+            &test_render_chunks(&difft, &[0], "test.ts", None)
         );
 
         // Overlapping ranges: 20-25, 23-29
         let split1 = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", Some((20, 25)))
+            &test_render_chunks(&difft, &[0], "test.ts", Some((20, 25)))
         );
         let split2 = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", Some((23, 29)))
+            &test_render_chunks(&difft, &[0], "test.ts", Some((23, 29)))
         );
 
         let union: std::collections::HashSet<u64> = split1.iter()
@@ -2222,14 +2335,14 @@ mod tests {
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
         let all_lines = extract_changed_new_lines(
-            &render_chunks(&difft, &[0], "test.ts", None)
+            &test_render_chunks(&difft, &[0], "test.ts", None)
         );
 
         // One block per line
         let mut union = std::collections::HashSet::new();
         for line_0 in 5..10 {
             let lines = extract_changed_new_lines(
-                &render_chunks(&difft, &[0], "test.ts", Some((line_0, line_0)))
+                &test_render_chunks(&difft, &[0], "test.ts", Some((line_0, line_0)))
             );
             assert_eq!(lines.len(), 1,
                 "single-line filter at {} should produce 1 changed line, got {:?}", line_0, lines);

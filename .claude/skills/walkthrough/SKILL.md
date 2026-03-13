@@ -1,7 +1,7 @@
 ---
 name: walkthrough
 description: "Generate a narrative walkthrough of code changes with difftastic diffs and verified complete coverage"
-allowed-tools: "Bash, Read, Write, Glob, Grep"
+allowed-tools: "Bash, Read, Write, Edit, Glob, Grep, Agent"
 argument-hint: "[diff-source] [--output path]"
 ---
 
@@ -9,7 +9,8 @@ argument-hint: "[diff-source] [--output path]"
 
 Generate a narrative walkthrough of code changes, rendered as an HTML document with
 side-by-side difftastic diffs. Every change chunk must be referenced in the walkthrough,
-ensuring complete coverage.
+ensuring complete coverage. The narrative goes through an adversarial review loop to
+ensure accuracy and clarity.
 
 ## Arguments
 
@@ -82,7 +83,7 @@ already there, so focus on:
 - Add prose before each difft block explaining what the diff shows and why
 - Number the sections
 
-Rules for writing the markdown:
+### Code block rules
 
 1. **Every code block** that references diffs uses the info string format:
    `difft <file-path> chunks=<spec>` where spec is comma-separated indices or `all`.
@@ -102,20 +103,44 @@ Rules for writing the markdown:
 
 5. Use `chunks=all` for new files, deleted files, or files with only one or two chunks.
 
-6. **Narrative style**: explain WHY the change was made, not just what changed. Be concise.
-   Use present tense ("This extracts..." not "This extracted...").
+### Prose style
 
-7. **Explain terms inline, not upfront.** Do not create a glossary or "key terms" section.
+6. **Lead with WHY, not WHAT.** The diff shows what changed. The prose should explain the
+   motivation, the constraint that forced this design, or the problem it solves. A reader
+   should understand the reasoning before seeing the code. Bad: "This adds a `timeout`
+   parameter." Good: "WebSocket connections can hang indefinitely if sboxd is unresponsive,
+   so we add a 30-second timeout."
+
+7. **Be concrete and specific.** Replace vague descriptions with exact names, values, and
+   relationships. Bad: "This updates the config." Good: "This adds `bootstrap?: BootstrapConfig`
+   to the `WorkspaceCreateRequest` wire type, so the TS client can send structured bootstrap
+   data over WebSocket." Reference function names, type names, and field names by their actual
+   identifiers.
+
+8. **Explain terms inline, not upfront.** Do not create a glossary or "key terms" section.
    Instead, define domain-specific terms, service names, and jargon the first time they
    naturally appear in the narrative. Anchor explanations with concrete use-cases or examples
    when possible (e.g. "a **sandbox** is an isolated container where user code runs; each
    Figma file gets its own"). Assume the reader may be unfamiliar with the codebase.
 
-8. **Interleave prose and diffs.** When a section has multiple diffs, place explanatory text
+9. **Interleave prose and diffs.** When a section has multiple diffs, place explanatory text
    between them rather than grouping all prose at the top and all diffs at the bottom. Each
-   diff block should be immediately preceded by the prose that explains it. For example, if
-   a section covers a feature flag addition and a new dependency, explain the flag, show the
-   flag diff, explain the dependency, show the dependency diff.
+   diff block should be immediately preceded by the prose that explains it.
+
+10. **Use present tense.** "This extracts..." not "This extracted...". The walkthrough
+    describes the change as it exists now.
+
+11. **Keep it tight.** One to three sentences per diff block is usually enough. If you need
+    more, the section should probably be split. Avoid restating what the diff already shows
+    (e.g. don't list every field that was added if the diff is self-evident). Focus on the
+    non-obvious: why this approach, what trade-off was made, what edge case it handles.
+
+12. **Connect sections.** Brief transitions help the reader follow the thread. "With the
+    types in place, the client can now..." is better than an abrupt jump to the next section.
+
+13. **Title and overview matter.** The title should be a concise summary of the change
+    (not a file name). The overview paragraph should give enough context that someone can
+    decide whether to read the full walkthrough.
 
 ## Step 5: Render and enrich
 
@@ -131,19 +156,118 @@ This does three things:
 
 If the render output reports uncovered chunks, add sections referencing them and re-render.
 
-## Step 6: Review and revise the narrative
+## Step 6: Review loop
 
-Re-read the markdown file (`OUTPUT_PATH`). The difft code blocks now contain the actual text
-diffs that correspond to what the HTML renders. For each section:
+The review loop ensures the narrative is accurate, complete, and clear. Spawn two reviewer
+agents in parallel. Each reads the rendered markdown (with enriched diffs) and produces a
+verdict. The loop continues until both reviewers pass.
 
-1. Read the diff in the code block carefully
-2. Check that the surrounding narrative accurately describes what the diff shows
-3. Look for mismatches: narrative claims that don't match the code, missing context about
-   why a change matters, or sections that would be clearer in a different order
+**Budget:** Maximum 3 review iterations. If reviewers are still failing after 3 rounds,
+present the current state to the user and ask whether to continue or stop.
 
-If revisions are needed, edit the narrative text (not the code block bodies) and re-run the
-render command. The code block bodies will be repopulated, so edits there are overwritten.
-Repeat until the narrative is coherent.
+### Reviewer 1: Adversary
+
+Spawns an agent (subagent_type: general-purpose, model: sonnet) with this prompt:
+
+```
+You are an adversarial reviewer for a code walkthrough. Read the walkthrough
+markdown file at {OUTPUT_PATH}.
+
+The file contains prose sections interleaved with difft code blocks. Each code
+block shows the actual diff (` ` context, `-` removed, `+` added lines). Your
+job is to verify the prose accurately describes the diffs.
+
+Check each section for:
+
+1. **Prose/diff mismatch** — the prose claims something the diff doesn't show,
+   or misses something significant the diff does show. Read the diff line by
+   line and compare against the prose description.
+
+2. **Inaccurate descriptions** — wrong function names, wrong field names, wrong
+   direction of change (says "adds" when the diff removes), wrong file
+   referenced.
+
+3. **Missing context** — the prose doesn't explain WHY a change was made, only
+   WHAT changed. The reader should understand the motivation.
+
+4. **Vague language** — handwavy descriptions where the diff has specific
+   details. "Updates the config" when the diff shows exactly which fields were
+   added.
+
+5. **Ordering issues** — a section references concepts or types that haven't
+   been introduced yet. The narrative should flow so each section builds on
+   what came before.
+
+6. **Overclaiming** — prose that states implications or consequences not evident
+   from the code (e.g. "this improves performance" when the diff just
+   restructures code).
+
+Write your findings as a numbered list. For each issue, cite the section number,
+the specific prose, and what the diff actually shows.
+
+End with a verdict:
+- PASS — no issues found
+- FAIL — {N} issues need to be addressed
+
+Output ONLY the review, no preamble.
+```
+
+### Reviewer 2: Open Questions
+
+Spawns an agent (subagent_type: general-purpose, model: sonnet) with this prompt:
+
+```
+You are a completeness reviewer for a code walkthrough. Read the walkthrough
+markdown file at {OUTPUT_PATH}.
+
+The file contains prose sections interleaved with difft code blocks. Each code
+block has a `chunks=` spec referencing specific diff chunks for a file. Your job
+is to identify gaps and unanswered questions a reader would have.
+
+Check for:
+
+1. **Unexplained design decisions** — the code makes a choice (e.g. a specific
+   timeout value, a particular data structure, a feature flag name) but the
+   prose doesn't explain why.
+
+2. **Missing error handling context** — the diff shows error handling, retries,
+   or fallbacks but the prose doesn't explain what failures they guard against.
+
+3. **Unclear scope** — the reader can't tell what's in vs out of scope for this
+   change. Are there follow-up changes expected? Does this replace something?
+
+4. **Undefined terms** — domain-specific jargon, service names, or acronyms
+   used without explanation on first appearance.
+
+5. **Missing connections** — chunks from different files that are related but
+   the prose doesn't explain how they connect (e.g. a type definition in one
+   file used by a function in another).
+
+6. **Reader confusion points** — places where a reader unfamiliar with the
+   codebase would be lost. Ask yourself: "If I didn't know this codebase,
+   would I understand what this section is telling me?"
+
+Write your findings as a numbered list. For each issue, cite the section and
+explain what question remains unanswered.
+
+End with a verdict:
+- PASS — no significant gaps
+- FAIL — {N} issues need to be addressed
+
+Output ONLY the review, no preamble.
+```
+
+### Processing review results
+
+After both reviewers complete:
+
+1. If **both PASS**: proceed to Step 7.
+2. If **either FAIL**: read their findings. Edit the narrative prose in
+   `OUTPUT_PATH` to address the issues (do NOT edit code block bodies, they get
+   repopulated). Re-run the render command, then re-spawn both reviewers on the
+   updated file. Increment the iteration counter.
+3. After **3 iterations** without both passing: present the remaining issues to
+   the user and ask whether to continue iterating or accept the current state.
 
 ## Step 7: Present
 
@@ -155,6 +279,7 @@ open "${OUTPUT_PATH%.md}.html"
 Print a summary:
 - Number of files covered
 - Number of chunks covered
+- Review iterations completed
 - Output file path
 
 If the user asks to publish, run:

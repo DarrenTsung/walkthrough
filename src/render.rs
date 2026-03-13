@@ -546,30 +546,31 @@ fn syntax_highlight_lines(
             let bold = style.font_style.contains(syntect::highlighting::FontStyle::BOLD);
             let italic = style.font_style.contains(syntect::highlighting::FontStyle::ITALIC);
 
-            // Map syntect theme colors to GitHub prettylights colors
-            let (color, gh_bold, gh_italic) = if italic {
-                // Comments are typically italic in InspiredGitHub
-                ("#59636e", false, true)
-            } else if bold {
-                // Keywords are bold in InspiredGitHub (#a71d5d)
-                ("#cf222e", false, false)
+            // Map syntect theme colors to GitHub prettylights colors.
+            // Check specific colors first, then fall back to bold/italic.
+            let (color, gh_bold, gh_italic) = if fg.r == 0x79 && fg.g == 0x5d && fg.b == 0xa3 {
+                // Entity/function names (#795da3) → purple
+                ("#6639ba", false, false)
             } else if fg.r == 0x18 && fg.g == 0x36 && fg.b == 0x91 {
-                // Strings (#183691)
+                // Strings (#183691) → dark blue
                 ("#0a3069", false, false)
             } else if fg.r == 0x00 && fg.g == 0x86 && fg.b == 0xb3 {
-                // Builtins/constants (#0086b3)
+                // Builtins/constants (#0086b3) → blue
                 ("#0550ae", false, false)
-            } else if fg.r == 0x79 && fg.g == 0x5d && fg.b == 0xa3 {
-                // Entity/function names (#795da3)
-                ("#6639ba", false, false)
             } else if fg.r == 0xed && fg.g == 0x6a && fg.b == 0x43 {
-                // Variables/numbers (#ed6a43)
+                // Variables/numbers (#ed6a43) → orange
                 ("#953800", false, false)
             } else if fg.r == 0xa7 && fg.g == 0x1d && fg.b == 0x5d {
-                // Keywords that aren't bold (#a71d5d)
+                // Keywords (#a71d5d) → red
                 ("#cf222e", false, false)
             } else if fg.r == 0xb5 && fg.g == 0x2a && fg.b == 0x1d {
-                // Errors/invalid (#b52a1d)
+                // Errors/invalid (#b52a1d) → red
+                ("#cf222e", false, false)
+            } else if italic {
+                // Comments are italic in InspiredGitHub
+                ("#59636e", false, true)
+            } else if bold && fg.r == 0x32 && fg.g == 0x32 && fg.b == 0x32 {
+                // Bold default-color: likely a keyword the theme doesn't color
                 ("#cf222e", false, false)
             } else {
                 ("#1f2328", false, false)

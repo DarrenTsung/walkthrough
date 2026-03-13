@@ -87,16 +87,24 @@ article {
     margin-bottom: 1rem;
     border: 1px solid var(--border);
     border-radius: 6px;
-    max-height: 80vh;
+    max-height: 75vh;
     overflow: hidden;
 }
 
 h1 {
-    font-size: 1.75em;
+    font-size: 1.2em;
     font-weight: 700;
-    margin: 0.5em 0 0.4em;
-    padding-bottom: 0.2em;
+    margin: 0 calc(-28px - 50vw + 50%);
+    padding: 10px 28px;
+    text-align: center;
     border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+h1 + * {
+    margin-top: 1.2em;
 }
 
 h2 {
@@ -205,10 +213,10 @@ img { max-width: 100%; }
 /* Floating table of contents */
 .toc {
     position: fixed;
-    top: 24px;
+    top: 68px;
     left: 16px;
     width: 200px;
-    max-height: calc(100vh - 48px);
+    max-height: calc(100vh - 92px);
     overflow: visible;
     font-size: 12px;
     line-height: 1.5;
@@ -487,7 +495,7 @@ const JS: &str = r#"
             var atEnd = block.scrollTop >= maxScroll - 1;
             var atStart = block.scrollTop <= 0;
 
-            if (e.deltaY > 0 && rect.top <= 80 && !atEnd) {
+            if (e.deltaY > 0 && rect.top <= 120 && !atEnd) {
                 e.preventDefault();
                 pinnedY = window.scrollY;
                 activeBlock = block;

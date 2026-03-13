@@ -1123,32 +1123,38 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         };
 
         if old_out_of_order {
-            let mut removed: Vec<usize> = Vec::new();
-            let mut added: Vec<usize> = Vec::new();
+            // Same decomposition as HTML renderer: sort sides independently,
+            // match identical lines, zip side-by-side.
+            let mut old_side: Vec<usize> = Vec::new();
+            let mut new_side: Vec<usize> = Vec::new();
             for &(_, ref item) in &items {
                 match item {
                     TextItem::DifftRow(row) => {
-                        if let Some(lhs) = row.lhs { removed.push(lhs.line_number as usize); }
-                        if let Some(rhs) = row.rhs { added.push(rhs.line_number as usize); }
+                        if let Some(lhs) = row.lhs { old_side.push(lhs.line_number as usize); }
+                        if let Some(rhs) = row.rhs { new_side.push(rhs.line_number as usize); }
                     }
-                    TextItem::RemovedLine(o) => { removed.push(*o); }
-                    TextItem::AddedLine(n) => { added.push(*n); }
-                    TextItem::PairedLine(o, n) => { removed.push(*o); added.push(*n); }
+                    TextItem::RemovedLine(o) => { old_side.push(*o); }
+                    TextItem::AddedLine(n) => { new_side.push(*n); }
+                    TextItem::PairedLine(o, n) => { old_side.push(*o); new_side.push(*n); }
                 }
             }
-            removed.sort();
-            removed.dedup();
-            added.sort();
-            added.dedup();
+            old_side.sort();
+            old_side.dedup();
+            new_side.sort();
+            new_side.dedup();
 
+            // For the text renderer, just output removed lines then added lines
+            // (no side-by-side layout in text mode).
             items.clear();
-            for &o in &removed {
-                items.push((o as u64, TextItem::RemovedLine(o)));
+            let mut seq: u64 = 0;
+            for &o in &old_side {
+                items.push((seq, TextItem::RemovedLine(o)));
+                seq += 1;
             }
-            for &n in &added {
-                items.push((old_last as u64 + 1 + n as u64, TextItem::AddedLine(n)));
+            for &n in &new_side {
+                items.push((seq, TextItem::AddedLine(n)));
+                seq += 1;
             }
-            items.sort_by_key(|&(k, _)| k);
         }
 
         // Collect ALL item line numbers before filtering so filtered-out
@@ -1503,35 +1509,129 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         };
 
         if old_out_of_order {
-            eprintln!("Warning: old-side line numbers out of order in chunk, decomposing into removed+added");
-            // Decompose: collect all old-side and new-side lines separately
-            let mut removed: Vec<usize> = Vec::new();
-            let mut added: Vec<usize> = Vec::new();
+            // Decompose into sorted old-side and new-side lists, then zip them
+            // side-by-side. Lines with identical content get paired; others are
+            // one-sided removed/added sharing rows where possible.
+            let mut old_side: Vec<usize> = Vec::new();
+            let mut new_side: Vec<usize> = Vec::new();
             for &(_, ref item) in &items {
                 match item {
                     RenderItem::DifftRow(row) => {
-                        if let Some(lhs) = row.lhs { removed.push(lhs.line_number as usize); }
-                        if let Some(rhs) = row.rhs { added.push(rhs.line_number as usize); }
+                        if let Some(lhs) = row.lhs { old_side.push(lhs.line_number as usize); }
+                        if let Some(rhs) = row.rhs { new_side.push(rhs.line_number as usize); }
                     }
-                    RenderItem::RemovedLine(o) => { removed.push(*o); }
-                    RenderItem::AddedLine(n) => { added.push(*n); }
-                    RenderItem::PairedLine(o, n) => { removed.push(*o); added.push(*n); }
+                    RenderItem::RemovedLine(o) => { old_side.push(*o); }
+                    RenderItem::AddedLine(n) => { new_side.push(*n); }
+                    RenderItem::PairedLine(o, n) => { old_side.push(*o); new_side.push(*n); }
                 }
             }
-            removed.sort();
-            removed.dedup();
-            added.sort();
-            added.dedup();
+            old_side.sort();
+            old_side.dedup();
+            new_side.sort();
+            new_side.dedup();
 
-            // Rebuild items: removed first (sorted by old-line), then added (sorted by new-line)
+            // Match identical lines between old and new using a simple LCS-like
+            // approach: scan both sides and pair lines with identical content.
+            let mut matched_old: std::collections::HashSet<usize> = std::collections::HashSet::new();
+            let mut matched_new: std::collections::HashSet<usize> = std::collections::HashSet::new();
+            let mut pairs: Vec<(usize, usize)> = Vec::new();
+            {
+                let mut ni = 0;
+                for &o in &old_side {
+                    let old_content = difft.old_lines.get(o).map(|s| s.as_str()).unwrap_or("");
+                    while ni < new_side.len() {
+                        let n = new_side[ni];
+                        let new_content = difft.new_lines.get(n).map(|s| s.as_str()).unwrap_or("");
+                        if old_content == new_content && !old_content.trim().is_empty() {
+                            pairs.push((o, n));
+                            matched_old.insert(o);
+                            matched_new.insert(n);
+                            ni += 1;
+                            break;
+                        }
+                        ni += 1;
+                    }
+                }
+            }
+
+            // Build side-by-side rows: unmatched removed, unmatched added, and
+            // pairs are rendered on the same row where possible.
+            let unmatched_old: Vec<usize> = old_side.iter().filter(|o| !matched_old.contains(o)).copied().collect();
+            let unmatched_new: Vec<usize> = new_side.iter().filter(|n| !matched_new.contains(n)).copied().collect();
+
             items.clear();
-            for &o in &removed {
-                items.push((o as u64, RenderItem::RemovedLine(o)));
+            // Use a merged sequence: fill rows with removed+added side by side,
+            // inserting pairs at the right position.
+            let mut oi = 0;
+            let mut ni = 0;
+            let mut pi = 0;
+
+            // Sort key: we need all items ordered so old side and new side are
+            // each consecutive. Use a simple counter.
+            let mut seq: u64 = 0;
+
+            // First: unmatched removed lines that come before the first pair
+            while oi < unmatched_old.len() && (pi >= pairs.len() || unmatched_old[oi] < pairs[pi].0) {
+                let o = unmatched_old[oi];
+                // Try to fill the right side with an unmatched added line
+                if ni < unmatched_new.len() && (pi >= pairs.len() || unmatched_new[ni] < pairs[pi].1) {
+                    let n = unmatched_new[ni];
+                    items.push((seq, RenderItem::PairedLine(o, n)));
+                    ni += 1;
+                } else {
+                    items.push((seq, RenderItem::RemovedLine(o)));
+                }
+                oi += 1;
+                seq += 1;
             }
-            for &n in &added {
-                items.push((old_last as u64 + 1 + n as u64, RenderItem::AddedLine(n)));
+
+            // Interleave pairs with remaining unmatched lines
+            while pi < pairs.len() {
+                let (po, pn) = pairs[pi];
+
+                // Remaining unmatched added before this pair
+                while ni < unmatched_new.len() && unmatched_new[ni] < pn {
+                    let n = unmatched_new[ni];
+                    if oi < unmatched_old.len() && unmatched_old[oi] < po {
+                        items.push((seq, RenderItem::PairedLine(unmatched_old[oi], n)));
+                        oi += 1;
+                    } else {
+                        items.push((seq, RenderItem::AddedLine(n)));
+                    }
+                    ni += 1;
+                    seq += 1;
+                }
+                // Remaining unmatched removed before this pair
+                while oi < unmatched_old.len() && unmatched_old[oi] < po {
+                    items.push((seq, RenderItem::RemovedLine(unmatched_old[oi])));
+                    oi += 1;
+                    seq += 1;
+                }
+
+                // The pair itself (render as paired with identical content)
+                items.push((seq, RenderItem::PairedLine(po, pn)));
+                pi += 1;
+                seq += 1;
             }
-            items.sort_by_key(|&(k, _)| k);
+
+            // Remaining unmatched removed
+            while oi < unmatched_old.len() {
+                if ni < unmatched_new.len() {
+                    items.push((seq, RenderItem::PairedLine(unmatched_old[oi], unmatched_new[ni])));
+                    ni += 1;
+                } else {
+                    items.push((seq, RenderItem::RemovedLine(unmatched_old[oi])));
+                }
+                oi += 1;
+                seq += 1;
+            }
+
+            // Remaining unmatched added
+            while ni < unmatched_new.len() {
+                items.push((seq, RenderItem::AddedLine(unmatched_new[ni])));
+                ni += 1;
+                seq += 1;
+            }
         }
 
         // Collect ALL item line numbers before filtering, so the gap filler

@@ -377,6 +377,26 @@ tr.line-paired-full .sign-rhs { color: #1a7f37; }
     border-bottom: 1px solid var(--border);
 }
 
+/* Service badges: `@sboxd` in markdown */
+.service-badge {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: #953800;
+    background: #fff8f0;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    border: 1px solid #f0d8b8;
+}
+
+@media (prefers-color-scheme: dark) {
+    .service-badge {
+        color: #f0a050;
+        background: #2a1a08;
+        border-color: #4a3018;
+    }
+}
+
 /* Mermaid diagrams */
 .mermaid-diagram {
     margin: 1rem 0;
@@ -2155,6 +2175,13 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                 format!("<pre><code class=\"language-mermaid\">{}</code></pre>", caps[1].to_string())
             }
         }
+    }).to_string();
+
+    // Replace @service inline code with styled service badges.
+    // pulldown-cmark renders `@sboxd` as <code>@sboxd</code>.
+    let service_re = Regex::new(r#"<code>@([^<]+)</code>"#)?;
+    html_body = service_re.replace_all(&html_body, |caps: &regex::Captures| {
+        format!("<span class=\"service-badge\">{}</span>", &caps[1])
     }).to_string();
 
     // Add anchor IDs to headings and extract the first h1 for <title>.

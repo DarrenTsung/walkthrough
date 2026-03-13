@@ -103,6 +103,26 @@ already there, so focus on:
 
 5. Use `chunks=all` for new files, deleted files, or files with only one or two chunks.
 
+### Service badges
+
+Use `` `@service-name` `` in inline code to render service names as styled badges
+(orange text, light background, heavier font weight). This makes services stand out
+from regular code references in the prose.
+
+Examples:
+- `` `@sboxd` `` renders as a badge for the sboxd service
+- `` `@cortex` `` renders as a badge for cortex
+- `` `@nimbus` `` renders as a badge for nimbus
+
+Use service badges for:
+- Service/process names (`@sboxd`, `@cortex`, `@nimbus`)
+- Infrastructure components (`@ugit`, `@foundry`)
+- External systems the code interacts with
+
+Do NOT use for:
+- Type names, function names, or field names (use regular `` `code` `` for those)
+- Feature flag names (use regular `` `code` ``)
+
 ### Mermaid diagrams
 
 Use `` ```mermaid `` code blocks to add diagrams that visually explain the change. The

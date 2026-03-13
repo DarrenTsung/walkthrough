@@ -474,49 +474,49 @@ fn html_escape(s: &str) -> String {
 /// Returns (color, italic). No more fragile RGB matching.
 fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     // Tree-sitter captures are hierarchical: "keyword.function", "string.special", etc.
-    // Colors are GitHub prettylights darkened ~15% to compensate for antialiasing.
+    // Match the most specific prefix first.
     if capture.starts_with("comment") {
-        return ("#4b5561", false);
+        return ("#59636e", false);
     }
     if capture.starts_with("string") {
-        return ("#082559", false);
+        return ("#0a3069", false);
     }
     if capture.starts_with("constant") || capture.starts_with("number") || capture.starts_with("boolean") || capture.starts_with("float") {
-        return ("#034298", false);
+        return ("#0550ae", false);
     }
     if capture.starts_with("keyword") || capture.starts_with("repeat") || capture.starts_with("conditional")
         || capture.starts_with("exception") || capture.starts_with("include") || capture.starts_with("storageclass")
     {
-        return ("#b31d28", false);
+        return ("#cf222e", false);
     }
     if capture.starts_with("constructor") {
-        return ("#7d2e00", false);
+        return ("#953800", false);
     }
     if capture.starts_with("type") {
-        return ("#1a1e24", false);
+        return ("#1f2328", false);
     }
     if capture.starts_with("function") || capture.starts_with("method") {
-        return ("#552da0", false);
+        return ("#6639ba", false);
     }
     if capture.starts_with("property") || capture.starts_with("field") {
-        return ("#034298", false);
+        return ("#0550ae", false);
     }
     if capture.starts_with("variable") || capture.starts_with("parameter") {
-        return ("#1a1e24", false);
+        return ("#1f2328", false);
     }
     if capture.starts_with("operator") || capture.starts_with("punctuation") {
-        return ("#1a1e24", false);
+        return ("#1f2328", false);
     }
     if capture.starts_with("tag") {
-        return ("#034298", false);
+        return ("#0550ae", false);
     }
     if capture.starts_with("attribute") {
-        return ("#552da0", false);
+        return ("#6639ba", false);
     }
     if capture.starts_with("label") || capture.starts_with("namespace") {
-        return ("#7d2e00", false);
+        return ("#953800", false);
     }
-    ("#1a1e24", false)
+    ("#1f2328", false)
 }
 
 /// Priority for overlapping captures. Higher = wins.
@@ -559,7 +559,7 @@ fn syntax_highlight_lines(lines: &[String], hl: &mut Highlighter, lang: Option<&
     for span in &spans {
         let (color, italic) = github_color_for_capture(&span.capture);
         let priority = capture_priority(&span.capture);
-        if color == "#1a1e24" && !italic { continue; }
+        if color == "#1f2328" && !italic { continue; }
         let start = (span.start as usize).min(text_len);
         let end = (span.end as usize).min(text_len);
         for b in start..end {
@@ -2499,7 +2499,7 @@ mod tests {
         let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
         // bootstrapViaWorkspaceCreate should be purple (#6639ba)
-        assert!(html.contains("color:#552da0"),
+        assert!(html.contains("color:#6639ba"),
             "function name should be purple (#6639ba) in HTML:\n{}",
             &html[..html.len().min(2000)]);
     }
@@ -2528,11 +2528,11 @@ mod tests {
         let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
         // Property names (workloadName) should be blue, variable (workloadConfig) default text
-        assert!(html.contains("color:#034298\">workloadName"),
+        assert!(html.contains("color:#0550ae\">workloadName"),
             "property key should be blue (#0550ae):\n{}",
             &html[..html.len().min(2000)]);
         // Variables should be default text (#1f2328), which means no span wrapper
-        assert!(!html.contains("color:#7d2e00\">workloadConfig"),
+        assert!(!html.contains("color:#953800\">workloadConfig"),
             "variable should not be orange (#953800), should be default text:\n{}",
             &html[..html.len().min(2000)]);
     }
@@ -2561,13 +2561,13 @@ mod tests {
         let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
         // `string`, `boolean`, and user-defined types should NOT have a colored span
-        assert!(!html.contains("color:#034298\">string"),
+        assert!(!html.contains("color:#0550ae\">string"),
             "type 'string' should be default text, not blue:\n{}",
             &html[..html.len().min(2000)]);
-        assert!(!html.contains("color:#034298\">boolean"),
+        assert!(!html.contains("color:#0550ae\">boolean"),
             "type 'boolean' should be default text, not blue:\n{}",
             &html[..html.len().min(2000)]);
-        assert!(!html.contains("color:#034298\">Foo"),
+        assert!(!html.contains("color:#0550ae\">Foo"),
             "user-defined type 'Foo' should be default text, not blue:\n{}",
             &html[..html.len().min(2000)]);
     }
@@ -2589,7 +2589,7 @@ mod tests {
 
         let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
-        assert!(html.contains("color:#7d2e00\">CortexStatsig"),
+        assert!(html.contains("color:#953800\">CortexStatsig"),
             "constructor/class name should be orange (#953800):\n{}",
             &html[..html.len().min(2000)]);
     }

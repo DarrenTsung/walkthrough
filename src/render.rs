@@ -514,6 +514,22 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     ("#1f2328", false)
 }
 
+/// Priority for overlapping captures. Higher = wins.
+/// Specific captures (function, type, keyword) beat generic ones (variable).
+fn capture_priority(capture: &str) -> u8 {
+    if capture.starts_with("comment") { return 10; }
+    if capture.starts_with("string") { return 10; }
+    if capture.starts_with("keyword") { return 9; }
+    if capture.starts_with("function") || capture.starts_with("method") { return 8; }
+    if capture.starts_with("type") || capture.starts_with("constructor") { return 8; }
+    if capture.starts_with("constant") || capture.starts_with("number") || capture.starts_with("boolean") { return 7; }
+    if capture.starts_with("tag") || capture.starts_with("attribute") { return 7; }
+    if capture.starts_with("property") || capture.starts_with("field") { return 6; }
+    if capture.starts_with("variable") || capture.starts_with("parameter") { return 5; }
+    if capture.starts_with("operator") || capture.starts_with("punctuation") { return 3; }
+    1
+}
+
 /// Syntax-highlight all lines of a file using arborium (tree-sitter).
 /// Returns one HTML string per line with `<span style="...">` tokens.
 fn syntax_highlight_lines(lines: &[String], hl: &mut Highlighter, lang: Option<&str>) -> Vec<String> {
@@ -529,16 +545,22 @@ fn syntax_highlight_lines(lines: &[String], hl: &mut Highlighter, lang: Option<&
     };
 
     // Build a per-byte color map from spans. Tree-sitter spans can overlap
-    // (nested scopes), so later spans override earlier ones (higher priority).
+    // (nested scopes like "function" + "variable" on the same token).
+    // Use capture priority so specific captures (function, type) win over
+    // generic ones (variable).
     let text_len = full_text.len();
-    let mut byte_color: Vec<Option<(&str, bool)>> = vec![None; text_len];
+    let mut byte_color: Vec<Option<(&str, bool, u8)>> = vec![None; text_len];
     for span in &spans {
         let (color, italic) = github_color_for_capture(&span.capture);
+        let priority = capture_priority(&span.capture);
         if color == "#1f2328" && !italic { continue; }
         let start = (span.start as usize).min(text_len);
         let end = (span.end as usize).min(text_len);
         for b in start..end {
-            byte_color[b] = Some((color, italic));
+            let dominated = byte_color[b].map_or(true, |(_, _, p)| priority >= p);
+            if dominated {
+                byte_color[b] = Some((color, italic, priority));
+            }
         }
     }
 
@@ -554,11 +576,13 @@ fn syntax_highlight_lines(lines: &[String], hl: &mut Highlighter, lang: Option<&
         let mut pos = line_start;
 
         while pos < line_end {
-            let cur_style = byte_color.get(pos).copied().flatten();
+            let cur_style = byte_color.get(pos).copied().flatten().map(|(c, i, _)| (c, i));
 
             // Find run of same style
             let mut run_end = pos + 1;
-            while run_end < line_end && byte_color.get(run_end).copied().flatten() == cur_style {
+            while run_end < line_end {
+                let next = byte_color.get(run_end).copied().flatten().map(|(c, i, _)| (c, i));
+                if next != cur_style { break; }
                 run_end += 1;
             }
 

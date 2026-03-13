@@ -27,7 +27,7 @@ const CSS: &str = r#"
     --diff-header-fg: #1f2328;
     --ln-fg: #59636e;
     --added-bg: #dafbe1;
-    --added-hl: #aceebb;
+    --added-hl: #b0e9bd;
     --added-num-bg: #aceebb;
     --removed-bg: #ffebe9;
     --removed-hl: #ffcecb;

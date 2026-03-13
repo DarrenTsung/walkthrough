@@ -597,12 +597,6 @@ fn syntax_highlight_lines(
 fn get_syntax<'a>(ss: &'a SyntaxSet, file_path: &str) -> &'a syntect::parsing::SyntaxReference {
     let ext = file_path.rsplit('.').next().unwrap_or("");
     ss.find_syntax_by_extension(ext)
-        // TypeScript/TSX: fall back to JavaScript since syntect's default set
-        // doesn't include TypeScript
-        .or_else(|| match ext {
-            "ts" | "tsx" | "mts" | "cts" => ss.find_syntax_by_extension("js"),
-            _ => None,
-        })
         .unwrap_or_else(|| ss.find_syntax_plain_text())
 }
 
@@ -1702,8 +1696,9 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
     let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
 
-    // Syntax highlighting setup
-    let ss = SyntaxSet::load_defaults_newlines();
+    // Syntax highlighting setup (two-face bundles bat's syntax definitions
+    // which include TypeScript, JSX, and many more languages).
+    let ss = two_face::syntax::extra_newlines();
     let ts = ThemeSet::load_defaults();
     let theme = &ts.themes["InspiredGitHub"];
 
@@ -1980,7 +1975,7 @@ mod tests {
     /// Build a DifftOutput from old/new lines, chunks, and hunks.
     /// Helper to call render_chunks with default syntax highlighting.
     fn test_render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter) -> String {
-        let ss = SyntaxSet::load_defaults_newlines();
+        let ss = two_face::syntax::extra_newlines();
         let ts = ThemeSet::load_defaults();
         let theme = &ts.themes["InspiredGitHub"];
         render_chunks(difft, chunk_indices, file_path, line_filter, &ss, theme)

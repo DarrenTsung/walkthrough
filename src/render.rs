@@ -271,9 +271,10 @@ img { max-width: 100%; }
 .diff-table {
     width: 100%;
     border-collapse: collapse;
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.8rem;
-    line-height: 1.5;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    line-height: 20px;
+    color: #1f2328;
     table-layout: fixed;
 }
 

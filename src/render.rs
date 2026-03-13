@@ -377,29 +377,39 @@ tr.line-paired-full .sign-rhs { color: #1a7f37; }
     border-bottom: 1px solid var(--border);
 }
 
-/* Code annotations */
-tr.annotated td {
-    border-left: 3px solid var(--primary);
-    cursor: pointer;
-}
-tr.annotated td:first-child {
-    padding-left: 9px; /* compensate for border */
+/* Code annotations: yellow right-edge indicator */
+tr.annotated td:last-child {
+    border-right: 3px solid #f0c000;
 }
 .note-tooltip {
     display: none;
     position: fixed;
     z-index: 10;
-    max-width: 400px;
+    max-width: none;
+    white-space: nowrap;
     padding: 8px 12px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 0.85rem;
     line-height: 1.4;
-    color: var(--text);
-    background: var(--bg);
-    border: 1px solid var(--border);
+    color: #5a4a00;
+    background: #fef9e7;
+    border: 1px solid #e8d44d;
     border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     pointer-events: none;
+}
+.note-tooltip hr {
+    border: none;
+    border-top: 1px solid #e8d44d;
+    margin: 4px 0;
+}
+@media (prefers-color-scheme: dark) {
+    tr.annotated td:last-child { border-right-color: #c0a000; }
+    .note-tooltip {
+        color: #e8d080;
+        background: #2a2400;
+        border-color: #4a4010;
+    }
 }
 
 /* Source blocks: single-column variant of diff-table */
@@ -547,36 +557,47 @@ const JS: &str = r#"
     updateActive();
 })();
 
-// Code annotation tooltips (click to toggle, dismiss on outside click)
+// Code annotation tooltips (hover, follow cursor, no flicker between rows)
 (function() {
-    var rows = document.querySelectorAll('tr.annotated[data-note]');
+    var rows = document.querySelectorAll('tr.annotated[data-notes]');
     if (!rows.length) return;
 
     var tip = document.createElement('div');
     tip.className = 'note-tooltip';
     document.body.appendChild(tip);
-    var activeRow = null;
+    var hideTimer = null;
+    var currentKey = '';
 
     rows.forEach(function(row) {
-        row.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (activeRow === row) {
-                tip.style.display = 'none';
-                activeRow = null;
-                return;
+        row.addEventListener('mouseenter', function() {
+            clearTimeout(hideTimer);
+            var raw = row.getAttribute('data-notes');
+            if (raw !== currentKey) {
+                tip.innerHTML = '';
+                var notes = raw.split('|');
+                notes.forEach(function(note, i) {
+                    if (i > 0) tip.appendChild(document.createElement('hr'));
+                    var p = document.createElement('div');
+                    p.textContent = note;
+                    p.style.padding = '2px 0';
+                    tip.appendChild(p);
+                });
+                currentKey = raw;
             }
-            tip.textContent = row.getAttribute('data-note');
             tip.style.display = 'block';
-            var rect = row.getBoundingClientRect();
-            tip.style.left = (rect.left + 40) + 'px';
-            tip.style.top = (rect.bottom + 4) + 'px';
-            activeRow = row;
         });
-    });
-
-    document.addEventListener('click', function() {
-        tip.style.display = 'none';
-        activeRow = null;
+        row.addEventListener('mousemove', function(e) {
+            var x = e.clientX + 16;
+            var maxX = window.innerWidth - tip.offsetWidth - 8;
+            tip.style.left = Math.min(x, maxX) + 'px';
+            tip.style.top = (e.clientY + 16) + 'px';
+        });
+        row.addEventListener('mouseleave', function() {
+            hideTimer = setTimeout(function() {
+                tip.style.display = 'none';
+                currentKey = '';
+            }, 50);
+        });
     });
 })();
 "#;
@@ -2114,11 +2135,22 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                                         if let Some(tr_pos) = last_block[..td_pos].rfind("<tr") {
                                             let tr_close = tr_pos + last_block[tr_pos..].find('>').unwrap_or(0);
                                             let old_tag = last_block[tr_pos..tr_close].to_string();
-                                            if !old_tag.contains("annotated") {
-                                                let new_tag = old_tag.replacen(
-                                                    "class=\"", "class=\"annotated ", 1
+                                            if old_tag.contains("data-notes=\"") {
+                                                // Append to existing notes
+                                                let new_tag = old_tag.replace(
+                                                    "data-notes=\"",
+                                                    &format!("data-notes=\"{}&#x7c;", escaped),
                                                 );
-                                                let new_tag = format!("{} data-note=\"{}\"", new_tag, escaped);
+                                                let before = last_block[..tr_pos].to_string();
+                                                let after = last_block[tr_close..].to_string();
+                                                *last_block = format!("{}{}{}", before, new_tag, after);
+                                            } else {
+                                                let new_tag = if !old_tag.contains("annotated") {
+                                                    old_tag.replacen("class=\"", "class=\"annotated ", 1)
+                                                } else {
+                                                    old_tag.clone()
+                                                };
+                                                let new_tag = format!("{} data-notes=\"{}\"", new_tag, escaped);
                                                 let before = last_block[..tr_pos].to_string();
                                                 let after = last_block[tr_close..].to_string();
                                                 *last_block = format!("{}{}{}", before, new_tag, after);

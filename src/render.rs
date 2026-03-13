@@ -488,7 +488,7 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     if capture.starts_with("keyword") || capture.starts_with("repeat") || capture.starts_with("conditional")
         || capture.starts_with("exception") || capture.starts_with("include") || capture.starts_with("storageclass")
     {
-        return ("#e80817", false);
+        return ("#db1522", false);
     }
     if capture.starts_with("constructor") {
         return ("#953800", false);

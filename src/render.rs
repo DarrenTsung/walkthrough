@@ -377,6 +377,16 @@ tr.line-paired-full .sign-rhs { color: #1a7f37; }
     border-bottom: 1px solid var(--border);
 }
 
+/* Mermaid diagrams */
+.mermaid-diagram {
+    margin: 1rem 0;
+    text-align: center;
+}
+.mermaid-diagram svg {
+    max-width: 100%;
+    height: auto;
+}
+
 /* Token-level highlights within changed lines (more saturated than row bg) */
 .hl-del { background: var(--removed-hl); }
 .hl-add { background: var(--added-hl); }
@@ -2095,6 +2105,58 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
         }
     }
 
+    // Pre-render mermaid code blocks to inline SVG via mmdc (mermaid CLI).
+    // pulldown-cmark renders ```mermaid as <pre><code class="language-mermaid">...</code></pre>
+    let mermaid_re = Regex::new(r#"(?s)<pre><code class="language-mermaid">(.*?)</code></pre>"#)?;
+    html_body = mermaid_re.replace_all(&html_body, |caps: &regex::Captures| {
+        let body = caps[1].replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"");
+
+        // Write mermaid source to temp file, run mmdc, read SVG output
+        let tmp_dir = std::env::temp_dir();
+        let input_path = tmp_dir.join("walkthrough_mermaid_input.mmd");
+        let output_svg = tmp_dir.join("walkthrough_mermaid_output.svg");
+        let _ = fs::write(&input_path, &body);
+
+        // Write puppeteer config to use system Chrome
+        let puppeteer_config = tmp_dir.join("walkthrough_puppeteer.json");
+        let _ = fs::write(&puppeteer_config, r#"{"executablePath":"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome","args":["--no-sandbox"]}"#);
+
+        let result = std::process::Command::new("mmdc")
+            .arg("-i").arg(&input_path)
+            .arg("-o").arg(&output_svg)
+            .arg("-t").arg("neutral")
+            .arg("-b").arg("transparent")
+            .arg("-p").arg(&puppeteer_config)
+            .output();
+
+        match result {
+            Ok(output) if output.status.success() => {
+                match fs::read_to_string(&output_svg) {
+                    Ok(svg) => {
+                        let _ = fs::remove_file(&input_path);
+                        let _ = fs::remove_file(&output_svg);
+                        format!("<div class=\"mermaid-diagram\">{}</div>", svg)
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: failed to read mermaid SVG: {}", e);
+                        format!("<pre><code class=\"language-mermaid\">{}</code></pre>", caps[1].to_string())
+                    }
+                }
+            }
+            Ok(output) => {
+                eprintln!("Warning: mmdc failed: {}", String::from_utf8_lossy(&output.stderr));
+                format!("<pre><code class=\"language-mermaid\">{}</code></pre>", caps[1].to_string())
+            }
+            Err(_) => {
+                eprintln!("Warning: mmdc not found. Install with: npm install -g @mermaid-js/mermaid-cli");
+                format!("<pre><code class=\"language-mermaid\">{}</code></pre>", caps[1].to_string())
+            }
+        }
+    }).to_string();
+
     // Add anchor IDs to headings and extract the first h1 for <title>.
     let heading_re = Regex::new(r"<(h[1-6])>(.*?)</h[1-6]>")?;
     let mut page_title = String::from("Walkthrough");
@@ -2257,7 +2319,7 @@ mod tests {
     /// Extract all (class, old_ln, new_ln) tuples from rendered HTML table rows.
     fn extract_rows(html: &str) -> Vec<(String, Option<u64>, Option<u64>)> {
         let row_re = Regex::new(r#"<tr class="([^"]+)">"#).unwrap();
-        let td_re = Regex::new(r#"<td class="ln[^"]*">(\d*)</td>"#).unwrap();
+        let td_re = Regex::new(r#"<td class="ln[^"]*"[^>]*>(\d*)</td>"#).unwrap();
 
         let mut rows = Vec::new();
         for row_cap in row_re.captures_iter(html) {
@@ -3180,7 +3242,7 @@ mod tests {
             .map(|&(o, _)| o as u64 + 1).collect();
 
         let row_re = Regex::new(r#"(?s)<tr class="([^"]+)">(.*?)</tr>"#).unwrap();
-        let td_re_for_hl = Regex::new(r#"<td class="ln[^"]*">(\d*)</td>"#).unwrap();
+        let td_re_for_hl = Regex::new(r#"<td class="ln[^"]*"[^>]*>(\d*)</td>"#).unwrap();
 
         for cap in row_re.captures_iter(&html) {
             let class = &cap[1];

@@ -45,6 +45,7 @@ The optional `lines=START-END` parameter (1-based, inclusive, relative to the ch
 ## External dependencies
 
 - **difftastic** (`difft`) must be installed and on PATH. Used with `--display json --color never` and `DFT_UNSTABLE=yes`.
+- **mermaid-cli** (`mmdc`) for pre-rendering mermaid diagrams to inline SVG. Install with `npm install -g @mermaid-js/mermaid-cli`. Uses system Chrome via a puppeteer config. If not installed, mermaid blocks fall back to showing source code.
 
 ## Build and check
 

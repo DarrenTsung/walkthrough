@@ -103,6 +103,47 @@ already there, so focus on:
 
 5. Use `chunks=all` for new files, deleted files, or files with only one or two chunks.
 
+### Mermaid diagrams
+
+Use `` ```mermaid `` code blocks to add diagrams that visually explain the change. The
+renderer pre-renders them to inline SVG via `mmdc` (no JavaScript dependency in the HTML).
+Diagrams are useful when prose alone can't convey the structure:
+
+- **Sequence diagrams** for request flows, RPC call chains, or multi-step processes:
+  ````markdown
+  ```mermaid
+  sequenceDiagram
+      participant C as Cortex
+      participant S as sboxd
+      C->>S: workspace/create (WebSocket)
+      Note over S: Run BootstrapConfig
+      S-->>C: workspace created
+  ```
+  ````
+
+- **Flowcharts** for decision trees, feature flag gating, or control flow:
+  ````markdown
+  ```mermaid
+  flowchart TD
+      A[workloadConfig?] -->|yes| B{feature flag}
+      B -->|enabled| C[new path]
+      B -->|disabled| D[legacy path]
+  ```
+  ````
+
+- **Class diagrams** for type relationships when new types are introduced:
+  ````markdown
+  ```mermaid
+  classDiagram
+      BootstrapConfig --> GitConfig
+      WorkspaceCreateRequest --> BootstrapConfig
+  ```
+  ````
+
+Place diagrams near the top of a section to orient the reader before the diff details.
+Keep them simple (5-10 nodes max). If `mmdc` is not installed, the renderer falls back
+to showing the mermaid source in a code block.
+
 ### Prose style
 
 6. **Lead with WHY, not WHAT.** The diff shows what changed. The prose should explain the

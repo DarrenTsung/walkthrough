@@ -493,7 +493,7 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
         return ("#0550ae", false);
     }
     if capture.starts_with("function") || capture.starts_with("method") {
-        return ("#0550ae", false);
+        return ("#6639ba", false);
     }
     if capture.starts_with("variable") || capture.starts_with("parameter") || capture.starts_with("field")
         || capture.starts_with("property")
@@ -2464,5 +2464,38 @@ mod tests {
 
         assert_eq!(union, all_lines,
             "single-line splits union must cover all.\n  unsplit: {:?}\n  union: {:?}", all_lines, union);
+    }
+
+    #[test]
+    fn function_names_are_purple() {
+        // Function names should be #6639ba (GitHub's --color-prettylights-syntax-entity).
+        // Tree-sitter emits both "function" and "variable" captures for function names;
+        // "function" should win via priority and map to purple.
+        // Note: tree-sitter needs the full function body to classify the name as "function".
+        let old_lines = vec!["// old"];
+        let new_lines = vec![
+            "async function bootstrapViaWorkspaceCreate(",
+            "  sboxdUrl: string,",
+            ") {",
+            "  const x = getSettings()",
+            "}",
+        ];
+
+        let chunk = vec![
+            LineEntry { lhs: None, rhs: Some(side(0, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(1, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(2, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(3, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(4, vec![])) },
+        ];
+        let hunks = vec![DiffHunk { old_start: 1, old_count: 0, new_start: 1, new_count: 5 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+
+        // bootstrapViaWorkspaceCreate should be purple (#6639ba)
+        assert!(html.contains("color:#6639ba"),
+            "function name should be purple (#6639ba) in HTML:\n{}",
+            &html[..html.len().min(2000)]);
     }
 }

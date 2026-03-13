@@ -74,7 +74,7 @@ body {
 article {
     max-width: 860px;
     margin: 0 auto;
-    padding: 24px 28px 60px;
+    padding: 24px 28px 20vh;
     line-height: 1.6;
 }
 
@@ -547,7 +547,7 @@ const JS: &str = r#"
     updateActive();
 })();
 
-// Code annotation tooltips
+// Code annotation tooltips (click to toggle, dismiss on outside click)
 (function() {
     var rows = document.querySelectorAll('tr.annotated[data-note]');
     if (!rows.length) return;
@@ -555,18 +555,28 @@ const JS: &str = r#"
     var tip = document.createElement('div');
     tip.className = 'note-tooltip';
     document.body.appendChild(tip);
+    var activeRow = null;
 
     rows.forEach(function(row) {
-        row.addEventListener('mouseenter', function() {
+        row.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (activeRow === row) {
+                tip.style.display = 'none';
+                activeRow = null;
+                return;
+            }
             tip.textContent = row.getAttribute('data-note');
             tip.style.display = 'block';
             var rect = row.getBoundingClientRect();
             tip.style.left = (rect.left + 40) + 'px';
             tip.style.top = (rect.bottom + 4) + 'px';
+            activeRow = row;
         });
-        row.addEventListener('mouseleave', function() {
-            tip.style.display = 'none';
-        });
+    });
+
+    document.addEventListener('click', function() {
+        tip.style.display = 'none';
+        activeRow = null;
     });
 })();
 "#;

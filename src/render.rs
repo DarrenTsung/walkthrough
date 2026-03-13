@@ -274,7 +274,7 @@ img { max-width: 100%; }
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     font-size: 12px;
     line-height: 18px;
-    color: #1f2328;
+    color: #0e1116;
     table-layout: fixed;
 }
 

@@ -489,11 +489,8 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     {
         return ("#cf222e", false);
     }
-    if capture == "type.builtin" {
-        return ("#1f2328", false);
-    }
     if capture.starts_with("type") || capture.starts_with("constructor") {
-        return ("#0550ae", false);
+        return ("#1f2328", false);
     }
     if capture.starts_with("function") || capture.starts_with("method") {
         return ("#6639ba", false);
@@ -2559,12 +2556,15 @@ mod tests {
 
         let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
-        // `string` and `boolean` should NOT have a colored span
+        // `string`, `boolean`, and user-defined types should NOT have a colored span
         assert!(!html.contains("color:#0550ae\">string"),
             "type 'string' should be default text, not blue:\n{}",
             &html[..html.len().min(2000)]);
         assert!(!html.contains("color:#0550ae\">boolean"),
             "type 'boolean' should be default text, not blue:\n{}",
+            &html[..html.len().min(2000)]);
+        assert!(!html.contains("color:#0550ae\">Foo"),
+            "user-defined type 'Foo' should be default text, not blue:\n{}",
             &html[..html.len().min(2000)]);
     }
 }

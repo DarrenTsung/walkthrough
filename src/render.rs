@@ -381,19 +381,19 @@ tr.line-paired-full .sign-rhs { color: #1a7f37; }
 .service-badge {
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
     font-size: 0.9em;
-    font-weight: 600;
-    color: #953800;
-    background: #fff8f0;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    color: #0550ae;
+    background: #f0f4ff;
     padding: 0.1em 0.4em;
     border-radius: 4px;
-    border: 1px solid #f0d8b8;
+    border: 1px solid #c8d8f0;
 }
 
 @media (prefers-color-scheme: dark) {
     .service-badge {
-        color: #f0a050;
-        background: #2a1a08;
-        border-color: #4a3018;
+        color: #a0c0f0;
+        background: #0a1428;
+        border-color: #1a2a48;
     }
 }
 

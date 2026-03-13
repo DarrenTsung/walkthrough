@@ -127,42 +127,51 @@ Do NOT use for:
 
 Use `` ```mermaid `` code blocks to add diagrams that visually explain the change. The
 renderer pre-renders them to inline SVG via `mmdc` (no JavaScript dependency in the HTML).
-Diagrams are useful when prose alone can't convey the structure:
 
-- **Sequence diagrams** for request flows, RPC call chains, or multi-step processes:
-  ````markdown
-  ```mermaid
-  sequenceDiagram
-      participant C as Cortex
-      participant S as sboxd
-      C->>S: workspace/create (WebSocket)
-      Note over S: Run BootstrapConfig
-      S-->>C: workspace created
-  ```
-  ````
+**Diagrams should show high-level architecture, not restate code.** A diagram that mirrors
+an if/else branch from the diff adds no value. Instead, diagrams should help the reader
+understand the system-level context that the code operates in.
 
-- **Flowcharts** for decision trees, feature flag gating, or control flow:
-  ````markdown
-  ```mermaid
-  flowchart TD
-      A[workloadConfig?] -->|yes| B{feature flag}
-      B -->|enabled| C[new path]
-      B -->|disabled| D[legacy path]
-  ```
-  ````
+The most effective pattern is **before/after sequence diagrams** that show how the
+interaction between services changes. Place one in the overview section to orient the
+reader before they see any code:
 
-- **Class diagrams** for type relationships when new types are introduced:
-  ````markdown
-  ```mermaid
-  classDiagram
-      BootstrapConfig --> GitConfig
-      WorkspaceCreateRequest --> BootstrapConfig
-  ```
-  ````
+````markdown
+```mermaid
+sequenceDiagram
+    participant Cortex
+    participant Nimbus
+    participant Sboxd
 
-Place diagrams near the top of a section to orient the reader before the diff details.
-Keep them simple (5-10 nodes max). If `mmdc` is not installed, the renderer falls back
-to showing the mermaid source in a code block.
+    rect rgb(240,240,240)
+    Note over Cortex,Sboxd: Before: nimbus mediates bootstrap
+    Cortex->>Nimbus: POST /sandbox {flat envVars}
+    Nimbus->>Sboxd: POST /api/ready {envVars}
+    Nimbus-->>Cortex: sandbox URLs
+    end
+
+    rect rgb(230,245,230)
+    Note over Cortex,Sboxd: After: cortex bootstraps directly
+    Cortex->>Nimbus: POST /sandbox
+    Nimbus-->>Cortex: sandbox URLs
+    Cortex->>Sboxd: workspace/create {BootstrapConfig}
+    end
+```
+````
+
+Other useful diagram types:
+
+- **Sequence diagrams** for request flows, RPC call chains, or multi-step processes
+- **Class diagrams** for type relationships when new types are introduced
+
+**Do NOT use:**
+- **Flowcharts** that restate branching logic already visible in the diff (if/else,
+  feature flag checks, guard conditions). The code is the source of truth for control
+  flow; a flowchart just adds a less precise duplicate.
+
+Place diagrams near the top of the walkthrough to orient the reader before the diff
+details. Keep them simple (5-10 nodes max). If `mmdc` is not installed, the renderer
+falls back to showing the mermaid source in a code block.
 
 ### Prose style
 

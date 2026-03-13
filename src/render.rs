@@ -489,6 +489,9 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     {
         return ("#cf222e", false);
     }
+    if capture == "type.builtin" {
+        return ("#1f2328", false);
+    }
     if capture.starts_with("type") || capture.starts_with("constructor") {
         return ("#0550ae", false);
     }
@@ -2530,6 +2533,38 @@ mod tests {
         // Variables should be default text (#1f2328), which means no span wrapper
         assert!(!html.contains("color:#953800\">workloadConfig"),
             "variable should not be orange (#953800), should be default text:\n{}",
+            &html[..html.len().min(2000)]);
+    }
+
+    #[test]
+    fn type_annotations_are_default_text() {
+        // Type annotations like `string`, `boolean`, `Record` should be default text,
+        // matching GitHub's rendering.
+        let old_lines = vec!["// old"];
+        let new_lines = vec![
+            "interface Foo {",
+            "  name: string",
+            "  enabled: boolean",
+            "}",
+        ];
+
+        let chunk = vec![
+            LineEntry { lhs: None, rhs: Some(side(0, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(1, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(2, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(3, vec![])) },
+        ];
+        let hunks = vec![DiffHunk { old_start: 1, old_count: 0, new_start: 1, new_count: 4 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+
+        // `string` and `boolean` should NOT have a colored span
+        assert!(!html.contains("color:#0550ae\">string"),
+            "type 'string' should be default text, not blue:\n{}",
+            &html[..html.len().min(2000)]);
+        assert!(!html.contains("color:#0550ae\">boolean"),
+            "type 'boolean' should be default text, not blue:\n{}",
             &html[..html.len().min(2000)]);
     }
 }

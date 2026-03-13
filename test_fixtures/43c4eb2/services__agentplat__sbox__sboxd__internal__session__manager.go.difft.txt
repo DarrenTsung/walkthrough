@@ -1,0 +1,211 @@
+services/agentplat/sbox/sboxd/internal/session/manager.go --- 1/6 --- Go
+ 311                                     311 
+ 312 // --- Public API ---               312 // --- Public API ---
+ 313                                     313 
+ 314 // Prompt sends a prompt to a sess  314 // Prompt sends a prompt to a sess
+ ... ion. Creates a new session if Sess  ... ion. Creates a new session if Sess
+ ... ionID is empty.                     ... ionID is empty
+ ...                                     315 // or if the provided SessionID do
+ ...                                     ... es not match any existing session.
+ 315 func (m *Manager) Prompt(ctx conte  316 func (m *Manager) Prompt(ctx conte
+ ... xt.Context, req *proto.SessionProm  ... xt.Context, req *proto.SessionProm
+ ... ptRequest) (*proto.SessionPromptRe  ... ptRequest) (*proto.SessionPromptRe
+ ... sponse, error) {                    ... sponse, error) {
+ 316     agentType := req.AgentType      317     agentType := req.AgentType
+ 317     if agentType == "" {            318     if agentType == "" {
+
+services/agentplat/sbox/sboxd/internal/session/manager.go --- 2/6 --- Go
+ 343         m.metrics.RecordPromptBefo  344         m.metrics.RecordPromptBefo
+ ... reBootstrap(agentType)              ... reBootstrap(agentType)
+ 344     }                               345     }
+ 345                                     346 
+ 346     // Pre-resolve workspace path   347     // Pre-resolve workspace path 
+ ... outside lock for new sessions (pot  ... outside lock for new sessions (pot
+ ... entially slow I/O)                  ... entially slow I/O).
+ ...                                     348     // We resolve eagerly for any 
+ ...                                     ... session ID that might trigger crea
+ ...                                     ... tion: empty,
+ ...                                     349     // "default", or a client-prov
+ ...                                     ... ided ID that may not exist yet.
+ 347     isDefault := req.SessionID ==   350     isDefault := req.SessionID == 
+ ... "default"                           ... "default"
+ 348     var wsPath string               ... 
+ 349     if req.SessionID == "" || isDe  ... 
+ ... fault {                             ... 
+ 350         wsID := req.WorkspaceID     351     wsID := req.WorkspaceID
+ 351         if wsID == "" {             352     if wsID == "" {
+ 352             wsID = m.defaultWorksp  353         wsID = m.defaultWorkspaceI
+ ... aceID                               ... D
+ 353         }                           354     }
+ 354         var err error               ... 
+ 355         wsPath, err = m.resolveWor  355     wsPath, err := m.resolveWorksp
+ ... kspacePath(wsID)                    ... acePath(wsID)
+ 356         if err != nil {             356     if err != nil {
+ 357             return nil, fmt.Errorf  357         return nil, fmt.Errorf("re
+ ... ("resolve workspace %q: %w", wsID,  ... solve workspace %q: %w", wsID, err
+ ...  err)                               ... )
+ 358         }                           358     }
+ 359     }                               ... 
+ 360                                     359 
+ 361     m.mu.Lock()                     360     m.mu.Lock()
+ 362                                     361 
+
+services/agentplat/sbox/sboxd/internal/session/manager.go --- 3/6 --- Go
+ 377         // Create new session       376         // Create new session
+ 378         isNewSession = true         377         isNewSession = true
+ 379         var err error               378         var err error
+ 380         s, err = m.createSessionLo  379         s, err = m.createSessionLo
+ ... ckedWithOpts(agentType, req.Worksp  ... ckedWithOpts(agentType, req.Worksp
+ ... aceID, wsPath, isDefault)           ... aceID, wsPath, isDefault, "")
+ 381         if err != nil {             380         if err != nil {
+ 382             m.mu.Unlock()           381             m.mu.Unlock()
+ 383             return nil, err         382             return nil, err
+
+services/agentplat/sbox/sboxd/internal/session/manager.go --- 4/6 --- Go
+ 386         var ok bool                 385         var ok bool
+ 387         s, ok = m.getSessionLocked  386         s, ok = m.getSessionLocked
+ ... (sessionID)                         ... (sessionID)
+ 388         if !ok {                    387         if !ok {
+ ...                                     388             // Auto-create: client
+ ...                                     ...  sent an unknown session ID (e.g. 
+ ...                                     ... a random UUID).
+ ...                                     389             // Validate before tou
+ ...                                     ... ching the filesystem.
+ ...                                     390             if err := validateSess
+ ...                                     ... ionID(sessionID); err != nil {
+ 389             m.mu.Unlock()           391                 m.mu.Unlock()
+ ...                                     392                 return nil, err
+ ...                                     393             }
+ ...                                     394             // Create the session 
+ ...                                     ... so the semantics match empty/defau
+ ...                                     ... lt.
+ ...                                     395             isNewSession = true
+ ...                                     396             var err error
+ ...                                     397             s, err = m.createSessi
+ ...                                     ... onLockedWithOpts(agentType, req.Wo
+ ...                                     ... rkspaceID, wsPath, false, sessionI
+ ...                                     ... D)
+ ...                                     398             if err != nil {
+ ...                                     399                 m.mu.Unlock()
+ 390             return nil, ErrSession  400                 return nil, err
+ ... NotFound                            ... 
+ ...                                     401             }
+ ...                                     402             slog.InfoContext(ctx, 
+ ...                                     ... "auto-created session for client-p
+ ...                                     ... rovided ID",
+ ...                                     403                 "session_id", sess
+ ...                                     ... ionID,
+ ...                                     404                 "agent_type", agen
+ ...                                     ... tType,
+ ...                                     405                 "workspace_id", re
+ ...                                     ... q.WorkspaceID,
+ ...                                     406             )
+ 391         }                           407         }
+ 392         // Check if session is bei  408         // Check if session is bei
+ ... ng deleted (subplan 01)             ... ng deleted (subplan 01)
+ 393         if s.deleting {             409         if s.deleting {
+
+services/agentplat/sbox/sboxd/internal/session/manager.go --- 5/6 --- Go
+ 988     return SessionStatusRunning    1004     return SessionStatusRunning
+ 989 }                                  1005 }
+ 990                                    1006 
+ 991 // createSessionLockedWithOpts cre 1007 // createSessionLockedWithOpts cre
+ ... ates a new session. When isDefault .... ates a new session. If id is empty
+ ...  is true, the                      .... , a UUID is
+ 992 // session uses the shared config  1008 // generated. When isDefault is tr
+ ... dir at {sessionPath}/{agentType}/  .... ue, the session uses the shared co
+ ... (backward compat).                 .... nfig dir at
+ ...                                    1009 // {sessionPath}/{agentType}/ (bac
+ ...                                    .... kward compat). Otherwise, the sess
+ ...                                    .... ion gets a
+ 993 // Otherwise, the session gets a p 1010 // per-session directory at {sessi
+ ... er-session directory at {sessionPa .... onPath}/sessions/{id}/{agentType}/
+ ... th}/sessions/{id}/{agentType}/.    .... .
+ 994 func (m *Manager) createSessionLoc 1011 func (m *Manager) createSessionLoc
+ ... kedWithOpts(agentType, workspaceID .... kedWithOpts(agentType, workspaceID
+ ... , wsPath string, isDefault bool) ( .... , wsPath string, isDefault bool, i
+ ... *session, error) {                 .... d string) (*session, error) {
+ 995     if workspaceID == "" {         1012     if workspaceID == "" {
+ 996         workspaceID = m.defaultWor 1013         workspaceID = m.defaultWor
+ ... kspaceID                           .... kspaceID
+ 997     }                              1014     }
+ 998                                    1015 
+ 999     id := uuid.New().String()      1016     if id == "" {
+ ...                                    1017         id = uuid.New().String()
+ ...                                    1018     }
+1000                                    1019 
+1001     var configDir string           1020     var configDir string
+1002     if isDefault {                 1021     if isDefault {
+
+services/agentplat/sbox/sboxd/internal/session/manager.go --- 6/6 --- Go
+1035         return nil, fmt.Errorf("cr 1054         return nil, fmt.Errorf("cr
+.... eate session streams dir: %w", err .... eate session streams dir: %w", err
+.... )                                  .... )
+1036     }                              1055     }
+1037                                    .... 
+1038     // For per-session dirs, creat .... 
+.... e the config directory             .... 
+1039     if !isDefault {                .... 
+1040         if err := os.MkdirAll(conf .... 
+.... igDir, 0755); err != nil {         .... 
+1041             delete(m.sessions, id) .... 
+1042             m.metrics.RecordSessio .... 
+.... nsActive(len(m.sessions))          .... 
+1043             return nil, fmt.Errorf .... 
+.... ("create per-session config dir: % .... 
+.... w", err)                           .... 
+1044         }                          .... 
+1045     }                              .... 
+1046                                    1056 
+1047     // Caller handles persistence  1057     // Caller handles persistence 
+.... (subplan 02)                       .... (subplan 02)
+1048     return s, nil                  1058     return s, nil
+1049 }                                  1059 }
+....                                    1060 
+....                                    1061 // validateSessionID returns an er
+....                                    .... ror if id is unsafe for use in fil
+....                                    .... esystem paths.
+....                                    1062 // Allowed characters are alphanum
+....                                    .... eric and hyphens (UUID-safe set).
+....                                    1063 func validateSessionID(id string) 
+....                                    .... error {
+....                                    1064     const maxLen = 128
+....                                    1065     if len(id) == 0 {
+....                                    1066         return fmt.Errorf("invalid
+....                                    ....  session ID: must not be empty")
+....                                    1067     }
+....                                    1068     if len(id) > maxLen {
+....                                    1069         return fmt.Errorf("invalid
+....                                    ....  session ID: exceeds maximum lengt
+....                                    .... h of %d", maxLen)
+....                                    1070     }
+....                                    1071     // First character must be alp
+....                                    .... hanumeric — leading hyphens can co
+....                                    .... nfuse CLI
+....                                    1072     // tools that interpret '-' as
+....                                    ....  a flag prefix.
+....                                    1073     first := rune(id[0])
+....                                    1074     if !((first >= 'a' && first <=
+....                                    ....  'z') || (first >= 'A' && first <=
+....                                    ....  'Z') || (first >= '0' && first <=
+....                                    ....  '9')) {
+....                                    1075         return fmt.Errorf("invalid
+....                                    ....  session ID: must start with an al
+....                                    .... phanumeric character")
+....                                    1076     }
+....                                    1077     for _, c := range id {
+....                                    1078         if !((c >= 'a' && c <= 'z'
+....                                    .... ) || (c >= 'A' && c <= 'Z') || (c 
+....                                    .... >= '0' && c <= '9') || c == '-') {
+....                                    1079             return fmt.Errorf("inv
+....                                    .... alid session ID: contains disallow
+....                                    .... ed character %q", c)
+....                                    1080         }
+....                                    1081     }
+....                                    1082     return nil
+....                                    1083 }
+1050                                    1084 
+1051 func (m *Manager) allocatePromptID 1085 func (m *Manager) allocatePromptID
+.... (s *session) int {                 .... (s *session) int {
+1052     id := s.info.NextPromptID      1086     id := s.info.NextPromptID
+

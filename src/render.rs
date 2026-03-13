@@ -3478,6 +3478,22 @@ mod tests {
             }
         }
 
+        // 2b. New-side non-decreasing (including context rows, since gap lines
+        // can push difft entries out of position)
+        let all_new_lns: Vec<u64> = rendered.iter()
+            .filter(|(c, _, _)| c != "chunk-sep")
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+        for i in 1..all_new_lns.len() {
+            if all_new_lns[i] < all_new_lns[i - 1] {
+                errors.push(format!(
+                    "new-side out of order (all rows): {} followed by {} at position {}",
+                    all_new_lns[i - 1], all_new_lns[i], i,
+                ));
+                break;
+            }
+        }
+
         // 3. No duplicate line numbers
         let mut seen = std::collections::HashSet::new();
         for &ln in &old_lns {

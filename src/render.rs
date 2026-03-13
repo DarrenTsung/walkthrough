@@ -318,7 +318,7 @@ tr.line-paired .sign-rhs { color: #1a7f37; }
 /* Context lines (unchanged) */
 tr.line-context td { background: var(--bg); }
 
-/* Removed lines (lhs side highlighted, rhs side empty) */
+/* Removed lines (full-line: lhs side highlighted, rhs side empty) */
 tr.line-removed td.code-lhs,
 tr.line-removed .sign-lhs { background: var(--removed-bg); }
 tr.line-removed .ln-lhs { background: var(--removed-num-bg); }
@@ -326,7 +326,16 @@ tr.line-removed td.code-rhs,
 tr.line-removed .sign-rhs,
 tr.line-removed .ln-rhs { background: var(--empty-bg); }
 
-/* Added lines (rhs side highlighted, lhs side empty) */
+/* Removed lines (partial: no row background, token highlights for changes) */
+tr.line-removed-partial td.code-lhs,
+tr.line-removed-partial .sign-lhs { background: var(--bg); }
+tr.line-removed-partial .ln-lhs { background: var(--removed-num-bg); }
+tr.line-removed-partial td.code-rhs,
+tr.line-removed-partial .sign-rhs,
+tr.line-removed-partial .ln-rhs { background: var(--empty-bg); }
+tr.line-removed-partial .sign-lhs { color: #cf222e; }
+
+/* Added lines (full-line: rhs side highlighted, lhs side empty) */
 tr.line-added td.code-rhs,
 tr.line-added .sign-rhs { background: var(--added-bg); }
 tr.line-added .ln-rhs { background: var(--added-num-bg); }
@@ -334,13 +343,32 @@ tr.line-added td.code-lhs,
 tr.line-added .sign-lhs,
 tr.line-added .ln-lhs { background: var(--empty-bg); }
 
-/* Paired rows: removed on left, added on right */
+/* Added lines (partial: no row background, token highlights for changes) */
+tr.line-added-partial td.code-rhs,
+tr.line-added-partial .sign-rhs { background: var(--bg); }
+tr.line-added-partial .ln-rhs { background: var(--added-num-bg); }
+tr.line-added-partial td.code-lhs,
+tr.line-added-partial .sign-lhs,
+tr.line-added-partial .ln-lhs { background: var(--empty-bg); }
+tr.line-added-partial .sign-rhs { color: #1a7f37; }
+
+/* Paired rows (partial change): no row background, token highlights only */
 tr.line-paired td.code-lhs,
-tr.line-paired .sign-lhs { background: var(--removed-bg); }
-tr.line-paired .ln-lhs { background: var(--removed-num-bg); }
+tr.line-paired .sign-lhs,
 tr.line-paired td.code-rhs,
-tr.line-paired .sign-rhs { background: var(--added-bg); }
+tr.line-paired .sign-rhs { background: var(--bg); }
+tr.line-paired .ln-lhs { background: var(--removed-num-bg); }
 tr.line-paired .ln-rhs { background: var(--added-num-bg); }
+
+/* Paired rows (full-line change): full row background like added/removed */
+tr.line-paired-full td.code-lhs,
+tr.line-paired-full .sign-lhs { background: var(--removed-bg); }
+tr.line-paired-full .ln-lhs { background: var(--removed-num-bg); }
+tr.line-paired-full td.code-rhs,
+tr.line-paired-full .sign-rhs { background: var(--added-bg); }
+tr.line-paired-full .ln-rhs { background: var(--added-num-bg); }
+tr.line-paired-full .sign-lhs { color: #cf222e; }
+tr.line-paired-full .sign-rhs { color: #1a7f37; }
 
 .chunk-sep td {
     height: 0.5rem;
@@ -349,9 +377,9 @@ tr.line-paired .ln-rhs { background: var(--added-num-bg); }
     border-bottom: 1px solid var(--border);
 }
 
-/* Token-level highlights within changed lines */
-.hl-del { background: var(--removed-hl); border-radius: 2px; }
-.hl-add { background: var(--added-hl); border-radius: 2px; }
+/* Token-level highlights within changed lines (more saturated than row bg) */
+.hl-del { background: var(--removed-hl); }
+.hl-add { background: var(--added-hl); }
 "#;
 
 const JS: &str = r#"
@@ -616,6 +644,99 @@ fn syntax_highlight_lines(lines: &[String], hl: &mut Highlighter, lang: Option<&
 /// Insert a diff highlight span into syntax-highlighted HTML at the given
 /// text-character positions (byte offsets into the original plain text).
 /// Walks the HTML, tracking the text position, and injects opening/closing tags.
+/// Insert multiple non-overlapping diff highlight spans into syntax-highlighted HTML.
+/// `spans` must be sorted by start position and non-overlapping.
+fn insert_diff_highlights(highlighted_html: &str, spans: &[(usize, usize)], hl_class: &str) -> String {
+    if spans.is_empty() {
+        return highlighted_html.to_string();
+    }
+
+    let mut out = String::new();
+    let mut text_pos: usize = 0;
+    let mut span_idx: usize = 0;
+    let mut opened = false;
+    let bytes = highlighted_html.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] == b'<' {
+            let tag_end = highlighted_html[i..].find('>').map(|p| i + p + 1).unwrap_or(len);
+            out.push_str(&highlighted_html[i..tag_end]);
+            i = tag_end;
+        } else if bytes[i] == b'&' {
+            let ent_end = highlighted_html[i..].find(';').map(|p| i + p + 1).unwrap_or(i + 1);
+            // Close current span if we've passed its end
+            if opened {
+                if let Some(&(_, end)) = spans.get(span_idx.wrapping_sub(1)) {
+                    if text_pos >= end {
+                        out.push_str("</span>");
+                        opened = false;
+                    }
+                }
+            }
+            // Open new span if we've reached its start
+            if !opened {
+                if let Some(&(start, end)) = spans.get(span_idx) {
+                    if text_pos >= start && text_pos < end {
+                        out.push_str(&format!("<span class=\"{}\">", hl_class));
+                        opened = true;
+                        span_idx += 1;
+                    }
+                }
+            }
+            out.push_str(&highlighted_html[i..ent_end]);
+            text_pos += 1;
+            // Close if we've reached end after this char
+            if opened {
+                if let Some(&(_, end)) = spans.get(span_idx.wrapping_sub(1)) {
+                    if text_pos >= end {
+                        out.push_str("</span>");
+                        opened = false;
+                    }
+                }
+            }
+            i = ent_end;
+        } else {
+            // Close current span if we've passed its end
+            if opened {
+                if let Some(&(_, end)) = spans.get(span_idx.wrapping_sub(1)) {
+                    if text_pos >= end {
+                        out.push_str("</span>");
+                        opened = false;
+                    }
+                }
+            }
+            // Open new span if we've reached its start
+            if !opened {
+                if let Some(&(start, end)) = spans.get(span_idx) {
+                    if text_pos >= start && text_pos < end {
+                        out.push_str(&format!("<span class=\"{}\">", hl_class));
+                        opened = true;
+                        span_idx += 1;
+                    }
+                }
+            }
+            out.push(bytes[i] as char);
+            text_pos += 1;
+            // Close if we've reached end after this char
+            if opened {
+                if let Some(&(_, end)) = spans.get(span_idx.wrapping_sub(1)) {
+                    if text_pos >= end {
+                        out.push_str("</span>");
+                        opened = false;
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+    if opened {
+        out.push_str("</span>");
+    }
+    out
+}
+
 fn insert_diff_highlight(highlighted_html: &str, change_start: usize, change_end: usize, hl_class: &str) -> String {
     if change_start >= change_end {
         return highlighted_html.to_string();
@@ -772,56 +893,166 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
     rows
 }
 
+/// Merge adjacent difft change spans separated by whitespace or punctuation.
+/// Returns sorted, non-overlapping (start, end) byte ranges.
+fn merge_whitespace_spans(changes: &[crate::difft_json::ChangeSpan], line: &str) -> Vec<(usize, usize)> {
+    let mut spans: Vec<(usize, usize)> = changes.iter()
+        .map(|s| (s.start, s.end))
+        .collect();
+    spans.sort_by_key(|&(start, _)| start);
+
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    for &(start, end) in &spans {
+        if let Some(last) = merged.last_mut() {
+            let gap = &line.as_bytes()[last.1..start.min(line.len())];
+            // Merge if gap is only whitespace and punctuation (not identifiers)
+            if gap.iter().all(|&b| !b.is_ascii_alphanumeric() && b != b'_') {
+                last.1 = end;
+                continue;
+            }
+        }
+        merged.push((start, end));
+    }
+    merged
+}
+
+/// Check if merged spans cover the full content of a line (from first
+/// non-whitespace character to the last non-whitespace character).
+fn spans_cover_full_line(spans: &[(usize, usize)], line: &str) -> bool {
+    if spans.is_empty() { return false; }
+    let first_nws = line.bytes().position(|b| b != b' ' && b != b'\t').unwrap_or(0);
+    let last_nws = line.bytes().rposition(|b| b != b' ' && b != b'\t').map(|p| p + 1).unwrap_or(0);
+    if first_nws >= last_nws { return true; } // all whitespace
+    let span_start = spans.first().map(|s| s.0).unwrap_or(usize::MAX);
+    let span_end = spans.last().map(|s| s.1).unwrap_or(0);
+    span_start <= first_nws && span_end >= last_nws
+}
+
 fn render_diff_row(
     row: &DiffRow,
     old_lines: &[String], new_lines: &[String],
     old_hl: &[String], new_hl: &[String],
 ) -> String {
     let mut html = String::new();
-    let has_lhs = row.lhs.is_some();
-    let has_rhs = row.rhs.is_some();
 
-    let row_class = match (has_lhs, has_rhs) {
-        (true, true) => "line-paired",
-        (true, false) => "line-removed",
-        (false, true) => "line-added",
-        (false, false) => return String::new(),
-    };
-
-    html.push_str(&format!("<tr class=\"{}\">", row_class));
-
-    // For paired rows, syntax-highlight the line then overlay the diff highlight.
+    // For paired rows, determine if it's a full-line or partial change,
+    // then choose the appropriate row class and highlight strategy.
     if let (Some(lhs), Some(rhs)) = (row.lhs, row.rhs) {
         let old_line = old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         let new_line = new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         let old_highlighted = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         let new_highlighted = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
-        let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
+
+        let old_code;
+        let new_code;
+        let is_full_line;
+
+        if !lhs.changes.is_empty() || !rhs.changes.is_empty() {
+            // Merge adjacent spans separated only by whitespace
+            let old_spans = merge_whitespace_spans(&lhs.changes, old_line);
+            let new_spans = merge_whitespace_spans(&rhs.changes, new_line);
+
+            // Check if spans cover the full content (first non-ws to end)
+            is_full_line = spans_cover_full_line(&new_spans, new_line)
+                && spans_cover_full_line(&old_spans, old_line);
+
+            if is_full_line {
+                // Full-line change: use row background, no token highlights needed
+                old_code = old_highlighted.to_string();
+                new_code = new_highlighted.to_string();
+            } else {
+                old_code = insert_diff_highlights(old_highlighted, &old_spans, "hl-del");
+                new_code = insert_diff_highlights(new_highlighted, &new_spans, "hl-add");
+            }
+
+            // Purely additive: old has no spans, only new changed.
+            // Render old side as context (no minus, no red).
+            // Purely additive: old has no spans, only new changed.
+            // Render old side as context (no minus, no red).
+            if lhs.changes.is_empty() && !rhs.changes.is_empty() {
+                let bg = "style=\"background:var(--bg)\"";
+                html.push_str("<tr class=\"line-paired\">");
+                html.push_str(&format!(
+                    "<td class=\"ln ln-lhs\" {bg}>{}</td><td class=\"sign sign-lhs\" {bg}></td><td class=\"code-lhs\" {bg}>{}</td>",
+                    lhs.line_number + 1, old_highlighted
+                ));
+                html.push_str(&format!(
+                    "<td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td>",
+                    rhs.line_number + 1, new_code
+                ));
+                html.push_str("</tr>");
+                return html;
+            }
+            // Purely subtractive: only old changed, new side is context
+            if !lhs.changes.is_empty() && rhs.changes.is_empty() {
+                let bg = "style=\"background:var(--bg)\"";
+                html.push_str("<tr class=\"line-paired\">");
+                html.push_str(&format!(
+                    "<td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>",
+                    lhs.line_number + 1, old_code
+                ));
+                html.push_str(&format!(
+                    "<td class=\"ln ln-rhs\" {bg}>{}</td><td class=\"sign sign-rhs\" {bg}></td><td class=\"code-rhs\" {bg}>{}</td>",
+                    rhs.line_number + 1, new_highlighted
+                ));
+                html.push_str("</tr>");
+                return html;
+            }
+        } else {
+            // No difft spans: fall back to prefix/suffix comparison
+            let (old_cs, old_ce, new_cs, new_ce) = find_change_bounds(old_line, new_line);
+            is_full_line = false;
+            old_code = insert_diff_highlight(old_highlighted, old_cs, old_ce, "hl-del");
+            new_code = insert_diff_highlight(new_highlighted, new_cs, new_ce, "hl-add");
+        }
+
+        let row_class = if is_full_line { "line-paired-full" } else { "line-paired" };
+        html.push_str(&format!("<tr class=\"{}\">", row_class));
 
         html.push_str(&format!(
             "<td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>",
-            lhs.line_number + 1,
-            insert_diff_highlight(old_highlighted, old_cs, old_ce, "hl-del")
+            lhs.line_number + 1, old_code
         ));
         html.push_str(&format!(
             "<td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td>",
-            rhs.line_number + 1,
-            insert_diff_highlight(new_highlighted, new_cs, new_ce, "hl-add")
+            rhs.line_number + 1, new_code
         ));
     } else if let Some(lhs) = row.lhs {
-        let content = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let old_line = old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let old_highlighted = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let spans = merge_whitespace_spans(&lhs.changes, old_line);
+        let is_full = spans.is_empty() || spans_cover_full_line(&spans, old_line);
+        let row_class = if is_full { "line-removed" } else { "line-removed-partial" };
+        let content = if is_full {
+            old_highlighted.to_string()
+        } else {
+            insert_diff_highlights(old_highlighted, &spans, "hl-del")
+        };
+        html.push_str(&format!("<tr class=\"{}\">", row_class));
         html.push_str(&format!(
             "<td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>",
             lhs.line_number + 1, content
         ));
         html.push_str("<td class=\"ln ln-rhs\"></td><td class=\"sign sign-rhs\"></td><td class=\"code-rhs\"></td>");
     } else if let Some(rhs) = row.rhs {
-        let content = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let new_line = new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let new_highlighted = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+        let spans = merge_whitespace_spans(&rhs.changes, new_line);
+        let is_full = spans.is_empty() || spans_cover_full_line(&spans, new_line);
+        let row_class = if is_full { "line-added" } else { "line-added-partial" };
+        let content = if is_full {
+            new_highlighted.to_string()
+        } else {
+            insert_diff_highlights(new_highlighted, &spans, "hl-add")
+        };
+        html.push_str(&format!("<tr class=\"{}\">", row_class));
         html.push_str("<td class=\"ln ln-lhs\"></td><td class=\"sign sign-lhs\"></td><td class=\"code-lhs\"></td>");
         html.push_str(&format!(
             "<td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td>",
             rhs.line_number + 1, content
         ));
+    } else {
+        return String::new();
     }
 
     html.push_str("</tr>");
@@ -969,21 +1200,36 @@ fn hunk_gap_lines(
         }
     }
 
-    // Pair gap lines by content similarity (trimmed equality).
-    // Each removed line is matched to at most one added line.
+    // Pair gap lines by content similarity. Match criteria (in priority order):
+    // 1. Exact trimmed equality (content is identical, just whitespace differs)
+    // 2. One line's trimmed content starts with the other's (structural match,
+    //    e.g. `cbOrOpts?:` matches `cbOrOpts?: Callback<...> | ...`)
     let mut paired = Vec::new();
     let mut used_added: std::collections::HashSet<usize> = std::collections::HashSet::new();
     let mut unmatched_removed = Vec::new();
 
     for &old_0 in &raw_removed {
         let old_content = old_lines.get(old_0).map(|s| s.trim()).unwrap_or("");
+        if old_content.is_empty() {
+            unmatched_removed.push(old_0);
+            continue;
+        }
+        // First try exact match, then prefix match
         let matched = raw_added.iter()
             .find(|&&new_0| {
                 !used_added.contains(&new_0) && {
                     let new_content = new_lines.get(new_0).map(|s| s.trim()).unwrap_or("");
-                    !old_content.is_empty() && old_content == new_content
+                    old_content == new_content
                 }
             })
+            .or_else(|| raw_added.iter()
+                .find(|&&new_0| {
+                    !used_added.contains(&new_0) && {
+                        let new_content = new_lines.get(new_0).map(|s| s.trim()).unwrap_or("");
+                        !new_content.is_empty()
+                            && (old_content.starts_with(new_content) || new_content.starts_with(old_content))
+                    }
+                }))
             .copied();
         if let Some(new_0) = matched {
             paired.push((old_0, new_0));
@@ -2015,7 +2261,11 @@ mod tests {
 
         let mut rows = Vec::new();
         for row_cap in row_re.captures_iter(html) {
-            let class = row_cap[1].to_string();
+            // Normalize variant classes for test comparisons
+            let class = row_cap[1].to_string()
+                .replace("line-paired-full", "line-paired")
+                .replace("line-added-partial", "line-added")
+                .replace("line-removed-partial", "line-removed");
             let start = row_cap.get(0).unwrap().end();
             // Find the closing </tr> after this point
             let rest = &html[start..];
@@ -2911,7 +3161,8 @@ mod tests {
         //     on BOTH sides -> should have hl-del/hl-add in HTML
         //   - gap_paired: rows matched by trimmed content (only whitespace differs)
         //     -> should NOT have hl-del/hl-add
-        //   - one-sided rows (added-only, removed-only) -> no hl highlights
+        //   - one-sided rows with full-line change -> no hl highlights (full bg)
+        //   - one-sided rows with partial spans -> should have hl highlights
         let mut difft_has_spans: std::collections::HashSet<u64> = std::collections::HashSet::new();
         for entry in chunk {
             if let (Some(lhs), Some(rhs)) = (&entry.lhs, &entry.rhs) {
@@ -2937,11 +3188,34 @@ mod tests {
             let has_hl_del = row_html.contains("class=\"hl-del\"");
             let has_hl_add = row_html.contains("class=\"hl-add\"");
 
+            // Full-line added/removed rows should NOT have token highlights
+            // (the full row background is sufficient). Partial variants SHOULD.
             if class == "line-added" && has_hl_add {
-                errors.push("added-only row has hl-add token highlight".to_string());
+                errors.push("full-line added row has hl-add token highlight".to_string());
             }
             if class == "line-removed" && has_hl_del {
-                errors.push("removed-only row has hl-del token highlight".to_string());
+                errors.push("full-line removed row has hl-del token highlight".to_string());
+            }
+            // Partial added/removed rows SHOULD have token highlights
+            if class == "line-added-partial" && !has_hl_add {
+                let rhs_ln = td_re_for_hl.captures_iter(row_html)
+                    .filter_map(|c| { let s = &c[1]; if s.is_empty() { None } else { s.parse::<u64>().ok() } })
+                    .nth(1);
+                if let Some(nl) = rhs_ln {
+                    errors.push(format!(
+                        "partial added row new={} should have hl-add highlights", nl,
+                    ));
+                }
+            }
+            if class == "line-removed-partial" && !has_hl_del {
+                let lhs_ln = td_re_for_hl.captures_iter(row_html)
+                    .filter_map(|c| { let s = &c[1]; if s.is_empty() { None } else { s.parse::<u64>().ok() } })
+                    .next();
+                if let Some(ol) = lhs_ln {
+                    errors.push(format!(
+                        "partial removed row old={} should have hl-del highlights", ol,
+                    ));
+                }
             }
             if class == "line-paired" {
                 let lns: Vec<Option<u64>> = td_re_for_hl.captures_iter(row_html)

@@ -6,8 +6,8 @@ use anyhow::{Context, Result};
 use pulldown_cmark::{Options, Parser};
 use regex::Regex;
 
-use syntect::highlighting::ThemeSet;
-use syntect::parsing::SyntaxSet;
+use arborium::advanced::Span;
+use arborium::Highlighter;
 
 use crate::difft_json::{DifftOutput, LineEntry, LineSide};
 
@@ -469,136 +469,135 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// Syntax-highlight all lines of a file, maintaining parser state across lines
-/// so multi-line constructs (comments, strings) are highlighted correctly.
-/// Map a syntect scope to GitHub prettylights CSS.
-/// Returns (color, bold, italic).
-fn github_style_for_scope(scope_str: &str) -> (&'static str, bool, bool) {
-    // Match most specific scope first
-    if scope_str.contains("comment") {
-        return ("#59636e", false, true);
+/// Map a tree-sitter capture name to a GitHub prettylights color.
+/// Returns (color, italic). No more fragile RGB matching.
+fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
+    // Tree-sitter captures are hierarchical: "keyword.function", "string.special", etc.
+    // Match the most specific prefix first.
+    if capture.starts_with("comment") {
+        return ("#59636e", true);
     }
-    if scope_str.contains("string") || scope_str.contains("constant.character") {
-        return ("#0a3069", false, false);
+    if capture.starts_with("string") {
+        return ("#0a3069", false);
     }
-    if scope_str.contains("constant.numeric") || scope_str.contains("constant.language") {
-        return ("#0550ae", false, false);
+    if capture.starts_with("constant") || capture.starts_with("number") || capture.starts_with("boolean") || capture.starts_with("float") {
+        return ("#0550ae", false);
     }
-    if scope_str.contains("keyword") || scope_str.contains("storage.type")
-        || scope_str.contains("storage.modifier")
+    if capture.starts_with("keyword") || capture.starts_with("repeat") || capture.starts_with("conditional")
+        || capture.starts_with("exception") || capture.starts_with("include") || capture.starts_with("storageclass")
     {
-        return ("#cf222e", false, false);
+        return ("#cf222e", false);
     }
-    if scope_str.contains("entity.name.function") || scope_str.contains("support.function") {
-        return ("#6639ba", false, false);
+    if capture.starts_with("type") || capture.starts_with("constructor") {
+        return ("#0550ae", false);
     }
-    if scope_str.contains("entity.name.type") || scope_str.contains("support.type")
-        || scope_str.contains("entity.name.tag")
+    if capture.starts_with("function") || capture.starts_with("method") {
+        return ("#6639ba", false);
+    }
+    if capture.starts_with("variable") || capture.starts_with("parameter") || capture.starts_with("field")
+        || capture.starts_with("property")
     {
-        return ("#0550ae", false, false);
+        return ("#953800", false);
     }
-    if scope_str.contains("variable") {
-        return ("#953800", false, false);
+    if capture.starts_with("operator") || capture.starts_with("punctuation") {
+        return ("#1f2328", false);
     }
-    if scope_str.contains("entity.name") {
-        return ("#6639ba", false, false);
+    if capture.starts_with("tag") {
+        return ("#0550ae", false);
     }
-    if scope_str.contains("punctuation.definition.tag") {
-        return ("#0550ae", false, false);
+    if capture.starts_with("attribute") {
+        return ("#6639ba", false);
     }
-    ("#1f2328", false, false)
+    if capture.starts_with("label") || capture.starts_with("namespace") {
+        return ("#953800", false);
+    }
+    ("#1f2328", false)
 }
 
-fn syntax_highlight_lines(
-    lines: &[String],
-    ss: &SyntaxSet,
-    syntax: &syntect::parsing::SyntaxReference,
-    theme: &syntect::highlighting::Theme,
-) -> Vec<String> {
-    use syntect::easy::HighlightLines;
-    use syntect::parsing::ScopeStack;
+/// Syntax-highlight all lines of a file using arborium (tree-sitter).
+/// Returns one HTML string per line with `<span style="...">` tokens.
+fn syntax_highlight_lines(lines: &[String], hl: &mut Highlighter, lang: Option<&str>) -> Vec<String> {
+    let lang = match lang {
+        Some(l) => l,
+        None => return lines.iter().map(|l| html_escape(l)).collect(),
+    };
 
-    let mut hl = HighlightLines::new(syntax, theme);
+    let full_text = lines.join("\n");
+    let spans = match hl.highlight_spans(lang, &full_text) {
+        Ok(s) => s,
+        Err(_) => return lines.iter().map(|l| html_escape(l)).collect(),
+    };
+
+    // Build per-line highlight data. Spans are sorted by start offset.
     let mut result = Vec::with_capacity(lines.len());
+    let mut span_idx = 0;
+    let mut byte_offset: usize = 0;
 
     for line in lines {
-        let line_nl = format!("{}\n", line);
-        let ops = match hl.highlight_line(&line_nl, ss) {
-            Ok(r) => r,
-            Err(_) => {
-                result.push(html_escape(line));
-                continue;
+        let line_start = byte_offset;
+        let line_end = byte_offset + line.len();
+
+        // Collect spans that overlap this line
+        let mut line_spans: Vec<&Span> = Vec::new();
+        let mut i = span_idx;
+        while i < spans.len() {
+            let s = &spans[i];
+            if (s.start as usize) >= line_end {
+                break;
             }
-        };
-
-        let mut html = String::new();
-        for (style, text) in &ops {
-            let text = text.trim_end_matches('\n');
-            if text.is_empty() { continue; }
-            let escaped = html_escape(text);
-
-            // Use syntect's scope info to map to GitHub colors.
-            // The style.foreground gives us a hint about the scope via the theme,
-            // but we need the actual scope. Since HighlightLines doesn't expose
-            // scopes directly, we use the theme color as a proxy to detect
-            // non-default tokens, then apply GitHub colors via the style properties.
-            let fg = style.foreground;
-            let bold = style.font_style.contains(syntect::highlighting::FontStyle::BOLD);
-            let italic = style.font_style.contains(syntect::highlighting::FontStyle::ITALIC);
-
-            // Map syntect theme colors to GitHub prettylights colors.
-            // Check specific colors first, then fall back to bold/italic.
-            let (color, gh_bold, gh_italic) = if fg.r == 0x79 && fg.g == 0x5d && fg.b == 0xa3 {
-                // Entity/function names (#795da3) → purple
-                ("#6639ba", false, false)
-            } else if fg.r == 0x18 && fg.g == 0x36 && fg.b == 0x91 {
-                // Strings (#183691) → dark blue
-                ("#0a3069", false, false)
-            } else if fg.r == 0x00 && fg.g == 0x86 && fg.b == 0xb3 {
-                // Builtins/constants (#0086b3) → blue
-                ("#0550ae", false, false)
-            } else if fg.r == 0xed && fg.g == 0x6a && fg.b == 0x43 {
-                // Variables/numbers (#ed6a43) → orange
-                ("#953800", false, false)
-            } else if fg.r == 0xa7 && fg.g == 0x1d && fg.b == 0x5d {
-                // Keywords (#a71d5d) → red
-                ("#cf222e", false, false)
-            } else if fg.r == 0xb5 && fg.g == 0x2a && fg.b == 0x1d {
-                // Errors/invalid (#b52a1d) → red
-                ("#cf222e", false, false)
-            } else if italic {
-                // Comments are italic in InspiredGitHub
-                ("#59636e", false, true)
-            } else if bold && fg.r == 0x32 && fg.g == 0x32 && fg.b == 0x32 {
-                // Bold default-color: likely a keyword the theme doesn't color
-                ("#cf222e", false, false)
-            } else {
-                ("#1f2328", false, false)
-            };
-
-            if gh_bold && gh_italic {
-                html.push_str(&format!("<span style=\"font-weight:bold;font-style:italic;color:{}\">{}</span>", color, escaped));
-            } else if gh_bold {
-                html.push_str(&format!("<span style=\"font-weight:bold;color:{}\">{}</span>", color, escaped));
-            } else if gh_italic {
-                html.push_str(&format!("<span style=\"font-style:italic;color:{}\">{}</span>", color, escaped));
-            } else if color == "#1f2328" {
-                // Default text color: skip the span for cleaner HTML
-                html.push_str(&escaped);
-            } else {
-                html.push_str(&format!("<span style=\"color:{}\">{}</span>", color, escaped));
+            if (s.end as usize) > line_start {
+                line_spans.push(s);
             }
+            i += 1;
         }
+
+        // Advance span_idx past spans that end before this line
+        while span_idx < spans.len() && (spans[span_idx].end as usize) <= line_start {
+            span_idx += 1;
+        }
+
+        // Render the line with highlight spans
+        let mut html = String::new();
+        let mut pos = line_start;
+
+        for span in &line_spans {
+            let s_start = (span.start as usize).max(line_start);
+            let s_end = (span.end as usize).min(line_end);
+            if s_start > s_end { continue; }
+
+            // Text before this span
+            if s_start > pos {
+                html.push_str(&html_escape(&full_text[pos..s_start]));
+            }
+
+            let text = &full_text[s_start..s_end];
+            let (color, italic) = github_color_for_capture(&span.capture);
+
+            if color == "#1f2328" && !italic {
+                html.push_str(&html_escape(text));
+            } else if italic {
+                html.push_str(&format!(
+                    "<span style=\"font-style:italic;color:{}\">{}</span>",
+                    color, html_escape(text)
+                ));
+            } else {
+                html.push_str(&format!(
+                    "<span style=\"color:{}\">{}</span>",
+                    color, html_escape(text)
+                ));
+            }
+            pos = s_end;
+        }
+
+        // Remaining text after last span
+        if pos < line_end {
+            html.push_str(&html_escape(&full_text[pos..line_end]));
+        }
+
         result.push(html);
+        byte_offset = line_end + 1; // +1 for the \n
     }
     result
-}
-
-/// Get the syntect syntax for a file path, falling back to plain text.
-fn get_syntax<'a>(ss: &'a SyntaxSet, file_path: &str) -> &'a syntect::parsing::SyntaxReference {
-    let ext = file_path.rsplit('.').next().unwrap_or("");
-    ss.find_syntax_by_extension(ext)
-        .unwrap_or_else(|| ss.find_syntax_plain_text())
 }
 
 /// Insert a diff highlight span into syntax-highlighted HTML at the given
@@ -1255,13 +1254,10 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
     out
 }
 
-fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, ss: &SyntaxSet, theme: &syntect::highlighting::Theme) -> String {
-    let syntax = get_syntax(ss, file_path);
-
-    // Pre-compute syntax-highlighted versions of all lines (stateful, so
-    // multi-line comments/strings are highlighted correctly).
-    let old_hl = syntax_highlight_lines(&difft.old_lines, ss, syntax, theme);
-    let new_hl = syntax_highlight_lines(&difft.new_lines, ss, syntax, theme);
+fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, hl: &mut Highlighter) -> String {
+    let lang = arborium::detect_language(file_path);
+    let old_hl = syntax_highlight_lines(&difft.old_lines, hl, lang);
+    let new_hl = syntax_highlight_lines(&difft.new_lines, hl, lang);
 
     let mut html = String::new();
     html.push_str(&format!(
@@ -1697,11 +1693,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
     let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
 
-    // Syntax highlighting setup (two-face bundles bat's syntax definitions
-    // which include TypeScript, JSX, and many more languages).
-    let ss = two_face::syntax::extra_newlines();
-    let ts = ThemeSet::load_defaults();
-    let theme = &ts.themes["InspiredGitHub"];
+    let mut hl = Highlighter::new();
 
     // Load all difft JSON data
     let mut data: HashMap<String, DifftOutput> = HashMap::new();
@@ -1782,7 +1774,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         for &idx in &indices {
                             referenced.insert((file.clone(), idx));
                         }
-                        let rendered_html = render_chunks(difft, &indices, &file, line_filter, &ss, theme);
+                        let rendered_html = render_chunks(difft, &indices, &file, line_filter, &mut hl);
                         let placeholder_id = diff_blocks.len();
                         diff_blocks.push(rendered_html);
                         processed_md
@@ -1976,10 +1968,8 @@ mod tests {
     /// Build a DifftOutput from old/new lines, chunks, and hunks.
     /// Helper to call render_chunks with default syntax highlighting.
     fn test_render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter) -> String {
-        let ss = two_face::syntax::extra_newlines();
-        let ts = ThemeSet::load_defaults();
-        let theme = &ts.themes["InspiredGitHub"];
-        render_chunks(difft, chunk_indices, file_path, line_filter, &ss, theme)
+        let mut hl = Highlighter::new();
+        render_chunks(difft, chunk_indices, file_path, line_filter, &mut hl)
     }
 
     fn make_difft(

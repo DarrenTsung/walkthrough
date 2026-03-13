@@ -293,16 +293,17 @@ col.code-col { width: calc(50% - 5em); }
     color: var(--ln-fg);
     user-select: none;
     white-space: nowrap;
-    padding-right: 0.4rem;
+    padding: 1px 8px 1px 8px;
     min-width: 3em;
+    border-right: 1px solid var(--border);
 }
 
 .diff-table .sign {
-    text-align: center;
     color: var(--ln-fg);
     user-select: none;
     white-space: nowrap;
-    padding: 1px 0;
+    padding: 1px 0 1px 8px;
+    width: 1.5em;
 }
 
 tr.line-added .sign-rhs { color: #1a7f37; }
@@ -318,28 +319,28 @@ tr.line-paired .sign-rhs { color: #1a7f37; }
 tr.line-context td { background: var(--bg); }
 
 /* Removed lines (lhs side highlighted, rhs side empty) */
-tr.line-removed td.code-lhs { background: var(--removed-bg); }
-tr.line-removed .ln-lhs,
-tr.line-removed .sign-lhs { background: var(--removed-num-bg); }
+tr.line-removed td.code-lhs,
+tr.line-removed .sign-lhs { background: var(--removed-bg); }
+tr.line-removed .ln-lhs { background: var(--removed-num-bg); }
 tr.line-removed td.code-rhs,
-tr.line-removed .ln-rhs,
-tr.line-removed .sign-rhs { background: var(--empty-bg); }
+tr.line-removed .sign-rhs,
+tr.line-removed .ln-rhs { background: var(--empty-bg); }
 
 /* Added lines (rhs side highlighted, lhs side empty) */
-tr.line-added td.code-rhs { background: var(--added-bg); }
-tr.line-added .ln-rhs,
-tr.line-added .sign-rhs { background: var(--added-num-bg); }
+tr.line-added td.code-rhs,
+tr.line-added .sign-rhs { background: var(--added-bg); }
+tr.line-added .ln-rhs { background: var(--added-num-bg); }
 tr.line-added td.code-lhs,
-tr.line-added .ln-lhs,
-tr.line-added .sign-lhs { background: var(--empty-bg); }
+tr.line-added .sign-lhs,
+tr.line-added .ln-lhs { background: var(--empty-bg); }
 
 /* Paired rows: removed on left, added on right */
-tr.line-paired td.code-lhs { background: var(--removed-bg); }
-tr.line-paired .ln-lhs,
-tr.line-paired .sign-lhs { background: var(--removed-num-bg); }
-tr.line-paired td.code-rhs { background: var(--added-bg); }
-tr.line-paired .ln-rhs,
-tr.line-paired .sign-rhs { background: var(--added-num-bg); }
+tr.line-paired td.code-lhs,
+tr.line-paired .sign-lhs { background: var(--removed-bg); }
+tr.line-paired .ln-lhs { background: var(--removed-num-bg); }
+tr.line-paired td.code-rhs,
+tr.line-paired .sign-rhs { background: var(--added-bg); }
+tr.line-paired .ln-rhs { background: var(--added-num-bg); }
 
 .chunk-sep td {
     height: 0.5rem;
@@ -470,6 +471,44 @@ fn html_escape(s: &str) -> String {
 
 /// Syntax-highlight all lines of a file, maintaining parser state across lines
 /// so multi-line constructs (comments, strings) are highlighted correctly.
+/// Map a syntect scope to GitHub prettylights CSS.
+/// Returns (color, bold, italic).
+fn github_style_for_scope(scope_str: &str) -> (&'static str, bool, bool) {
+    // Match most specific scope first
+    if scope_str.contains("comment") {
+        return ("#59636e", false, true);
+    }
+    if scope_str.contains("string") || scope_str.contains("constant.character") {
+        return ("#0a3069", false, false);
+    }
+    if scope_str.contains("constant.numeric") || scope_str.contains("constant.language") {
+        return ("#0550ae", false, false);
+    }
+    if scope_str.contains("keyword") || scope_str.contains("storage.type")
+        || scope_str.contains("storage.modifier")
+    {
+        return ("#cf222e", false, false);
+    }
+    if scope_str.contains("entity.name.function") || scope_str.contains("support.function") {
+        return ("#6639ba", false, false);
+    }
+    if scope_str.contains("entity.name.type") || scope_str.contains("support.type")
+        || scope_str.contains("entity.name.tag")
+    {
+        return ("#0550ae", false, false);
+    }
+    if scope_str.contains("variable") {
+        return ("#953800", false, false);
+    }
+    if scope_str.contains("entity.name") {
+        return ("#6639ba", false, false);
+    }
+    if scope_str.contains("punctuation.definition.tag") {
+        return ("#0550ae", false, false);
+    }
+    ("#1f2328", false, false)
+}
+
 fn syntax_highlight_lines(
     lines: &[String],
     ss: &SyntaxSet,
@@ -477,13 +516,14 @@ fn syntax_highlight_lines(
     theme: &syntect::highlighting::Theme,
 ) -> Vec<String> {
     use syntect::easy::HighlightLines;
+    use syntect::parsing::ScopeStack;
 
     let mut hl = HighlightLines::new(syntax, theme);
     let mut result = Vec::with_capacity(lines.len());
 
     for line in lines {
         let line_nl = format!("{}\n", line);
-        let regions = match hl.highlight_line(&line_nl, ss) {
+        let ops = match hl.highlight_line(&line_nl, ss) {
             Ok(r) => r,
             Err(_) => {
                 result.push(html_escape(line));
@@ -492,26 +532,60 @@ fn syntax_highlight_lines(
         };
 
         let mut html = String::new();
-        for (style, text) in &regions {
+        for (style, text) in &ops {
             let text = text.trim_end_matches('\n');
             if text.is_empty() { continue; }
-            let fg = style.foreground;
             let escaped = html_escape(text);
+
+            // Use syntect's scope info to map to GitHub colors.
+            // The style.foreground gives us a hint about the scope via the theme,
+            // but we need the actual scope. Since HighlightLines doesn't expose
+            // scopes directly, we use the theme color as a proxy to detect
+            // non-default tokens, then apply GitHub colors via the style properties.
+            let fg = style.foreground;
             let bold = style.font_style.contains(syntect::highlighting::FontStyle::BOLD);
             let italic = style.font_style.contains(syntect::highlighting::FontStyle::ITALIC);
-            match (bold, italic) {
-                (true, true) => html.push_str(&format!(
-                    "<span style=\"font-weight:bold;font-style:italic;color:#{:02x}{:02x}{:02x}\">{}</span>",
-                    fg.r, fg.g, fg.b, escaped)),
-                (true, false) => html.push_str(&format!(
-                    "<span style=\"font-weight:bold;color:#{:02x}{:02x}{:02x}\">{}</span>",
-                    fg.r, fg.g, fg.b, escaped)),
-                (false, true) => html.push_str(&format!(
-                    "<span style=\"font-style:italic;color:#{:02x}{:02x}{:02x}\">{}</span>",
-                    fg.r, fg.g, fg.b, escaped)),
-                (false, false) => html.push_str(&format!(
-                    "<span style=\"color:#{:02x}{:02x}{:02x}\">{}</span>",
-                    fg.r, fg.g, fg.b, escaped)),
+
+            // Map syntect theme colors to GitHub prettylights colors
+            let (color, gh_bold, gh_italic) = if italic {
+                // Comments are typically italic in InspiredGitHub
+                ("#59636e", false, true)
+            } else if bold {
+                // Keywords are bold in InspiredGitHub (#a71d5d)
+                ("#cf222e", false, false)
+            } else if fg.r == 0x18 && fg.g == 0x36 && fg.b == 0x91 {
+                // Strings (#183691)
+                ("#0a3069", false, false)
+            } else if fg.r == 0x00 && fg.g == 0x86 && fg.b == 0xb3 {
+                // Builtins/constants (#0086b3)
+                ("#0550ae", false, false)
+            } else if fg.r == 0x79 && fg.g == 0x5d && fg.b == 0xa3 {
+                // Entity/function names (#795da3)
+                ("#6639ba", false, false)
+            } else if fg.r == 0xed && fg.g == 0x6a && fg.b == 0x43 {
+                // Variables/numbers (#ed6a43)
+                ("#953800", false, false)
+            } else if fg.r == 0xa7 && fg.g == 0x1d && fg.b == 0x5d {
+                // Keywords that aren't bold (#a71d5d)
+                ("#cf222e", false, false)
+            } else if fg.r == 0xb5 && fg.g == 0x2a && fg.b == 0x1d {
+                // Errors/invalid (#b52a1d)
+                ("#cf222e", false, false)
+            } else {
+                ("#1f2328", false, false)
+            };
+
+            if gh_bold && gh_italic {
+                html.push_str(&format!("<span style=\"font-weight:bold;font-style:italic;color:{}\">{}</span>", color, escaped));
+            } else if gh_bold {
+                html.push_str(&format!("<span style=\"font-weight:bold;color:{}\">{}</span>", color, escaped));
+            } else if gh_italic {
+                html.push_str(&format!("<span style=\"font-style:italic;color:{}\">{}</span>", color, escaped));
+            } else if color == "#1f2328" {
+                // Default text color: skip the span for cleaner HTML
+                html.push_str(&escaped);
+            } else {
+                html.push_str(&format!("<span style=\"color:{}\">{}</span>", color, escaped));
             }
         }
         result.push(html);

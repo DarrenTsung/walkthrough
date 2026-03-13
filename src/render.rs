@@ -528,70 +528,53 @@ fn syntax_highlight_lines(lines: &[String], hl: &mut Highlighter, lang: Option<&
         Err(_) => return lines.iter().map(|l| html_escape(l)).collect(),
     };
 
-    // Build per-line highlight data. Spans are sorted by start offset.
+    // Build a per-byte color map from spans. Tree-sitter spans can overlap
+    // (nested scopes), so later spans override earlier ones (higher priority).
+    let text_len = full_text.len();
+    let mut byte_color: Vec<Option<(&str, bool)>> = vec![None; text_len];
+    for span in &spans {
+        let (color, italic) = github_color_for_capture(&span.capture);
+        if color == "#1f2328" && !italic { continue; }
+        let start = (span.start as usize).min(text_len);
+        let end = (span.end as usize).min(text_len);
+        for b in start..end {
+            byte_color[b] = Some((color, italic));
+        }
+    }
+
+    // Render per-line HTML from the byte color map.
     let mut result = Vec::with_capacity(lines.len());
-    let mut span_idx = 0;
     let mut byte_offset: usize = 0;
 
     for line in lines {
         let line_start = byte_offset;
         let line_end = byte_offset + line.len();
 
-        // Collect spans that overlap this line
-        let mut line_spans: Vec<&Span> = Vec::new();
-        let mut i = span_idx;
-        while i < spans.len() {
-            let s = &spans[i];
-            if (s.start as usize) >= line_end {
-                break;
-            }
-            if (s.end as usize) > line_start {
-                line_spans.push(s);
-            }
-            i += 1;
-        }
-
-        // Advance span_idx past spans that end before this line
-        while span_idx < spans.len() && (spans[span_idx].end as usize) <= line_start {
-            span_idx += 1;
-        }
-
-        // Render the line with highlight spans
         let mut html = String::new();
         let mut pos = line_start;
 
-        for span in &line_spans {
-            let s_start = (span.start as usize).max(line_start);
-            let s_end = (span.end as usize).min(line_end);
-            if s_start > s_end { continue; }
+        while pos < line_end {
+            let cur_style = byte_color.get(pos).copied().flatten();
 
-            // Text before this span
-            if s_start > pos {
-                html.push_str(&html_escape(&full_text[pos..s_start]));
+            // Find run of same style
+            let mut run_end = pos + 1;
+            while run_end < line_end && byte_color.get(run_end).copied().flatten() == cur_style {
+                run_end += 1;
             }
 
-            let text = &full_text[s_start..s_end];
-            let (color, italic) = github_color_for_capture(&span.capture);
-
-            if color == "#1f2328" && !italic {
-                html.push_str(&html_escape(text));
-            } else if italic {
-                html.push_str(&format!(
+            let text = &full_text[pos..run_end];
+            match cur_style {
+                None => html.push_str(&html_escape(text)),
+                Some((color, true)) => html.push_str(&format!(
                     "<span style=\"font-style:italic;color:{}\">{}</span>",
                     color, html_escape(text)
-                ));
-            } else {
-                html.push_str(&format!(
+                )),
+                Some((color, false)) => html.push_str(&format!(
                     "<span style=\"color:{}\">{}</span>",
                     color, html_escape(text)
-                ));
+                )),
             }
-            pos = s_end;
-        }
-
-        // Remaining text after last span
-        if pos < line_end {
-            html.push_str(&html_escape(&full_text[pos..line_end]));
+            pos = run_end;
         }
 
         result.push(html);

@@ -110,12 +110,11 @@ useful when the narrative needs to show the old implementation being replaced, o
 code that helps the reader understand what the diff is changing.
 
 ````markdown
-```src services/cortex/lib/support/foundry_api.ts:128-159 old
+```src services/cortex/lib/support/foundry_api.ts:128-159
 ```
 ````
 
 The syntax is `src <filepath>:<start>-<end>` where start/end are 1-based line numbers.
-Add `old` to show the pre-change version of the file (default is the new/current version).
 
 The renderer pulls lines from the collected difft JSON data, syntax highlights them, and
 renders as a single-column code block with the same styling as diff blocks.
@@ -124,6 +123,13 @@ Use source blocks to:
 - Show the old implementation being replaced by new code
 - Show related code that provides context for the change
 - Show configuration or type definitions referenced by the diff
+
+**Prefer showing code over describing code.** When new code is a port or restructuring of
+existing code, show the old code with a `src` block and let the reader see the 1:1
+correspondence themselves. A sentence like "The config is a direct port of the existing
+`sandboxEnvVars` workload block" followed by the old code is far clearer than a paragraph
+explaining each field mapping in prose. The diff already shows the new code; the `src`
+block shows what it replaced.
 
 ### Service badges
 

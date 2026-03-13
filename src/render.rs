@@ -1990,7 +1990,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
 
     let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
-    let src_re = Regex::new(r"^src\s+(\S+):(\d+)-(\d+)(?:\s+(old))?")?;
+    let src_re = Regex::new(r"^src\s+(\S+):(\d+)-(\d+)")?;
 
     let mut hl = Highlighter::new();
 
@@ -2102,10 +2102,9 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                     let file = caps[1].to_string();
                     let start: usize = caps[2].parse().unwrap_or(1);
                     let end: usize = caps[3].parse().unwrap_or(1);
-                    let use_old = caps.get(4).is_some();
 
                     if let Some(difft) = data.get(&file) {
-                        let lines = if use_old { &difft.old_lines } else { &difft.new_lines };
+                        let lines = &difft.new_lines;
                         let lang = arborium::detect_language(&file);
                         let hl_lines = syntax_highlight_lines(lines, &mut hl, lang);
 

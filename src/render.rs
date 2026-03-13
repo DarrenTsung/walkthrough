@@ -499,7 +499,7 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
         return ("#0550ae", false);
     }
     if capture.starts_with("variable") || capture.starts_with("parameter") {
-        return ("#953800", false);
+        return ("#1f2328", false);
     }
     if capture.starts_with("operator") || capture.starts_with("punctuation") {
         return ("#1f2328", false);
@@ -2523,12 +2523,13 @@ mod tests {
 
         let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
-        // Property names (workloadName) should be blue, variable (workloadConfig) orange
+        // Property names (workloadName) should be blue, variable (workloadConfig) default text
         assert!(html.contains("color:#0550ae\">workloadName"),
             "property key should be blue (#0550ae):\n{}",
             &html[..html.len().min(2000)]);
-        assert!(html.contains("color:#953800\">workloadConfig"),
-            "object variable should be orange (#953800):\n{}",
+        // Variables should be default text (#1f2328), which means no span wrapper
+        assert!(!html.contains("color:#953800\">workloadConfig"),
+            "variable should not be orange (#953800), should be default text:\n{}",
             &html[..html.len().min(2000)]);
     }
 }

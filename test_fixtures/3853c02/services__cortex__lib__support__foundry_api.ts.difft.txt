@@ -1,0 +1,165 @@
+services/cortex/lib/support/foundry_api.ts --- 1/3 --- TypeScript
+ 17 import { maybeRewriteSandboxUrl } f  17 import { maybeRewriteSandboxUrl } f
+ .. rom '#lib/foundry/maybe_rewrite_san  .. rom '#lib/foundry/maybe_rewrite_san
+ .. dbox_url.js'                         .. dbox_url.js'
+ 18 import statsD from './statsd.js'     18 import statsD from './statsd.js'
+ 19 import { generateSinatraJwt, genera  19 import { generateSinatraJwt, genera
+ .. teUgitJwt } from '#lib/util/jwt.js'  .. teUgitJwt } from '#lib/util/jwt.js'
+ ..                                      20 import { AgentPlatClient } from '@f
+ ..                                      .. igma/agentplat-client'
+ ..                                      21 import { DEFAULT_WORKSPACE_ID, DEFA
+ ..                                      .. ULT_WORKSPACE_PATH } from '@figma/a
+ ..                                      .. gentplat-stream-protocol'
+ ..                                      22 import type { BootstrapConfig } fro
+ ..                                      .. m '@figma/agentplat-stream-protocol
+ ..                                      .. '
+ 20                                      23 
+ 21 let antiabuseClient: AntiabuseClien  24 let antiabuseClient: AntiabuseClien
+ .. t | null = null                      .. t | null = null
+ 22                                      25 
+
+services/cortex/lib/support/foundry_api.ts --- 2/3 --- TypeScript
+158   }                                 161   }
+159 }                                   162 }
+...                                     163 
+...                                     164 /**
+...                                     165  * Calls sboxd workspace/create wit
+...                                     ... h structured BootstrapConfig via We
+...                                     ... bSocket.
+...                                     166  * Replaces the env-var-based /api/
+...                                     ... ready bootstrap path. Bootstrap is 
+...                                     ... idempotent,
+...                                     167  * so this is safe to call on every
+...                                     ...  sandbox access (new, warm, or reus
+...                                     ... ed).
+...                                     168  */
+...                                     169 async function bootstrapViaWorkspac
+...                                     ... eCreate(
+...                                     170   sboxdUrl: string,
+...                                     171   context: RequestContext,
+...                                     172   workloadConfig: WorkloadConfig,
+...                                     173 ): Promise<void> {
+...                                     174   const apiUrl = getSettings().ugit
+...                                     ... _base_url || hardcodedApiUrls[getEn
+...                                     ... v()]
+...                                     175 
+...                                     176   const bootstrap: BootstrapConfig 
+...                                     ... = {
+...                                     177     workloadName: workloadConfig.wo
+...                                     ... rkloadName,
+...                                     178     workloadOwnerType: 'file',
+...                                     179     workloadOwnerID: context.fileId
+...                                     ... !,
+...                                     180     git: {
+...                                     181       baseUrl: `${apiUrl}/git`,
+...                                     182       username: context.fileId!,
+...                                     183       password: await generateUgitJ
+...                                     ... wt(context, workloadConfig.workload
+...                                     ... Name),
+...                                     184     },
+...                                     185     agentType: 'claude',
+...                                     186     sandboxGitEnabled: CortexStatsi
+...                                     ... g.checkGate(context, 'make_sandbox_
+...                                     ... git_persistence', false),
+...                                     187   }
+...                                     188 
+...                                     189   logger.info('Bootstrapping worksp
+...                                     ... ace via workspace/create', { sboxd_
+...                                     ... url: sboxdUrl })
+...                                     190 
+...                                     191   const client = new AgentPlatClien
+...                                     ... t(sboxdUrl)
+...                                     192 
+...                                     193   try {
+...                                     194     await new Promise<void>((resolv
+...                                     ... e, reject) => {
+...                                     195       const timeout = setTimeout(()
+...                                     ...  => {
+...                                     196         reject(new Error('sboxd wor
+...                                     ... kspace/create timed out after 30s')
+...                                     ... )
+...                                     197       }, 30_000)
+...                                     198 
+...                                     199       client.connect(undefined, (co
+...                                     ... nnectErr) => {
+...                                     200         if (connectErr) {
+...                                     201           clearTimeout(timeout)
+...                                     202           return reject(connectErr)
+...                                     203         }
+...                                     204 
+...                                     205         client.createWorkspace(
+...                                     206           DEFAULT_WORKSPACE_PATH,
+...                                     207           { workspaceId: DEFAULT_WO
+...                                     ... RKSPACE_ID, bootstrap },
+...                                     208           (createErr) => {
+...                                     209             clearTimeout(timeout)
+...                                     210             if (createErr) return r
+...                                     ... eject(createErr)
+...                                     211             resolve()
+...                                     212           },
+...                                     213         )
+...                                     214       })
+...                                     215     })
+...                                     216   } finally {
+...                                     217     client.close()
+...                                     218   }
+...                                     219 }
+160                                     220 
+161 /**                                 221 /**
+162  * Client for interacting with the  222  * Client for interacting with the 
+... Foundry controller API              ... Foundry controller API
+
+services/cortex/lib/support/foundry_api.ts --- 3/3 --- TypeScript
+314                                     374 
+315       const rewrittenSboxdUrl = sbo 375       const rewrittenSboxdUrl = sbo
+... xdUrl ? maybeRewriteSandboxUrl(sbox ... xdUrl ? maybeRewriteSandboxUrl(sbox
+... dUrl, context) : undefined          ... dUrl, context) : undefined
+316                                     376 
+317       // When a sandbox is reused ( 377       // Bootstrap the workspace on
+... not newly provisioned, not from war ...  sboxd. With the feature flag enabl
+... m pool) and                         ... ed, we call
+318       // a workload is configured,  378       // workspace/create with stru
+... Nimbus skips the sboxd ready call.  ... ctured BootstrapConfig for all work
+... We call it                          ... load-configured
+319       // directly to bootstrap the  379       // sandboxes (new, warm, reus
+... workspace (git repos, agent templat ... ed) since bootstrap is idempotent. 
+... es, plugins,                        ... Without the
+320       // credentials). Errors are p 380       // flag, we fall back to the 
+... ropagated because a failed reconcil ... legacy /api/ready path for reused s
+... iation means                        ... andboxes only.
+321       // the sboxd session will def ... 
+... initely fail.                       ... 
+322       if (                          381       if (workloadConfig && context
+...                                     ... .fileId && rewrittenSboxdUrl) {
+323         workloadConfig &&           382         const useWorkspaceCreate = 
+...                                     ... CortexStatsig.checkGate(
+324         rewrittenSboxdUrl &&        383           context,
+...                                     384           'cortex_workspace_create_
+...                                     ... bootstrap',
+...                                     385           false,
+...                                     386         )
+...                                     387 
+...                                     388         if (useWorkspaceCreate) {
+...                                     389           await bootstrapViaWorkspa
+...                                     ... ceCreate(rewrittenSboxdUrl, context
+...                                     ... , workloadConfig)
+...                                     390           statsD.increment('foundry
+...                                     ... _api_client.workspace_bootstrapped'
+...                                     ... , 1, tags)
+325         !sandboxResponse.newlyProvi 391         } else if (!sandboxResponse
+... sioned &&                           ... .newlyProvisioned && !sandboxRespon
+...                                     ... se.warm) {
+326         !sandboxResponse.warm       ... 
+327       ) {                           ... 
+328         await reconcileSboxdReady(r 392           await reconcileSboxdReady
+... ewrittenSboxdUrl, controllerToken,  ... (rewrittenSboxdUrl, controllerToken
+... envVars)                            ... , envVars)
+329         statsD.increment('foundry_a 393           statsD.increment('foundry
+... pi_client.sboxd_reconciled', 1, tag ... _api_client.sboxd_reconciled', 1, t
+... s)                                  ... ags)
+330       }                             394         }
+...                                     395       }
+331                                     396 
+332       return {                      397       return {
+333         id: sandboxResponse.id,     398         id: sandboxResponse.id,
+

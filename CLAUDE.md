@@ -60,21 +60,63 @@ cargo clippy
 
 Adjacent difft highlight spans that are directly adjacent or separated only by whitespace are merged into single `<span>` regions (`merge_whitespace_spans` in render.rs). Without this, difft's structural matching produces separate spans for each token (e.g. `meta:`, `{`, `level`, `},`), leaving unhighlighted gaps between them.
 
-### Hunk gap filling
-
-Difft's structural matching can miss lines that `git diff` considers changed. The renderer cross-references unified diff hunks with difft's output to find these gaps and renders them as extra removed/added/paired lines. Hunk analysis runs before context line computation to ensure context lines don't overlap with changed lines.
-
 ### Scroll-pinned diff blocks
 
 Diff blocks have `max-height: 80vh` with `overflow: hidden` (no scrollbar). A JS script intercepts `wheel` events at the window level: when a diff block's top reaches near the viewport top, page scroll is captured and redirected to scroll the block internally. The page's `scrollY` is pinned via a `scroll` event listener to prevent trackpad momentum from pushing surrounding text off-screen. The sticky `.diff-header` stays pinned at the top of the block. When the diff content reaches its end, the pin releases and normal page scrolling resumes.
 
 ### Markdown enrichment
 
-The render command writes back to the input markdown file, replacing each difft code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, hunk gap filling, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs. This enables an LLM workflow where the narrative is written first, then refined after seeing the actual diffs inline.
+The render command writes back to the input markdown file, replacing each difft code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs. This enables an LLM workflow where the narrative is written first, then refined after seeing the actual diffs inline.
 
 ### Line mapping
 
 `new_to_old_line` and `old_to_new_line` map between old/new file lines using unified diff hunk boundaries. Used to compute context line correspondence and resolve one-sided chunks (e.g. added-only) to the correct old-file position.
+
+## Fixture-based rendering tests
+
+The `test_fixtures/` directory holds per-commit fixture data (JSON from `walkthrough collect`) that `cargo test` uses to verify the rendering pipeline. Each subdirectory is named by commit hash and contains `*.json` files.
+
+### What the tests check
+
+For every chunk in every fixture JSON, `fixture_rendering_matches` verifies:
+
+1. **Row layout** matches `consolidate_chunk` + sort (same line pairings, same order)
+2. **Old-side line numbers** are non-decreasing
+3. **No duplicate line numbers** on either side
+4. **Added-only rows** have no `hl-add` token highlights (full-row background is sufficient)
+5. **Removed-only rows** have no `hl-del` token highlights
+6. **Text rendering** changed-line count matches HTML rendering
+
+### Adding a new fixture
+
+```bash
+# 1. Capture fixture data from a commit (or range)
+mkdir -p test_fixtures/<commit>
+cargo run -- collect -o test_fixtures/<commit> -- <commit>~1..<commit>
+
+# 2. Remove internal files (keep SUMMARY.md for rendering)
+rm -f test_fixtures/<commit>/.gitignore test_fixtures/<commit>/.meta.json
+
+# 3. Optionally capture difft CLI text for visual reference
+GIT_EXTERNAL_DIFF="difft --display side-by-side-show-both --color never" \
+  git diff <commit>~1..<commit> -- <file> > test_fixtures/<commit>/<file>.difft.txt
+
+# 4. Run tests
+cargo test fixture_rendering_matches
+
+# 5. Render the fixture walkthrough (uses SUMMARY.md from collect)
+walkthrough render test_fixtures/<commit>/SUMMARY.md \
+  --data-dir test_fixtures/<commit>/ -o walkthrough-<commit>.html
+```
+
+Each fixture directory contains:
+- `*.json` - enriched difft JSON (from `walkthrough collect`)
+- `SUMMARY.md` - walkthrough markdown referencing all chunks (renderable)
+- `*.difft.txt` - optional difft CLI text output for LLM visual reference
+
+### When to add fixtures
+
+Add a fixture when you find rendering that differs from difft's CLI output. The fixture captures the exact difft JSON that triggered the issue, ensuring the fix is regression-tested.
 
 ## Testing rendered HTML with playwright-cli
 

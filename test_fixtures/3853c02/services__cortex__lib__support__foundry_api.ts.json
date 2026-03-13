@@ -1,0 +1,3474 @@
+{
+  "chunks": [
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "import",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "{",
+              "end": 8,
+              "highlight": "delimiter",
+              "start": 7
+            },
+            {
+              "content": "AgentPlatClient",
+              "end": 24,
+              "highlight": "type",
+              "start": 9
+            },
+            {
+              "content": "}",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            },
+            {
+              "content": "from",
+              "end": 31,
+              "highlight": "keyword",
+              "start": 27
+            },
+            {
+              "content": "'@figma/agentplat-client'",
+              "end": 57,
+              "highlight": "string",
+              "start": 32
+            }
+          ],
+          "line_number": 19
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "import",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "{",
+              "end": 8,
+              "highlight": "delimiter",
+              "start": 7
+            },
+            {
+              "content": "DEFAULT_WORKSPACE_ID",
+              "end": 29,
+              "highlight": "keyword",
+              "start": 9
+            },
+            {
+              "content": ",",
+              "end": 30,
+              "highlight": "normal",
+              "start": 29
+            },
+            {
+              "content": "DEFAULT_WORKSPACE_PATH",
+              "end": 53,
+              "highlight": "keyword",
+              "start": 31
+            },
+            {
+              "content": "}",
+              "end": 55,
+              "highlight": "delimiter",
+              "start": 54
+            },
+            {
+              "content": "from",
+              "end": 60,
+              "highlight": "keyword",
+              "start": 56
+            },
+            {
+              "content": "'@figma/agentplat-stream-protocol'",
+              "end": 95,
+              "highlight": "string",
+              "start": 61
+            }
+          ],
+          "line_number": 20
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "import",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "type",
+              "end": 11,
+              "highlight": "keyword",
+              "start": 7
+            },
+            {
+              "content": "{",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            },
+            {
+              "content": "BootstrapConfig",
+              "end": 29,
+              "highlight": "type",
+              "start": 14
+            },
+            {
+              "content": "}",
+              "end": 31,
+              "highlight": "delimiter",
+              "start": 30
+            },
+            {
+              "content": "from",
+              "end": 36,
+              "highlight": "keyword",
+              "start": 32
+            },
+            {
+              "content": "'@figma/agentplat-stream-protocol'",
+              "end": 71,
+              "highlight": "string",
+              "start": 37
+            }
+          ],
+          "line_number": 21
+        }
+      }
+    ],
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "/**",
+              "end": 3,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 163
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": " * Calls sboxd workspace/create with structured BootstrapConfig via WebSocket.",
+              "end": 78,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 164
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": " * Replaces the env-var-based /api/ready bootstrap path. Bootstrap is idempotent,",
+              "end": 81,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 165
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": " * so this is safe to call on every sandbox access (new, warm, or reused).",
+              "end": 74,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 166
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": " */",
+              "end": 3,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 167
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "async",
+              "end": 5,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "function",
+              "end": 14,
+              "highlight": "keyword",
+              "start": 6
+            },
+            {
+              "content": "bootstrapViaWorkspaceCreate",
+              "end": 42,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": "(",
+              "end": 43,
+              "highlight": "delimiter",
+              "start": 42
+            }
+          ],
+          "line_number": 168
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "sboxdUrl",
+              "end": 10,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 11,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "string",
+              "end": 18,
+              "highlight": "type",
+              "start": 12
+            },
+            {
+              "content": ",",
+              "end": 19,
+              "highlight": "normal",
+              "start": 18
+            }
+          ],
+          "line_number": 169
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "context",
+              "end": 9,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 10,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": "RequestContext",
+              "end": 25,
+              "highlight": "type",
+              "start": 11
+            },
+            {
+              "content": ",",
+              "end": 26,
+              "highlight": "normal",
+              "start": 25
+            }
+          ],
+          "line_number": 170
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "workloadConfig",
+              "end": 16,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 17,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": "WorkloadConfig",
+              "end": 32,
+              "highlight": "type",
+              "start": 18
+            },
+            {
+              "content": ",",
+              "end": 33,
+              "highlight": "normal",
+              "start": 32
+            }
+          ],
+          "line_number": 171
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": ")",
+              "end": 1,
+              "highlight": "delimiter",
+              "start": 0
+            },
+            {
+              "content": ":",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "Promise",
+              "end": 10,
+              "highlight": "type",
+              "start": 3
+            },
+            {
+              "content": "<",
+              "end": 11,
+              "highlight": "delimiter",
+              "start": 10
+            },
+            {
+              "content": "void",
+              "end": 15,
+              "highlight": "type",
+              "start": 11
+            },
+            {
+              "content": ">",
+              "end": 16,
+              "highlight": "delimiter",
+              "start": 15
+            },
+            {
+              "content": "{",
+              "end": 18,
+              "highlight": "delimiter",
+              "start": 17
+            }
+          ],
+          "line_number": 172
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "const",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "apiUrl",
+              "end": 14,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "=",
+              "end": 16,
+              "highlight": "keyword",
+              "start": 15
+            },
+            {
+              "content": "getSettings",
+              "end": 28,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "(",
+              "end": 29,
+              "highlight": "delimiter",
+              "start": 28
+            },
+            {
+              "content": ")",
+              "end": 30,
+              "highlight": "delimiter",
+              "start": 29
+            },
+            {
+              "content": ".",
+              "end": 31,
+              "highlight": "normal",
+              "start": 30
+            },
+            {
+              "content": "ugit_base_url",
+              "end": 44,
+              "highlight": "normal",
+              "start": 31
+            },
+            {
+              "content": "||",
+              "end": 47,
+              "highlight": "keyword",
+              "start": 45
+            },
+            {
+              "content": "hardcodedApiUrls",
+              "end": 64,
+              "highlight": "normal",
+              "start": 48
+            },
+            {
+              "content": "[",
+              "end": 65,
+              "highlight": "delimiter",
+              "start": 64
+            },
+            {
+              "content": "getEnv",
+              "end": 71,
+              "highlight": "normal",
+              "start": 65
+            },
+            {
+              "content": "(",
+              "end": 72,
+              "highlight": "delimiter",
+              "start": 71
+            },
+            {
+              "content": ")",
+              "end": 73,
+              "highlight": "delimiter",
+              "start": 72
+            },
+            {
+              "content": "]",
+              "end": 74,
+              "highlight": "delimiter",
+              "start": 73
+            }
+          ],
+          "line_number": 173
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "const",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "bootstrap",
+              "end": 17,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ":",
+              "end": 18,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "BootstrapConfig",
+              "end": 34,
+              "highlight": "type",
+              "start": 19
+            },
+            {
+              "content": "=",
+              "end": 36,
+              "highlight": "keyword",
+              "start": 35
+            },
+            {
+              "content": "{",
+              "end": 38,
+              "highlight": "delimiter",
+              "start": 37
+            }
+          ],
+          "line_number": 175
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "workloadName",
+              "end": 16,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ":",
+              "end": 17,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": "workloadConfig",
+              "end": 32,
+              "highlight": "normal",
+              "start": 18
+            },
+            {
+              "content": ".",
+              "end": 33,
+              "highlight": "normal",
+              "start": 32
+            },
+            {
+              "content": "workloadName",
+              "end": 45,
+              "highlight": "normal",
+              "start": 33
+            },
+            {
+              "content": ",",
+              "end": 46,
+              "highlight": "normal",
+              "start": 45
+            }
+          ],
+          "line_number": 176
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "workloadOwnerType",
+              "end": 21,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ":",
+              "end": 22,
+              "highlight": "normal",
+              "start": 21
+            },
+            {
+              "content": "'file'",
+              "end": 29,
+              "highlight": "string",
+              "start": 23
+            },
+            {
+              "content": ",",
+              "end": 30,
+              "highlight": "normal",
+              "start": 29
+            }
+          ],
+          "line_number": 177
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "workloadOwnerID",
+              "end": 19,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ":",
+              "end": 20,
+              "highlight": "normal",
+              "start": 19
+            },
+            {
+              "content": "context",
+              "end": 28,
+              "highlight": "normal",
+              "start": 21
+            },
+            {
+              "content": ".",
+              "end": 29,
+              "highlight": "normal",
+              "start": 28
+            },
+            {
+              "content": "fileId",
+              "end": 35,
+              "highlight": "normal",
+              "start": 29
+            },
+            {
+              "content": "!",
+              "end": 36,
+              "highlight": "keyword",
+              "start": 35
+            },
+            {
+              "content": ",",
+              "end": 37,
+              "highlight": "normal",
+              "start": 36
+            }
+          ],
+          "line_number": 178
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "git",
+              "end": 7,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ":",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "{",
+              "end": 10,
+              "highlight": "delimiter",
+              "start": 9
+            }
+          ],
+          "line_number": 179
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "baseUrl",
+              "end": 13,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": ":",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "`${apiUrl}/git`",
+              "end": 30,
+              "highlight": "string",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 31,
+              "highlight": "normal",
+              "start": 30
+            }
+          ],
+          "line_number": 180
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "username",
+              "end": 14,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": ":",
+              "end": 15,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": "context",
+              "end": 23,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": ".",
+              "end": 24,
+              "highlight": "normal",
+              "start": 23
+            },
+            {
+              "content": "fileId",
+              "end": 30,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": "!",
+              "end": 31,
+              "highlight": "keyword",
+              "start": 30
+            },
+            {
+              "content": ",",
+              "end": 32,
+              "highlight": "normal",
+              "start": 31
+            }
+          ],
+          "line_number": 181
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "password",
+              "end": 14,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": ":",
+              "end": 15,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": "await",
+              "end": 21,
+              "highlight": "keyword",
+              "start": 16
+            },
+            {
+              "content": "generateUgitJwt",
+              "end": 37,
+              "highlight": "normal",
+              "start": 22
+            },
+            {
+              "content": "(",
+              "end": 38,
+              "highlight": "delimiter",
+              "start": 37
+            },
+            {
+              "content": "context",
+              "end": 45,
+              "highlight": "normal",
+              "start": 38
+            },
+            {
+              "content": ",",
+              "end": 46,
+              "highlight": "normal",
+              "start": 45
+            },
+            {
+              "content": "workloadConfig",
+              "end": 61,
+              "highlight": "normal",
+              "start": 47
+            },
+            {
+              "content": ".",
+              "end": 62,
+              "highlight": "normal",
+              "start": 61
+            },
+            {
+              "content": "workloadName",
+              "end": 74,
+              "highlight": "normal",
+              "start": 62
+            },
+            {
+              "content": ")",
+              "end": 75,
+              "highlight": "delimiter",
+              "start": 74
+            },
+            {
+              "content": ",",
+              "end": 76,
+              "highlight": "normal",
+              "start": 75
+            }
+          ],
+          "line_number": 182
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 5,
+              "highlight": "delimiter",
+              "start": 4
+            },
+            {
+              "content": ",",
+              "end": 6,
+              "highlight": "normal",
+              "start": 5
+            }
+          ],
+          "line_number": 183
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "agentType",
+              "end": 13,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ":",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "'claude'",
+              "end": 23,
+              "highlight": "string",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 24,
+              "highlight": "normal",
+              "start": 23
+            }
+          ],
+          "line_number": 184
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "sandboxGitEnabled",
+              "end": 21,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ":",
+              "end": 22,
+              "highlight": "normal",
+              "start": 21
+            },
+            {
+              "content": "CortexStatsig",
+              "end": 36,
+              "highlight": "type",
+              "start": 23
+            },
+            {
+              "content": ".",
+              "end": 37,
+              "highlight": "normal",
+              "start": 36
+            },
+            {
+              "content": "checkGate",
+              "end": 46,
+              "highlight": "normal",
+              "start": 37
+            },
+            {
+              "content": "(",
+              "end": 47,
+              "highlight": "delimiter",
+              "start": 46
+            },
+            {
+              "content": "context",
+              "end": 54,
+              "highlight": "normal",
+              "start": 47
+            },
+            {
+              "content": ",",
+              "end": 55,
+              "highlight": "normal",
+              "start": 54
+            },
+            {
+              "content": "'make_sandbox_git_persistence'",
+              "end": 86,
+              "highlight": "string",
+              "start": 56
+            },
+            {
+              "content": ",",
+              "end": 87,
+              "highlight": "normal",
+              "start": 86
+            },
+            {
+              "content": "false",
+              "end": 93,
+              "highlight": "keyword",
+              "start": 88
+            },
+            {
+              "content": ")",
+              "end": 94,
+              "highlight": "delimiter",
+              "start": 93
+            },
+            {
+              "content": ",",
+              "end": 95,
+              "highlight": "normal",
+              "start": 94
+            }
+          ],
+          "line_number": 185
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 3,
+              "highlight": "delimiter",
+              "start": 2
+            }
+          ],
+          "line_number": 186
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "logger",
+              "end": 8,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 9,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "info",
+              "end": 13,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": "(",
+              "end": 14,
+              "highlight": "delimiter",
+              "start": 13
+            },
+            {
+              "content": "'Bootstrapping workspace via workspace/create'",
+              "end": 60,
+              "highlight": "string",
+              "start": 14
+            },
+            {
+              "content": ",",
+              "end": 61,
+              "highlight": "normal",
+              "start": 60
+            },
+            {
+              "content": "{",
+              "end": 63,
+              "highlight": "delimiter",
+              "start": 62
+            },
+            {
+              "content": "sboxd_url",
+              "end": 73,
+              "highlight": "normal",
+              "start": 64
+            },
+            {
+              "content": ":",
+              "end": 74,
+              "highlight": "normal",
+              "start": 73
+            },
+            {
+              "content": "sboxdUrl",
+              "end": 83,
+              "highlight": "normal",
+              "start": 75
+            },
+            {
+              "content": "}",
+              "end": 85,
+              "highlight": "delimiter",
+              "start": 84
+            },
+            {
+              "content": ")",
+              "end": 86,
+              "highlight": "delimiter",
+              "start": 85
+            }
+          ],
+          "line_number": 188
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "const",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "client",
+              "end": 14,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "=",
+              "end": 16,
+              "highlight": "keyword",
+              "start": 15
+            },
+            {
+              "content": "new",
+              "end": 20,
+              "highlight": "keyword",
+              "start": 17
+            },
+            {
+              "content": "AgentPlatClient",
+              "end": 36,
+              "highlight": "type",
+              "start": 21
+            },
+            {
+              "content": "(",
+              "end": 37,
+              "highlight": "delimiter",
+              "start": 36
+            },
+            {
+              "content": "sboxdUrl",
+              "end": 45,
+              "highlight": "normal",
+              "start": 37
+            },
+            {
+              "content": ")",
+              "end": 46,
+              "highlight": "delimiter",
+              "start": 45
+            }
+          ],
+          "line_number": 190
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "try",
+              "end": 5,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "{",
+              "end": 7,
+              "highlight": "delimiter",
+              "start": 6
+            }
+          ],
+          "line_number": 192
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "await",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 4
+            },
+            {
+              "content": "new",
+              "end": 13,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": "Promise",
+              "end": 21,
+              "highlight": "type",
+              "start": 14
+            },
+            {
+              "content": "<",
+              "end": 22,
+              "highlight": "delimiter",
+              "start": 21
+            },
+            {
+              "content": "void",
+              "end": 26,
+              "highlight": "type",
+              "start": 22
+            },
+            {
+              "content": ">",
+              "end": 27,
+              "highlight": "delimiter",
+              "start": 26
+            },
+            {
+              "content": "(",
+              "end": 28,
+              "highlight": "delimiter",
+              "start": 27
+            },
+            {
+              "content": "(",
+              "end": 29,
+              "highlight": "delimiter",
+              "start": 28
+            },
+            {
+              "content": "resolve",
+              "end": 36,
+              "highlight": "normal",
+              "start": 29
+            },
+            {
+              "content": ",",
+              "end": 37,
+              "highlight": "normal",
+              "start": 36
+            },
+            {
+              "content": "reject",
+              "end": 44,
+              "highlight": "normal",
+              "start": 38
+            },
+            {
+              "content": ")",
+              "end": 45,
+              "highlight": "delimiter",
+              "start": 44
+            },
+            {
+              "content": "=>",
+              "end": 48,
+              "highlight": "keyword",
+              "start": 46
+            },
+            {
+              "content": "{",
+              "end": 50,
+              "highlight": "delimiter",
+              "start": 49
+            }
+          ],
+          "line_number": 193
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "const",
+              "end": 11,
+              "highlight": "keyword",
+              "start": 6
+            },
+            {
+              "content": "timeout",
+              "end": 19,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "=",
+              "end": 21,
+              "highlight": "keyword",
+              "start": 20
+            },
+            {
+              "content": "setTimeout",
+              "end": 32,
+              "highlight": "normal",
+              "start": 22
+            },
+            {
+              "content": "(",
+              "end": 33,
+              "highlight": "delimiter",
+              "start": 32
+            },
+            {
+              "content": "(",
+              "end": 34,
+              "highlight": "delimiter",
+              "start": 33
+            },
+            {
+              "content": ")",
+              "end": 35,
+              "highlight": "delimiter",
+              "start": 34
+            },
+            {
+              "content": "=>",
+              "end": 38,
+              "highlight": "keyword",
+              "start": 36
+            },
+            {
+              "content": "{",
+              "end": 40,
+              "highlight": "delimiter",
+              "start": 39
+            }
+          ],
+          "line_number": 194
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "reject",
+              "end": 14,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "(",
+              "end": 15,
+              "highlight": "delimiter",
+              "start": 14
+            },
+            {
+              "content": "new",
+              "end": 18,
+              "highlight": "keyword",
+              "start": 15
+            },
+            {
+              "content": "Error",
+              "end": 24,
+              "highlight": "type",
+              "start": 19
+            },
+            {
+              "content": "(",
+              "end": 25,
+              "highlight": "delimiter",
+              "start": 24
+            },
+            {
+              "content": "'sboxd workspace/create timed out after 30s'",
+              "end": 69,
+              "highlight": "string",
+              "start": 25
+            },
+            {
+              "content": ")",
+              "end": 70,
+              "highlight": "delimiter",
+              "start": 69
+            },
+            {
+              "content": ")",
+              "end": 71,
+              "highlight": "delimiter",
+              "start": 70
+            }
+          ],
+          "line_number": 195
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 7,
+              "highlight": "delimiter",
+              "start": 6
+            },
+            {
+              "content": ",",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "30_000",
+              "end": 15,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ")",
+              "end": 16,
+              "highlight": "delimiter",
+              "start": 15
+            }
+          ],
+          "line_number": 196
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "client",
+              "end": 12,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": ".",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "connect",
+              "end": 20,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "(",
+              "end": 21,
+              "highlight": "delimiter",
+              "start": 20
+            },
+            {
+              "content": "undefined",
+              "end": 30,
+              "highlight": "keyword",
+              "start": 21
+            },
+            {
+              "content": ",",
+              "end": 31,
+              "highlight": "normal",
+              "start": 30
+            },
+            {
+              "content": "(",
+              "end": 33,
+              "highlight": "delimiter",
+              "start": 32
+            },
+            {
+              "content": "connectErr",
+              "end": 43,
+              "highlight": "normal",
+              "start": 33
+            },
+            {
+              "content": ")",
+              "end": 44,
+              "highlight": "delimiter",
+              "start": 43
+            },
+            {
+              "content": "=>",
+              "end": 47,
+              "highlight": "keyword",
+              "start": 45
+            },
+            {
+              "content": "{",
+              "end": 49,
+              "highlight": "delimiter",
+              "start": 48
+            }
+          ],
+          "line_number": 198
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 10,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "(",
+              "end": 12,
+              "highlight": "delimiter",
+              "start": 11
+            },
+            {
+              "content": "connectErr",
+              "end": 22,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": ")",
+              "end": 23,
+              "highlight": "delimiter",
+              "start": 22
+            },
+            {
+              "content": "{",
+              "end": 25,
+              "highlight": "delimiter",
+              "start": 24
+            }
+          ],
+          "line_number": 199
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "clearTimeout",
+              "end": 22,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "(",
+              "end": 23,
+              "highlight": "delimiter",
+              "start": 22
+            },
+            {
+              "content": "timeout",
+              "end": 30,
+              "highlight": "normal",
+              "start": 23
+            },
+            {
+              "content": ")",
+              "end": 31,
+              "highlight": "delimiter",
+              "start": 30
+            }
+          ],
+          "line_number": 200
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 16,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": "reject",
+              "end": 23,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "(",
+              "end": 24,
+              "highlight": "delimiter",
+              "start": 23
+            },
+            {
+              "content": "connectErr",
+              "end": 34,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": ")",
+              "end": 35,
+              "highlight": "delimiter",
+              "start": 34
+            }
+          ],
+          "line_number": 201
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            }
+          ],
+          "line_number": 202
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "client",
+              "end": 14,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ".",
+              "end": 15,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": "createWorkspace",
+              "end": 30,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": "(",
+              "end": 31,
+              "highlight": "delimiter",
+              "start": 30
+            }
+          ],
+          "line_number": 204
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "DEFAULT_WORKSPACE_PATH",
+              "end": 32,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": ",",
+              "end": 33,
+              "highlight": "normal",
+              "start": 32
+            }
+          ],
+          "line_number": 205
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "{",
+              "end": 11,
+              "highlight": "delimiter",
+              "start": 10
+            },
+            {
+              "content": "workspaceId",
+              "end": 23,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": ":",
+              "end": 24,
+              "highlight": "normal",
+              "start": 23
+            },
+            {
+              "content": "DEFAULT_WORKSPACE_ID",
+              "end": 45,
+              "highlight": "keyword",
+              "start": 25
+            },
+            {
+              "content": ",",
+              "end": 46,
+              "highlight": "normal",
+              "start": 45
+            },
+            {
+              "content": "bootstrap",
+              "end": 56,
+              "highlight": "normal",
+              "start": 47
+            },
+            {
+              "content": "}",
+              "end": 58,
+              "highlight": "delimiter",
+              "start": 57
+            },
+            {
+              "content": ",",
+              "end": 59,
+              "highlight": "normal",
+              "start": 58
+            }
+          ],
+          "line_number": 206
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "(",
+              "end": 11,
+              "highlight": "delimiter",
+              "start": 10
+            },
+            {
+              "content": "createErr",
+              "end": 20,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": ")",
+              "end": 21,
+              "highlight": "delimiter",
+              "start": 20
+            },
+            {
+              "content": "=>",
+              "end": 24,
+              "highlight": "keyword",
+              "start": 22
+            },
+            {
+              "content": "{",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            }
+          ],
+          "line_number": 207
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "clearTimeout",
+              "end": 24,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 25,
+              "highlight": "delimiter",
+              "start": 24
+            },
+            {
+              "content": "timeout",
+              "end": 32,
+              "highlight": "normal",
+              "start": 25
+            },
+            {
+              "content": ")",
+              "end": 33,
+              "highlight": "delimiter",
+              "start": 32
+            }
+          ],
+          "line_number": 208
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 14,
+              "highlight": "keyword",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 16,
+              "highlight": "delimiter",
+              "start": 15
+            },
+            {
+              "content": "createErr",
+              "end": 25,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": ")",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            },
+            {
+              "content": "return",
+              "end": 33,
+              "highlight": "keyword",
+              "start": 27
+            },
+            {
+              "content": "reject",
+              "end": 40,
+              "highlight": "normal",
+              "start": 34
+            },
+            {
+              "content": "(",
+              "end": 41,
+              "highlight": "delimiter",
+              "start": 40
+            },
+            {
+              "content": "createErr",
+              "end": 50,
+              "highlight": "normal",
+              "start": 41
+            },
+            {
+              "content": ")",
+              "end": 51,
+              "highlight": "delimiter",
+              "start": 50
+            }
+          ],
+          "line_number": 209
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "resolve",
+              "end": 19,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 20,
+              "highlight": "delimiter",
+              "start": 19
+            },
+            {
+              "content": ")",
+              "end": 21,
+              "highlight": "delimiter",
+              "start": 20
+            }
+          ],
+          "line_number": 210
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 11,
+              "highlight": "delimiter",
+              "start": 10
+            },
+            {
+              "content": ",",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            }
+          ],
+          "line_number": 211
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": ")",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            }
+          ],
+          "line_number": 212
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 7,
+              "highlight": "delimiter",
+              "start": 6
+            },
+            {
+              "content": ")",
+              "end": 8,
+              "highlight": "delimiter",
+              "start": 7
+            }
+          ],
+          "line_number": 213
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 5,
+              "highlight": "delimiter",
+              "start": 4
+            },
+            {
+              "content": ")",
+              "end": 6,
+              "highlight": "delimiter",
+              "start": 5
+            }
+          ],
+          "line_number": 214
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 3,
+              "highlight": "delimiter",
+              "start": 2
+            },
+            {
+              "content": "finally",
+              "end": 11,
+              "highlight": "keyword",
+              "start": 4
+            },
+            {
+              "content": "{",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            }
+          ],
+          "line_number": 215
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "client",
+              "end": 10,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ".",
+              "end": 11,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "close",
+              "end": 16,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "(",
+              "end": 17,
+              "highlight": "delimiter",
+              "start": 16
+            },
+            {
+              "content": ")",
+              "end": 18,
+              "highlight": "delimiter",
+              "start": 17
+            }
+          ],
+          "line_number": 216
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 3,
+              "highlight": "delimiter",
+              "start": 2
+            }
+          ],
+          "line_number": 217
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 1,
+              "highlight": "delimiter",
+              "start": 0
+            }
+          ],
+          "line_number": 218
+        }
+      }
+    ],
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "'cortex_workspace_create_bootstrap'",
+              "end": 45,
+              "highlight": "string",
+              "start": 10
+            },
+            {
+              "content": ",",
+              "end": 46,
+              "highlight": "normal",
+              "start": 45
+            }
+          ],
+          "line_number": 383
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "false",
+              "end": 15,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": ",",
+              "end": 16,
+              "highlight": "normal",
+              "start": 15
+            }
+          ],
+          "line_number": 384
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": ")",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            }
+          ],
+          "line_number": 385
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 10,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "(",
+              "end": 12,
+              "highlight": "delimiter",
+              "start": 11
+            },
+            {
+              "content": "useWorkspaceCreate",
+              "end": 30,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": ")",
+              "end": 31,
+              "highlight": "delimiter",
+              "start": 30
+            },
+            {
+              "content": "{",
+              "end": 33,
+              "highlight": "delimiter",
+              "start": 32
+            }
+          ],
+          "line_number": 387
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "await",
+              "end": 15,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": "bootstrapViaWorkspaceCreate",
+              "end": 43,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": "(",
+              "end": 44,
+              "highlight": "delimiter",
+              "start": 43
+            },
+            {
+              "content": "rewrittenSboxdUrl",
+              "end": 61,
+              "highlight": "normal",
+              "start": 44
+            },
+            {
+              "content": ",",
+              "end": 62,
+              "highlight": "normal",
+              "start": 61
+            },
+            {
+              "content": "context",
+              "end": 70,
+              "highlight": "normal",
+              "start": 63
+            },
+            {
+              "content": ",",
+              "end": 71,
+              "highlight": "normal",
+              "start": 70
+            },
+            {
+              "content": "workloadConfig",
+              "end": 86,
+              "highlight": "normal",
+              "start": 72
+            },
+            {
+              "content": ")",
+              "end": 87,
+              "highlight": "delimiter",
+              "start": 86
+            }
+          ],
+          "line_number": 388
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "statsD",
+              "end": 16,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": ".",
+              "end": 17,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": "increment",
+              "end": 26,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "(",
+              "end": 27,
+              "highlight": "delimiter",
+              "start": 26
+            },
+            {
+              "content": "'foundry_api_client.workspace_bootstrapped'",
+              "end": 70,
+              "highlight": "string",
+              "start": 27
+            },
+            {
+              "content": ",",
+              "end": 71,
+              "highlight": "normal",
+              "start": 70
+            },
+            {
+              "content": "1",
+              "end": 73,
+              "highlight": "normal",
+              "start": 72
+            },
+            {
+              "content": ",",
+              "end": 74,
+              "highlight": "normal",
+              "start": 73
+            },
+            {
+              "content": "tags",
+              "end": 79,
+              "highlight": "normal",
+              "start": 75
+            },
+            {
+              "content": ")",
+              "end": 80,
+              "highlight": "delimiter",
+              "start": 79
+            }
+          ],
+          "line_number": 389
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 7,
+              "highlight": "delimiter",
+              "start": 6
+            }
+          ],
+          "line_number": 394
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "// When a sandbox is reused (not newly provisioned, not from warm pool) and",
+              "end": 81,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 316
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Bootstrap the workspace on sboxd. With the feature flag enabled, we call",
+              "end": 81,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 376
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "// a workload is configured, Nimbus skips the sboxd ready call. We call it",
+              "end": 80,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 317
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "// workspace/create with structured BootstrapConfig for all workload-configured",
+              "end": 85,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 377
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "// directly to bootstrap the workspace (git repos, agent templates, plugins,",
+              "end": 82,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 318
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "// sandboxes (new, warm, reused) since bootstrap is idempotent. Without the",
+              "end": 81,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 378
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "// credentials). Errors are propagated because a failed reconciliation means",
+              "end": 82,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 319
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "// flag, we fall back to the legacy /api/ready path for reused sandboxes only.",
+              "end": 84,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 379
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "// the sboxd session will definitely fail.",
+              "end": 48,
+              "highlight": "comment",
+              "start": 6
+            }
+          ],
+          "line_number": 320
+        }
+      },
+      {
+        "lhs": {
+          "changes": [],
+          "line_number": 321
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "(",
+              "end": 10,
+              "highlight": "delimiter",
+              "start": 9
+            },
+            {
+              "content": "workloadConfig",
+              "end": 24,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "&&",
+              "end": 27,
+              "highlight": "keyword",
+              "start": 25
+            },
+            {
+              "content": "context",
+              "end": 35,
+              "highlight": "normal",
+              "start": 28
+            },
+            {
+              "content": ".",
+              "end": 36,
+              "highlight": "normal",
+              "start": 35
+            },
+            {
+              "content": "fileId",
+              "end": 42,
+              "highlight": "normal",
+              "start": 36
+            },
+            {
+              "content": "&&",
+              "end": 45,
+              "highlight": "keyword",
+              "start": 43
+            },
+            {
+              "content": "rewrittenSboxdUrl",
+              "end": 63,
+              "highlight": "normal",
+              "start": 46
+            },
+            {
+              "content": ")",
+              "end": 64,
+              "highlight": "delimiter",
+              "start": 63
+            },
+            {
+              "content": "{",
+              "end": 66,
+              "highlight": "delimiter",
+              "start": 65
+            }
+          ],
+          "line_number": 380
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "workloadConfig",
+              "end": 22,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "&&",
+              "end": 25,
+              "highlight": "keyword",
+              "start": 23
+            }
+          ],
+          "line_number": 322
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "const",
+              "end": 13,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "useWorkspaceCreate",
+              "end": 32,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": "=",
+              "end": 34,
+              "highlight": "keyword",
+              "start": 33
+            },
+            {
+              "content": "CortexStatsig",
+              "end": 48,
+              "highlight": "type",
+              "start": 35
+            },
+            {
+              "content": ".",
+              "end": 49,
+              "highlight": "normal",
+              "start": 48
+            },
+            {
+              "content": "checkGate",
+              "end": 58,
+              "highlight": "normal",
+              "start": 49
+            },
+            {
+              "content": "(",
+              "end": 59,
+              "highlight": "delimiter",
+              "start": 58
+            }
+          ],
+          "line_number": 381
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "rewrittenSboxdUrl",
+              "end": 25,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "&&",
+              "end": 28,
+              "highlight": "keyword",
+              "start": 26
+            }
+          ],
+          "line_number": 323
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "context",
+              "end": 17,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": ",",
+              "end": 18,
+              "highlight": "normal",
+              "start": 17
+            }
+          ],
+          "line_number": 382
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "!",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "sandboxResponse",
+              "end": 24,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 25,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": "newlyProvisioned",
+              "end": 41,
+              "highlight": "normal",
+              "start": 25
+            }
+          ],
+          "line_number": 324
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            },
+            {
+              "content": "else",
+              "end": 14,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": "if",
+              "end": 17,
+              "highlight": "keyword",
+              "start": 15
+            },
+            {
+              "content": "!",
+              "end": 20,
+              "highlight": "keyword",
+              "start": 19
+            },
+            {
+              "content": "sandboxResponse",
+              "end": 35,
+              "highlight": "normal",
+              "start": 20
+            },
+            {
+              "content": ".",
+              "end": 36,
+              "highlight": "normal",
+              "start": 35
+            },
+            {
+              "content": "newlyProvisioned",
+              "end": 52,
+              "highlight": "normal",
+              "start": 36
+            }
+          ],
+          "line_number": 390
+        }
+      }
+    ]
+  ],
+  "hunks": [
+    {
+      "new_count": 3,
+      "new_start": 20,
+      "old_count": 0,
+      "old_start": 19
+    },
+    {
+      "new_count": 57,
+      "new_start": 164,
+      "old_count": 0,
+      "old_start": 160
+    },
+    {
+      "new_count": 18,
+      "new_start": 377,
+      "old_count": 13,
+      "old_start": 317
+    }
+  ],
+  "language": "TypeScript",
+  "new_lines": [
+    "import { Request } from 'express'",
+    "import { createHash } from 'crypto'",
+    "import { RequestContext } from '#lib/context.js'",
+    "import { nimbusClient } from './nimbus_api.js'",
+    "import { CortexRateLimitExceededError } from '@figma/synapse-global/shared/cortex_errors/errors'",
+    "import logger from '#lib/util/logger.js'",
+    "import { SandboxInfo, SboxWorkloadName, foundryRequest } from '@figma/synapse-server/foundry'",
+    "import { CortexStatsig } from '#lib/statsig/statsig.js'",
+    "import {",
+    "  AntiabuseClient,",
+    "  doAntiabuse,",
+    "  getAntiabuseClient as getAntiabuseClientFactory,",
+    "  RulesAction_ActionType as RulesActionType,",
+    "} from '@figma/security-infra-lib-antiabuse-ts-client'",
+    "import { getEnv, isLocal } from '@figma/synapse-server/lib/settings/environment'",
+    "import { getSettings, hardcodedApiUrls } from '#lib/settings.js'",
+    "import { maybeRewriteSandboxUrl } from '#lib/foundry/maybe_rewrite_sandbox_url.js'",
+    "import statsD from './statsd.js'",
+    "import { generateSinatraJwt, generateUgitJwt } from '#lib/util/jwt.js'",
+    "import { AgentPlatClient } from '@figma/agentplat-client'",
+    "import { DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_PATH } from '@figma/agentplat-stream-protocol'",
+    "import type { BootstrapConfig } from '@figma/agentplat-stream-protocol'",
+    "",
+    "let antiabuseClient: AntiabuseClient | null = null",
+    "",
+    "function getAntiabuseClient(): AntiabuseClient {",
+    "  if (antiabuseClient == null) {",
+    "    antiabuseClient = getAntiabuseClientFactory()",
+    "  }",
+    "  return antiabuseClient",
+    "}",
+    "",
+    "interface FoundryApiClientOptions {",
+    "  req: Request",
+    "  context: RequestContext",
+    "  routingKey: string",
+    "  forceProvision?: boolean",
+    "  originHost?: string",
+    "  provider?: string",
+    "}",
+    "",
+    "export { SboxWorkloadName } from '@figma/synapse-server/foundry'",
+    "",
+    "export interface WorkloadConfig {",
+    "  workloadName: SboxWorkloadName",
+    "}",
+    "",
+    "interface FoundryApiClientConfig {",
+    "  workloadConfig?: WorkloadConfig",
+    "}",
+    "",
+    "/**",
+    " * Generates environment variables for sandbox provisioning",
+    " */",
+    "export async function sandboxEnvVars(",
+    "  context: RequestContext,",
+    "  willBeNewlyProvisioned: boolean,",
+    "  originHost?: string,",
+    "  workloadConfig?: WorkloadConfig,",
+    "): Promise<Record<string, string>> {",
+    "  const vars: Record<string, string> = {}",
+    "",
+    "  // Only set INITIAL_ALLOWED_ORIGIN if originHost is provided",
+    "  if (originHost) {",
+    "    vars['INITIAL_ALLOWED_ORIGIN'] = originHost",
+    "  }",
+    "",
+    "  // Add FILE_KEY_HASH as SHA1 of the file key",
+    "  if (context.fileKey) {",
+    "    vars['FILE_KEY_HASH'] = createHash('sha1').update(context.fileKey).digest('hex')",
+    "  }",
+    "",
+    "  // All configs for a workload",
+    "  if (context.fileId && !!workloadConfig) {",
+    "    const apiUrl = getSettings().ugit_base_url || hardcodedApiUrls[getEnv()]",
+    "    vars['UGIT_BASE_URL'] = `${apiUrl}/git`",
+    "    vars['UGIT_USERNAME'] = context.fileId",
+    "    vars['UGIT_PASSWORD'] = await generateUgitJwt(context, workloadConfig.workloadName)",
+    "    vars['WORKLOAD_OWNER_TYPE'] = 'file'",
+    "    vars['WORKLOAD_OWNER_ID'] = context.fileId",
+    "    vars['WORKLOAD_NAME'] = workloadConfig.workloadName",
+    "    vars['SBOXD_READY_ENABLED'] = 'true'",
+    "  }",
+    "",
+    "  if (!workloadConfig || workloadConfig.workloadName === SboxWorkloadName.Make) {",
+    "    if (CortexStatsig.checkGate(context, 'make_foundry_css_import_hoisting', false)) {",
+    "      vars['CSS_IMPORT_HOISTING'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_foundry_remove_invalid_css_fonts', false)) {",
+    "      vars['REMOVE_INVALID_CSS_FONTS'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_foundry_allow_npm_scripts', false)) {",
+    "      vars['ALLOW_NPM_SCRIPTS'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'bake_point_and_edit', false)) {",
+    "      vars['FF_BAKE_POINT_AND_EDIT'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_permissive_tsx_loader', false)) {",
+    "      vars['FF_MAKE_PERMISSIVE_TSX_LOADER'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_sandbox_git_persistence', false)) {",
+    "      vars['SANDBOX_GIT_ENABLED'] = 'true'",
+    "    }",
+    "  }",
+    "",
+    "  if (",
+    "    willBeNewlyProvisioned &&",
+    "    CortexStatsig.checkGate(context, 'foundry_cached_preview_sandbox_trigger', false)",
+    "  ) {",
+    "    vars['SINATRA_JWT'] = await generateSinatraJwt(context)",
+    "  }",
+    "",
+    "  vars['EXEC_ENABLED'] = 'true'",
+    "  vars['CORTEX_ENV'] = getEnv()",
+    "",
+    "  return vars",
+    "}",
+    "",
+    "/**",
+    " * Calls sboxd /api/ready to trigger workspace bootstrap on a reused sandbox.",
+    " *",
+    " * When a sandbox is provisioned before the workload config is known, the sboxd",
+    " * bootstrap (git repos, agent templates, plugins, credentials) never runs.",
+    " * This function directly calls the sboxd ready endpoint to reconcile,",
+    " * matching the same protocol Nimbus uses on OnCreate/OnReady.",
+    " */",
+    "async function reconcileSboxdReady(",
+    "  sboxdUrl: string,",
+    "  controllerToken: string,",
+    "  envVars: Record<string, string>,",
+    "): Promise<void> {",
+    "  const body = JSON.stringify({ envVars })",
+    "  const controller = new AbortController()",
+    "  const timeout = setTimeout(() => controller.abort(), 30_000)",
+    "",
+    "  logger.info('Calling sboxd ready endpoint', { sboxd_url: `${sboxdUrl}/api/ready` })",
+    "",
+    "  try {",
+    "    // nosemgrep: figma.cortex-use-safe-fetch-instead-of-fetch (sboxd URL is an internal sandbox address from Nimbus, not user-controlled; safeFetch SSRF filter would block private IPs)",
+    "    const response = await fetch(`${sboxdUrl}/api/ready`, {",
+    "      method: 'POST',",
+    "      headers: {",
+    "        'Content-Type': 'application/json',",
+    "        Authorization: `Bearer ${controllerToken}`,",
+    "      },",
+    "      body,",
+    "      signal: controller.signal,",
+    "    })",
+    "",
+    "    if (!response.ok) {",
+    "      const text = await response.text().catch(() => '')",
+    "      throw new Error(`sboxd ready returned ${response.status}: ${text}`)",
+    "    }",
+    "  } finally {",
+    "    clearTimeout(timeout)",
+    "  }",
+    "}",
+    "",
+    "/**",
+    " * Calls sboxd workspace/create with structured BootstrapConfig via WebSocket.",
+    " * Replaces the env-var-based /api/ready bootstrap path. Bootstrap is idempotent,",
+    " * so this is safe to call on every sandbox access (new, warm, or reused).",
+    " */",
+    "async function bootstrapViaWorkspaceCreate(",
+    "  sboxdUrl: string,",
+    "  context: RequestContext,",
+    "  workloadConfig: WorkloadConfig,",
+    "): Promise<void> {",
+    "  const apiUrl = getSettings().ugit_base_url || hardcodedApiUrls[getEnv()]",
+    "",
+    "  const bootstrap: BootstrapConfig = {",
+    "    workloadName: workloadConfig.workloadName,",
+    "    workloadOwnerType: 'file',",
+    "    workloadOwnerID: context.fileId!,",
+    "    git: {",
+    "      baseUrl: `${apiUrl}/git`,",
+    "      username: context.fileId!,",
+    "      password: await generateUgitJwt(context, workloadConfig.workloadName),",
+    "    },",
+    "    agentType: 'claude',",
+    "    sandboxGitEnabled: CortexStatsig.checkGate(context, 'make_sandbox_git_persistence', false),",
+    "  }",
+    "",
+    "  logger.info('Bootstrapping workspace via workspace/create', { sboxd_url: sboxdUrl })",
+    "",
+    "  const client = new AgentPlatClient(sboxdUrl)",
+    "",
+    "  try {",
+    "    await new Promise<void>((resolve, reject) => {",
+    "      const timeout = setTimeout(() => {",
+    "        reject(new Error('sboxd workspace/create timed out after 30s'))",
+    "      }, 30_000)",
+    "",
+    "      client.connect(undefined, (connectErr) => {",
+    "        if (connectErr) {",
+    "          clearTimeout(timeout)",
+    "          return reject(connectErr)",
+    "        }",
+    "",
+    "        client.createWorkspace(",
+    "          DEFAULT_WORKSPACE_PATH,",
+    "          { workspaceId: DEFAULT_WORKSPACE_ID, bootstrap },",
+    "          (createErr) => {",
+    "            clearTimeout(timeout)",
+    "            if (createErr) return reject(createErr)",
+    "            resolve()",
+    "          },",
+    "        )",
+    "      })",
+    "    })",
+    "  } finally {",
+    "    client.close()",
+    "  }",
+    "}",
+    "",
+    "/**",
+    " * Client for interacting with the Foundry controller API",
+    " */",
+    "export const foundryApiClient = (config?: FoundryApiClientConfig) => {",
+    "  const nimbus = nimbusClient()",
+    "  const workloadConfig = config?.workloadConfig",
+    "",
+    "  const client = {",
+    "    /**",
+    "     * Ensures a sandbox is provisioned and returns connection info.",
+    "     */",
+    "    async ensureSandbox(options: FoundryApiClientOptions): Promise<SandboxInfo> {",
+    "      const { req, context, routingKey, forceProvision, originHost, provider } = options",
+    "      const start = performance.now()",
+    "",
+    "      // Check if sandbox will be newly provisioned so we can rate limit new sandbox provisioning via antiabuse",
+    "      const sandboxStatus = await nimbus.getSandboxByRoutingKey(routingKey, context.sessionId)",
+    "      const willBeNewlyProvisioned = sandboxStatus.status !== 'running' || forceProvision",
+    "      if (willBeNewlyProvisioned) {",
+    "        const disableAntiabuse = CortexStatsig.checkGate(context, 'cortex_disable_antiabuse', false)",
+    "        if (disableAntiabuse) {",
+    "          logger.info('Antiabuse disabled for new sandbox provisioning via Statsig gate')",
+    "          statsD.increment('foundry_api_client.ensure_sandbox.antiabuse_disabled', 1)",
+    "        } else {",
+    "          const antiabuseClient = getAntiabuseClient()",
+    "          const forwardedForIPs = req.get('x-forwarded-for')",
+    "",
+    "          try {",
+    "            const response = await doAntiabuse(antiabuseClient, 'cortex_request', {",
+    "              user_id: context.userId,",
+    "              route: 'foundry_new_sandbox_provision',",
+    "              ip: forwardedForIPs ? forwardedForIPs.split(',')[0].trim() : null,",
+    "              file: {",
+    "                key: context.fileKey,",
+    "              },",
+    "              session_id: context.sessionId,",
+    "              unauthenticated_user_id: context.unauthenticatedUserId,",
+    "              file_org_id: context.fileOrgId,",
+    "              product_type: context.productType,",
+    "              plan_parent_id: context.planParentId,",
+    "              seat_type: context.seatType,",
+    "              plan_tier: context.planTier,",
+    "              file_plan: context.filePlan,",
+    "              ...context.userAntiabuseInfo,",
+    "              user_agent: req.get('user-agent') || null,",
+    "              ja3: req.get('CloudFront-Viewer-JA3-Fingerprint') || null,",
+    "              ja4: req.get('CloudFront-Viewer-JA4-Fingerprint') || null,",
+    "              asn: req.get('CloudFront-Viewer-ASN') || null,",
+    "              geo_ip_country: req.get('CloudFront-Viewer-Country') || null,",
+    "              geo_ip_city: req.get('CloudFront-Viewer-City') || null,",
+    "            })",
+    "            if (response.type !== RulesActionType.NONE) {",
+    "              statsD.increment('foundry_api_client.ensure_sandbox.rate_limited', 1)",
+    "              throw new CortexRateLimitExceededError({})",
+    "            }",
+    "          } catch (err: unknown) {",
+    "            const isIntegrationTest =",
+    "              isLocal() && (context.integrationTest || context.vitestIntegrationTest)",
+    "            if (",
+    "              (isIntegrationTest || context.rateLimitBypass) &&",
+    "              err instanceof CortexRateLimitExceededError",
+    "            ) {",
+    "              logger.warn('Rate limit bypassed for new sandbox provision', err)",
+    "              statsD.increment('foundry_api_client.ensure_sandbox.rate_limit_bypassed', 1)",
+    "            } else {",
+    "              throw err",
+    "            }",
+    "          }",
+    "        }",
+    "      }",
+    "",
+    "      statsD.increment('foundry_api_client.ensure_sandbox.awaiting_sandbox', 1, {",
+    "        will_be_newly_provisioned: String(willBeNewlyProvisioned ?? true),",
+    "      })",
+    "",
+    "      // Generate environment variables internally to ensure consistency across all callers",
+    "      const envVars = await sandboxEnvVars(",
+    "        context,",
+    "        // Default to true since if we're not sure whether a sandbox will be newly provisioned, we should generate all env variables",
+    "        willBeNewlyProvisioned ?? true,",
+    "        originHost,",
+    "        workloadConfig,",
+    "      )",
+    "",
+    "      const sandboxResponse = await nimbus.sandbox({",
+    "        req,",
+    "        sandboxRequestBody: {",
+    "          routingKey,",
+    "          namespace:",
+    "            workloadConfig?.workloadName === SboxWorkloadName.Assistant ? 'assistant' : 'foundry',",
+    "          forceProvision,",
+    "          envVars,",
+    "          userId: context.userId,",
+    "          fileKeyHash: context.fileKey",
+    "            ? createHash('sha1').update(context.fileKey).digest('hex')",
+    "            : '',",
+    "          provider,",
+    "        },",
+    "        userId: context.userId,",
+    "        fileKey: context.fileKey,",
+    "        fileId: context.fileId,",
+    "        sessionId: context.sessionId,",
+    "      })",
+    "",
+    "      if (!sandboxResponse.urls) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_sandbox_urls',",
+    "        })",
+    "        throw new Error(`No sandbox URLs: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const controllerUrl = sandboxResponse.urls['controller']",
+    "      if (!controllerUrl) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_controller_url',",
+    "        })",
+    "        throw new Error(`No controller URL: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const appUrl = sandboxResponse.urls['app']",
+    "      if (!appUrl) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_app_url',",
+    "        })",
+    "        throw new Error(`No app URL: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const sboxdUrl = sandboxResponse.urls['sboxd']",
+    "",
+    "      if (!sandboxResponse.tokens) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_sandbox_tokens',",
+    "        })",
+    "        throw new Error(`No sandbox tokens: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const controllerToken = sandboxResponse.tokens['CONTROLLER_TOKEN']",
+    "      if (!controllerToken) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_controller_token',",
+    "        })",
+    "        throw new Error(`No controller token: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const durationMs = performance.now() - start",
+    "      const tags = {",
+    "        newly_provisioned: String(sandboxResponse.newlyProvisioned ?? false),",
+    "        warm: String(sandboxResponse.warm ?? false),",
+    "        provider: sandboxResponse.provider ?? 'unknown',",
+    "      }",
+    "",
+    "      statsD.distribution('foundry_api_client.ensure_sandbox.duration_ms', durationMs, tags)",
+    "      statsD.increment('foundry_api_client.ensure_sandbox.success', 1, tags)",
+    "",
+    "      const rewrittenSboxdUrl = sboxdUrl ? maybeRewriteSandboxUrl(sboxdUrl, context) : undefined",
+    "",
+    "      // Bootstrap the workspace on sboxd. With the feature flag enabled, we call",
+    "      // workspace/create with structured BootstrapConfig for all workload-configured",
+    "      // sandboxes (new, warm, reused) since bootstrap is idempotent. Without the",
+    "      // flag, we fall back to the legacy /api/ready path for reused sandboxes only.",
+    "      if (workloadConfig && context.fileId && rewrittenSboxdUrl) {",
+    "        const useWorkspaceCreate = CortexStatsig.checkGate(",
+    "          context,",
+    "          'cortex_workspace_create_bootstrap',",
+    "          false,",
+    "        )",
+    "",
+    "        if (useWorkspaceCreate) {",
+    "          await bootstrapViaWorkspaceCreate(rewrittenSboxdUrl, context, workloadConfig)",
+    "          statsD.increment('foundry_api_client.workspace_bootstrapped', 1, tags)",
+    "        } else if (!sandboxResponse.newlyProvisioned && !sandboxResponse.warm) {",
+    "          await reconcileSboxdReady(rewrittenSboxdUrl, controllerToken, envVars)",
+    "          statsD.increment('foundry_api_client.sboxd_reconciled', 1, tags)",
+    "        }",
+    "      }",
+    "",
+    "      return {",
+    "        id: sandboxResponse.id,",
+    "        status: sandboxResponse.status,",
+    "        controllerUrl,",
+    "        controllerToken,",
+    "        appUrl: maybeRewriteSandboxUrl(appUrl, context),",
+    "        sboxdUrl: rewrittenSboxdUrl,",
+    "        newlyProvisioned: sandboxResponse.newlyProvisioned,",
+    "        warm: sandboxResponse.warm,",
+    "        provider: sandboxResponse.provider,",
+    "      }",
+    "    },",
+    "",
+    "    /**",
+    "     * Makes an authenticated request to the foundry controller",
+    "     */",
+    "    async request(",
+    "      sandboxInfo: SandboxInfo,",
+    "      path: string,",
+    "      options: {",
+    "        method: 'GET' | 'POST' | 'PATCH' | 'DELETE'",
+    "        body?: unknown",
+    "        context: RequestContext",
+    "        originHost?: string",
+    "        includeAuthzToken?: boolean",
+    "        signal?: AbortSignal",
+    "      },",
+    "    ): Promise<Response> {",
+    "      const { method, body, context, originHost, includeAuthzToken, signal } = options",
+    "      const start = performance.now()",
+    "",
+    "      // Build context-specific headers",
+    "      const extraHeaders: Record<string, string> = {}",
+    "      if (context.sessionId) {",
+    "        extraHeaders['x-session-id'] = context.sessionId",
+    "      }",
+    "      if (context.fileId) {",
+    "        extraHeaders['x-file-id'] = context.fileId",
+    "      }",
+    "      if (context.envoyRequestId) {",
+    "        extraHeaders['x-envoy-request-id'] = context.envoyRequestId",
+    "      }",
+    "",
+    "      let success = false",
+    "      try {",
+    "        const response = await foundryRequest(sandboxInfo, path, {",
+    "          method,",
+    "          body,",
+    "          originHost,",
+    "          includeAuthzToken,",
+    "          signal,",
+    "          extraHeaders,",
+    "        })",
+    "        success = response.ok",
+    "        return response",
+    "      } finally {",
+    "        const durationMs = performance.now() - start",
+    "        // Normalize path to remove dynamic segments (e.g., workspace IDs)",
+    "        const normalizedPath = path.replace(/workspace-[^/]+/g, ':workspaceId')",
+    "        statsD.distribution('foundry_api_client.request.duration_ms', durationMs, {",
+    "          method,",
+    "          path: normalizedPath,",
+    "          success: String(success),",
+    "          provider: sandboxInfo.provider ?? 'unknown',",
+    "        })",
+    "      }",
+    "    },",
+    "  }",
+    "",
+    "  return client",
+    "}"
+  ],
+  "old_lines": [
+    "import { Request } from 'express'",
+    "import { createHash } from 'crypto'",
+    "import { RequestContext } from '#lib/context.js'",
+    "import { nimbusClient } from './nimbus_api.js'",
+    "import { CortexRateLimitExceededError } from '@figma/synapse-global/shared/cortex_errors/errors'",
+    "import logger from '#lib/util/logger.js'",
+    "import { SandboxInfo, SboxWorkloadName, foundryRequest } from '@figma/synapse-server/foundry'",
+    "import { CortexStatsig } from '#lib/statsig/statsig.js'",
+    "import {",
+    "  AntiabuseClient,",
+    "  doAntiabuse,",
+    "  getAntiabuseClient as getAntiabuseClientFactory,",
+    "  RulesAction_ActionType as RulesActionType,",
+    "} from '@figma/security-infra-lib-antiabuse-ts-client'",
+    "import { getEnv, isLocal } from '@figma/synapse-server/lib/settings/environment'",
+    "import { getSettings, hardcodedApiUrls } from '#lib/settings.js'",
+    "import { maybeRewriteSandboxUrl } from '#lib/foundry/maybe_rewrite_sandbox_url.js'",
+    "import statsD from './statsd.js'",
+    "import { generateSinatraJwt, generateUgitJwt } from '#lib/util/jwt.js'",
+    "",
+    "let antiabuseClient: AntiabuseClient | null = null",
+    "",
+    "function getAntiabuseClient(): AntiabuseClient {",
+    "  if (antiabuseClient == null) {",
+    "    antiabuseClient = getAntiabuseClientFactory()",
+    "  }",
+    "  return antiabuseClient",
+    "}",
+    "",
+    "interface FoundryApiClientOptions {",
+    "  req: Request",
+    "  context: RequestContext",
+    "  routingKey: string",
+    "  forceProvision?: boolean",
+    "  originHost?: string",
+    "  provider?: string",
+    "}",
+    "",
+    "export { SboxWorkloadName } from '@figma/synapse-server/foundry'",
+    "",
+    "export interface WorkloadConfig {",
+    "  workloadName: SboxWorkloadName",
+    "}",
+    "",
+    "interface FoundryApiClientConfig {",
+    "  workloadConfig?: WorkloadConfig",
+    "}",
+    "",
+    "/**",
+    " * Generates environment variables for sandbox provisioning",
+    " */",
+    "export async function sandboxEnvVars(",
+    "  context: RequestContext,",
+    "  willBeNewlyProvisioned: boolean,",
+    "  originHost?: string,",
+    "  workloadConfig?: WorkloadConfig,",
+    "): Promise<Record<string, string>> {",
+    "  const vars: Record<string, string> = {}",
+    "",
+    "  // Only set INITIAL_ALLOWED_ORIGIN if originHost is provided",
+    "  if (originHost) {",
+    "    vars['INITIAL_ALLOWED_ORIGIN'] = originHost",
+    "  }",
+    "",
+    "  // Add FILE_KEY_HASH as SHA1 of the file key",
+    "  if (context.fileKey) {",
+    "    vars['FILE_KEY_HASH'] = createHash('sha1').update(context.fileKey).digest('hex')",
+    "  }",
+    "",
+    "  // All configs for a workload",
+    "  if (context.fileId && !!workloadConfig) {",
+    "    const apiUrl = getSettings().ugit_base_url || hardcodedApiUrls[getEnv()]",
+    "    vars['UGIT_BASE_URL'] = `${apiUrl}/git`",
+    "    vars['UGIT_USERNAME'] = context.fileId",
+    "    vars['UGIT_PASSWORD'] = await generateUgitJwt(context, workloadConfig.workloadName)",
+    "    vars['WORKLOAD_OWNER_TYPE'] = 'file'",
+    "    vars['WORKLOAD_OWNER_ID'] = context.fileId",
+    "    vars['WORKLOAD_NAME'] = workloadConfig.workloadName",
+    "    vars['SBOXD_READY_ENABLED'] = 'true'",
+    "  }",
+    "",
+    "  if (!workloadConfig || workloadConfig.workloadName === SboxWorkloadName.Make) {",
+    "    if (CortexStatsig.checkGate(context, 'make_foundry_css_import_hoisting', false)) {",
+    "      vars['CSS_IMPORT_HOISTING'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_foundry_remove_invalid_css_fonts', false)) {",
+    "      vars['REMOVE_INVALID_CSS_FONTS'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_foundry_allow_npm_scripts', false)) {",
+    "      vars['ALLOW_NPM_SCRIPTS'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'bake_point_and_edit', false)) {",
+    "      vars['FF_BAKE_POINT_AND_EDIT'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_permissive_tsx_loader', false)) {",
+    "      vars['FF_MAKE_PERMISSIVE_TSX_LOADER'] = 'true'",
+    "    }",
+    "",
+    "    if (CortexStatsig.checkGate(context, 'make_sandbox_git_persistence', false)) {",
+    "      vars['SANDBOX_GIT_ENABLED'] = 'true'",
+    "    }",
+    "  }",
+    "",
+    "  if (",
+    "    willBeNewlyProvisioned &&",
+    "    CortexStatsig.checkGate(context, 'foundry_cached_preview_sandbox_trigger', false)",
+    "  ) {",
+    "    vars['SINATRA_JWT'] = await generateSinatraJwt(context)",
+    "  }",
+    "",
+    "  vars['EXEC_ENABLED'] = 'true'",
+    "  vars['CORTEX_ENV'] = getEnv()",
+    "",
+    "  return vars",
+    "}",
+    "",
+    "/**",
+    " * Calls sboxd /api/ready to trigger workspace bootstrap on a reused sandbox.",
+    " *",
+    " * When a sandbox is provisioned before the workload config is known, the sboxd",
+    " * bootstrap (git repos, agent templates, plugins, credentials) never runs.",
+    " * This function directly calls the sboxd ready endpoint to reconcile,",
+    " * matching the same protocol Nimbus uses on OnCreate/OnReady.",
+    " */",
+    "async function reconcileSboxdReady(",
+    "  sboxdUrl: string,",
+    "  controllerToken: string,",
+    "  envVars: Record<string, string>,",
+    "): Promise<void> {",
+    "  const body = JSON.stringify({ envVars })",
+    "  const controller = new AbortController()",
+    "  const timeout = setTimeout(() => controller.abort(), 30_000)",
+    "",
+    "  logger.info('Calling sboxd ready endpoint', { sboxd_url: `${sboxdUrl}/api/ready` })",
+    "",
+    "  try {",
+    "    // nosemgrep: figma.cortex-use-safe-fetch-instead-of-fetch (sboxd URL is an internal sandbox address from Nimbus, not user-controlled; safeFetch SSRF filter would block private IPs)",
+    "    const response = await fetch(`${sboxdUrl}/api/ready`, {",
+    "      method: 'POST',",
+    "      headers: {",
+    "        'Content-Type': 'application/json',",
+    "        Authorization: `Bearer ${controllerToken}`,",
+    "      },",
+    "      body,",
+    "      signal: controller.signal,",
+    "    })",
+    "",
+    "    if (!response.ok) {",
+    "      const text = await response.text().catch(() => '')",
+    "      throw new Error(`sboxd ready returned ${response.status}: ${text}`)",
+    "    }",
+    "  } finally {",
+    "    clearTimeout(timeout)",
+    "  }",
+    "}",
+    "",
+    "/**",
+    " * Client for interacting with the Foundry controller API",
+    " */",
+    "export const foundryApiClient = (config?: FoundryApiClientConfig) => {",
+    "  const nimbus = nimbusClient()",
+    "  const workloadConfig = config?.workloadConfig",
+    "",
+    "  const client = {",
+    "    /**",
+    "     * Ensures a sandbox is provisioned and returns connection info.",
+    "     */",
+    "    async ensureSandbox(options: FoundryApiClientOptions): Promise<SandboxInfo> {",
+    "      const { req, context, routingKey, forceProvision, originHost, provider } = options",
+    "      const start = performance.now()",
+    "",
+    "      // Check if sandbox will be newly provisioned so we can rate limit new sandbox provisioning via antiabuse",
+    "      const sandboxStatus = await nimbus.getSandboxByRoutingKey(routingKey, context.sessionId)",
+    "      const willBeNewlyProvisioned = sandboxStatus.status !== 'running' || forceProvision",
+    "      if (willBeNewlyProvisioned) {",
+    "        const disableAntiabuse = CortexStatsig.checkGate(context, 'cortex_disable_antiabuse', false)",
+    "        if (disableAntiabuse) {",
+    "          logger.info('Antiabuse disabled for new sandbox provisioning via Statsig gate')",
+    "          statsD.increment('foundry_api_client.ensure_sandbox.antiabuse_disabled', 1)",
+    "        } else {",
+    "          const antiabuseClient = getAntiabuseClient()",
+    "          const forwardedForIPs = req.get('x-forwarded-for')",
+    "",
+    "          try {",
+    "            const response = await doAntiabuse(antiabuseClient, 'cortex_request', {",
+    "              user_id: context.userId,",
+    "              route: 'foundry_new_sandbox_provision',",
+    "              ip: forwardedForIPs ? forwardedForIPs.split(',')[0].trim() : null,",
+    "              file: {",
+    "                key: context.fileKey,",
+    "              },",
+    "              session_id: context.sessionId,",
+    "              unauthenticated_user_id: context.unauthenticatedUserId,",
+    "              file_org_id: context.fileOrgId,",
+    "              product_type: context.productType,",
+    "              plan_parent_id: context.planParentId,",
+    "              seat_type: context.seatType,",
+    "              plan_tier: context.planTier,",
+    "              file_plan: context.filePlan,",
+    "              ...context.userAntiabuseInfo,",
+    "              user_agent: req.get('user-agent') || null,",
+    "              ja3: req.get('CloudFront-Viewer-JA3-Fingerprint') || null,",
+    "              ja4: req.get('CloudFront-Viewer-JA4-Fingerprint') || null,",
+    "              asn: req.get('CloudFront-Viewer-ASN') || null,",
+    "              geo_ip_country: req.get('CloudFront-Viewer-Country') || null,",
+    "              geo_ip_city: req.get('CloudFront-Viewer-City') || null,",
+    "            })",
+    "            if (response.type !== RulesActionType.NONE) {",
+    "              statsD.increment('foundry_api_client.ensure_sandbox.rate_limited', 1)",
+    "              throw new CortexRateLimitExceededError({})",
+    "            }",
+    "          } catch (err: unknown) {",
+    "            const isIntegrationTest =",
+    "              isLocal() && (context.integrationTest || context.vitestIntegrationTest)",
+    "            if (",
+    "              (isIntegrationTest || context.rateLimitBypass) &&",
+    "              err instanceof CortexRateLimitExceededError",
+    "            ) {",
+    "              logger.warn('Rate limit bypassed for new sandbox provision', err)",
+    "              statsD.increment('foundry_api_client.ensure_sandbox.rate_limit_bypassed', 1)",
+    "            } else {",
+    "              throw err",
+    "            }",
+    "          }",
+    "        }",
+    "      }",
+    "",
+    "      statsD.increment('foundry_api_client.ensure_sandbox.awaiting_sandbox', 1, {",
+    "        will_be_newly_provisioned: String(willBeNewlyProvisioned ?? true),",
+    "      })",
+    "",
+    "      // Generate environment variables internally to ensure consistency across all callers",
+    "      const envVars = await sandboxEnvVars(",
+    "        context,",
+    "        // Default to true since if we're not sure whether a sandbox will be newly provisioned, we should generate all env variables",
+    "        willBeNewlyProvisioned ?? true,",
+    "        originHost,",
+    "        workloadConfig,",
+    "      )",
+    "",
+    "      const sandboxResponse = await nimbus.sandbox({",
+    "        req,",
+    "        sandboxRequestBody: {",
+    "          routingKey,",
+    "          namespace:",
+    "            workloadConfig?.workloadName === SboxWorkloadName.Assistant ? 'assistant' : 'foundry',",
+    "          forceProvision,",
+    "          envVars,",
+    "          userId: context.userId,",
+    "          fileKeyHash: context.fileKey",
+    "            ? createHash('sha1').update(context.fileKey).digest('hex')",
+    "            : '',",
+    "          provider,",
+    "        },",
+    "        userId: context.userId,",
+    "        fileKey: context.fileKey,",
+    "        fileId: context.fileId,",
+    "        sessionId: context.sessionId,",
+    "      })",
+    "",
+    "      if (!sandboxResponse.urls) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_sandbox_urls',",
+    "        })",
+    "        throw new Error(`No sandbox URLs: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const controllerUrl = sandboxResponse.urls['controller']",
+    "      if (!controllerUrl) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_controller_url',",
+    "        })",
+    "        throw new Error(`No controller URL: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const appUrl = sandboxResponse.urls['app']",
+    "      if (!appUrl) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_app_url',",
+    "        })",
+    "        throw new Error(`No app URL: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const sboxdUrl = sandboxResponse.urls['sboxd']",
+    "",
+    "      if (!sandboxResponse.tokens) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_sandbox_tokens',",
+    "        })",
+    "        throw new Error(`No sandbox tokens: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const controllerToken = sandboxResponse.tokens['CONTROLLER_TOKEN']",
+    "      if (!controllerToken) {",
+    "        statsD.increment('foundry_api_client.ensure_sandbox.failure', 1, {",
+    "          reason: 'no_controller_token',",
+    "        })",
+    "        throw new Error(`No controller token: ${JSON.stringify(sandboxResponse)}`)",
+    "      }",
+    "",
+    "      const durationMs = performance.now() - start",
+    "      const tags = {",
+    "        newly_provisioned: String(sandboxResponse.newlyProvisioned ?? false),",
+    "        warm: String(sandboxResponse.warm ?? false),",
+    "        provider: sandboxResponse.provider ?? 'unknown',",
+    "      }",
+    "",
+    "      statsD.distribution('foundry_api_client.ensure_sandbox.duration_ms', durationMs, tags)",
+    "      statsD.increment('foundry_api_client.ensure_sandbox.success', 1, tags)",
+    "",
+    "      const rewrittenSboxdUrl = sboxdUrl ? maybeRewriteSandboxUrl(sboxdUrl, context) : undefined",
+    "",
+    "      // When a sandbox is reused (not newly provisioned, not from warm pool) and",
+    "      // a workload is configured, Nimbus skips the sboxd ready call. We call it",
+    "      // directly to bootstrap the workspace (git repos, agent templates, plugins,",
+    "      // credentials). Errors are propagated because a failed reconciliation means",
+    "      // the sboxd session will definitely fail.",
+    "      if (",
+    "        workloadConfig &&",
+    "        rewrittenSboxdUrl &&",
+    "        !sandboxResponse.newlyProvisioned &&",
+    "        !sandboxResponse.warm",
+    "      ) {",
+    "        await reconcileSboxdReady(rewrittenSboxdUrl, controllerToken, envVars)",
+    "        statsD.increment('foundry_api_client.sboxd_reconciled', 1, tags)",
+    "      }",
+    "",
+    "      return {",
+    "        id: sandboxResponse.id,",
+    "        status: sandboxResponse.status,",
+    "        controllerUrl,",
+    "        controllerToken,",
+    "        appUrl: maybeRewriteSandboxUrl(appUrl, context),",
+    "        sboxdUrl: rewrittenSboxdUrl,",
+    "        newlyProvisioned: sandboxResponse.newlyProvisioned,",
+    "        warm: sandboxResponse.warm,",
+    "        provider: sandboxResponse.provider,",
+    "      }",
+    "    },",
+    "",
+    "    /**",
+    "     * Makes an authenticated request to the foundry controller",
+    "     */",
+    "    async request(",
+    "      sandboxInfo: SandboxInfo,",
+    "      path: string,",
+    "      options: {",
+    "        method: 'GET' | 'POST' | 'PATCH' | 'DELETE'",
+    "        body?: unknown",
+    "        context: RequestContext",
+    "        originHost?: string",
+    "        includeAuthzToken?: boolean",
+    "        signal?: AbortSignal",
+    "      },",
+    "    ): Promise<Response> {",
+    "      const { method, body, context, originHost, includeAuthzToken, signal } = options",
+    "      const start = performance.now()",
+    "",
+    "      // Build context-specific headers",
+    "      const extraHeaders: Record<string, string> = {}",
+    "      if (context.sessionId) {",
+    "        extraHeaders['x-session-id'] = context.sessionId",
+    "      }",
+    "      if (context.fileId) {",
+    "        extraHeaders['x-file-id'] = context.fileId",
+    "      }",
+    "      if (context.envoyRequestId) {",
+    "        extraHeaders['x-envoy-request-id'] = context.envoyRequestId",
+    "      }",
+    "",
+    "      let success = false",
+    "      try {",
+    "        const response = await foundryRequest(sandboxInfo, path, {",
+    "          method,",
+    "          body,",
+    "          originHost,",
+    "          includeAuthzToken,",
+    "          signal,",
+    "          extraHeaders,",
+    "        })",
+    "        success = response.ok",
+    "        return response",
+    "      } finally {",
+    "        const durationMs = performance.now() - start",
+    "        // Normalize path to remove dynamic segments (e.g., workspace IDs)",
+    "        const normalizedPath = path.replace(/workspace-[^/]+/g, ':workspaceId')",
+    "        statsD.distribution('foundry_api_client.request.duration_ms', durationMs, {",
+    "          method,",
+    "          path: normalizedPath,",
+    "          success: String(success),",
+    "          provider: sandboxInfo.provider ?? 'unknown',",
+    "        })",
+    "      }",
+    "    },",
+    "  }",
+    "",
+    "  return client",
+    "}"
+  ],
+  "path": "services/cortex/lib/support/foundry_api.ts",
+  "status": "changed"
+}

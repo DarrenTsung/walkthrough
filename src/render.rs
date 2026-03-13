@@ -377,6 +377,31 @@ tr.line-paired-full .sign-rhs { color: #1a7f37; }
     border-bottom: 1px solid var(--border);
 }
 
+/* Code annotations */
+tr.annotated td {
+    border-left: 3px solid var(--primary);
+    cursor: pointer;
+}
+tr.annotated td:first-child {
+    padding-left: 9px; /* compensate for border */
+}
+.note-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 10;
+    max-width: 400px;
+    padding: 8px 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    pointer-events: none;
+}
+
 /* Source blocks: single-column variant of diff-table */
 .src-single .code-lhs { width: 100%; }
 
@@ -520,6 +545,29 @@ const JS: &str = r#"
         }
     });
     updateActive();
+})();
+
+// Code annotation tooltips
+(function() {
+    var rows = document.querySelectorAll('tr.annotated[data-note]');
+    if (!rows.length) return;
+
+    var tip = document.createElement('div');
+    tip.className = 'note-tooltip';
+    document.body.appendChild(tip);
+
+    rows.forEach(function(row) {
+        row.addEventListener('mouseenter', function() {
+            tip.textContent = row.getAttribute('data-note');
+            tip.style.display = 'block';
+            var rect = row.getBoundingClientRect();
+            tip.style.left = (rect.left + 40) + 'px';
+            tip.style.top = (rect.bottom + 4) + 'px';
+        });
+        row.addEventListener('mouseleave', function() {
+            tip.style.display = 'none';
+        });
+    });
 })();
 "#;
 
@@ -2008,16 +2056,79 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
         }
     }
 
-    // First pass: replace difft code blocks with HTML placeholders,
+    // First pass: replace difft/src/notes code blocks with HTML placeholders,
     // and build the enriched markdown with text diffs in code block bodies.
     // Also track which (file, chunk) pairs are referenced for verification.
     let mut processed_md = String::new();
     let mut enriched_md = String::new();
     let mut diff_blocks: Vec<String> = Vec::new();
     let mut in_difft_block = false;
+    let mut in_notes_block = false;
+    let mut notes_body = String::new();
+    let mut notes_backtick_count = 0;
+    let mut last_block_base_line: usize = 0; // base new-line (0-based) for relative→absolute
     let mut referenced: std::collections::HashSet<(String, usize)> = std::collections::HashSet::new();
 
     for line in md_content.lines() {
+        if in_notes_block {
+            if line.trim_start().starts_with("```") {
+                in_notes_block = false;
+                enriched_md.push_str(line);
+                enriched_md.push('\n');
+
+                // Parse notes and inject into most recent diff block
+                let note_re = Regex::new(r"^(\d+)(?:-(\d+))?:\s*(.+)$").unwrap();
+                let mut annotations: Vec<(u64, u64, String)> = Vec::new();
+                for note_line in notes_body.lines() {
+                    let trimmed = note_line.trim();
+                    if trimmed.is_empty() { continue; }
+                    if let Some(caps) = note_re.captures(trimmed) {
+                        let rel_start: usize = caps[1].parse().unwrap_or(0);
+                        let rel_end: usize = caps.get(2).map_or(rel_start, |m| m.as_str().parse().unwrap_or(rel_start));
+                        let text = caps[3].to_string();
+                        let abs_start = (last_block_base_line + rel_start) as u64;
+                        let abs_end = (last_block_base_line + rel_end) as u64;
+                        annotations.push((abs_start, abs_end, text));
+                    }
+                }
+
+                if !annotations.is_empty() {
+                    let block_idx = diff_blocks.len().saturating_sub(1);
+                    if let Some(last_block) = diff_blocks.last_mut() {
+                        for (start, end, text) in &annotations {
+                            let escaped = html_escape(text).replace('"', "&quot;");
+                            for ln in *start..=*end {
+                                for side in &["ln-lhs", "ln-rhs"] {
+                                    let exact = format!("class=\"ln {}\">{}</td>", side, ln);
+                                    if let Some(td_pos) = last_block.find(&exact) {
+                                        if let Some(tr_pos) = last_block[..td_pos].rfind("<tr") {
+                                            let tr_close = tr_pos + last_block[tr_pos..].find('>').unwrap_or(0);
+                                            let old_tag = last_block[tr_pos..tr_close].to_string();
+                                            if !old_tag.contains("annotated") {
+                                                let new_tag = old_tag.replacen(
+                                                    "class=\"", "class=\"annotated ", 1
+                                                );
+                                                let new_tag = format!("{} data-note=\"{}\"", new_tag, escaped);
+                                                let before = last_block[..tr_pos].to_string();
+                                                let after = last_block[tr_close..].to_string();
+                                                *last_block = format!("{}{}{}", before, new_tag, after);
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                notes_body.push_str(line);
+                notes_body.push('\n');
+                enriched_md.push_str(line);
+                enriched_md.push('\n');
+            }
+            continue;
+        }
         if !in_difft_block {
             if line.starts_with("```") && line.chars().filter(|&c| c == '`').count() >= 3 {
                 let backtick_count = line.chars().take_while(|&c| c == '`').count();
@@ -2078,6 +2189,19 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         diff_blocks.push(rendered_html);
                         processed_md
                             .push_str(&format!("<!-- DIFF_PLACEHOLDER_{} -->\n", placeholder_id));
+
+                        // Track base new-line for relative note line numbers
+                        let mut base = usize::MAX;
+                        for &ci in &indices {
+                            if let Some(chunk) = difft.chunks.get(ci) {
+                                for entry in chunk {
+                                    if let Some(rhs) = &entry.rhs {
+                                        base = base.min(rhs.line_number as usize);
+                                    }
+                                }
+                            }
+                        }
+                        last_block_base_line = if base == usize::MAX { 0 } else { base };
 
                         // Write enriched markdown: opening fence + text diff + closing fence
                         let text_diff = render_chunks_text(difft, &indices, line_filter);
@@ -2151,6 +2275,16 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         enriched_md.push('\n');
                     }
                     in_difft_block = true;
+                    continue;
+                }
+
+                // Notes block: ```notes
+                if info.trim() == "notes" {
+                    in_notes_block = true;
+                    notes_body.clear();
+                    notes_backtick_count = backtick_count;
+                    enriched_md.push_str(line);
+                    enriched_md.push('\n');
                     continue;
                 }
             }

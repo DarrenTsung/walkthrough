@@ -355,16 +355,63 @@ End with a verdict:
 Output ONLY the review, no preamble.
 ```
 
+### Reviewer 3: Simplicity
+
+Spawns an agent (subagent_type: general-purpose, model: sonnet) with this prompt:
+
+```
+You are a simplicity reviewer for a code walkthrough. Read the walkthrough
+markdown file at {OUTPUT_PATH}.
+
+The file contains prose sections interleaved with difft code blocks and
+optional `notes` blocks (code annotations). Your job is to find prose that
+restates what the code already says, and suggest converting it to annotations
+or removing it entirely.
+
+Check each section for:
+
+1. **Redundant explanations** — prose that describes what specific lines of
+   code do, when the code is self-evident. Example: "A 30-second timeout guards
+   against sboxd being unresponsive" is redundant when the code shows
+   `setTimeout(() => reject(...), 30_000)`. Convert these to `notes` blocks
+   (one-line annotations on the relevant lines) or remove them entirely.
+
+2. **Paragraph-as-code-tour** — multiple sentences walking through the code
+   line by line. The reader can read the code. Focus prose on WHY, not WHAT.
+   Suggest which sentences to keep (the ones with non-obvious context) and
+   which to convert to annotations or cut.
+
+3. **Overly detailed field-by-field descriptions** — listing every field in a
+   config or type when the diff shows them. Suggest using a `src` block to
+   show related old code instead, or just letting the diff speak for itself.
+
+4. **Annotations that should be prose** — `notes` blocks containing context
+   or motivation that would be better as a prose paragraph before the diff
+   (annotations are for what, prose is for why).
+
+For each issue, suggest a specific fix:
+- "Convert to annotation: `32-34: 30s timeout for unresponsive sboxd`"
+- "Remove: code is self-evident"
+- "Replace with `src` block showing old implementation"
+- "Move to prose paragraph: this is motivation, not a code comment"
+
+End with a verdict:
+- PASS — prose is concise and complements the code
+- FAIL — {N} issues need to be addressed
+
+Output ONLY the review, no preamble.
+```
+
 ### Processing review results
 
-After both reviewers complete:
+After all three reviewers complete:
 
-1. If **both PASS**: proceed to Step 7.
-2. If **either FAIL**: read their findings. Edit the narrative prose in
+1. If **all PASS**: proceed to Step 7.
+2. If **any FAIL**: read their findings. Edit the narrative prose in
    `OUTPUT_PATH` to address the issues (do NOT edit code block bodies, they get
-   repopulated). Re-run the render command, then re-spawn both reviewers on the
+   repopulated). Re-run the render command, then re-spawn all reviewers on the
    updated file. Increment the iteration counter.
-3. After **3 iterations** without both passing: present the remaining issues to
+3. After **3 iterations** without all passing: present the remaining issues to
    the user and ask whether to continue iterating or accept the current state.
 
 ## Step 7: Present

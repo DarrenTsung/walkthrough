@@ -489,7 +489,10 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     {
         return ("#cf222e", false);
     }
-    if capture.starts_with("type") || capture.starts_with("constructor") {
+    if capture.starts_with("constructor") {
+        return ("#953800", false);
+    }
+    if capture.starts_with("type") {
         return ("#1f2328", false);
     }
     if capture.starts_with("function") || capture.starts_with("method") {
@@ -523,7 +526,8 @@ fn capture_priority(capture: &str) -> u8 {
     if capture.starts_with("string") { return 10; }
     if capture.starts_with("keyword") { return 9; }
     if capture.starts_with("function") || capture.starts_with("method") { return 8; }
-    if capture.starts_with("type") || capture.starts_with("constructor") { return 8; }
+    if capture.starts_with("constructor") { return 9; }
+    if capture.starts_with("type") { return 8; }
     if capture.starts_with("constant") || capture.starts_with("number") || capture.starts_with("boolean") { return 7; }
     if capture.starts_with("tag") || capture.starts_with("attribute") { return 7; }
     if capture.starts_with("property") || capture.starts_with("field") { return 6; }
@@ -2565,6 +2569,28 @@ mod tests {
             &html[..html.len().min(2000)]);
         assert!(!html.contains("color:#0550ae\">Foo"),
             "user-defined type 'Foo' should be default text, not blue:\n{}",
+            &html[..html.len().min(2000)]);
+    }
+
+    #[test]
+    fn constructor_names_are_orange() {
+        // In `CortexStatsig.checkGate(...)`, CortexStatsig is a class/constructor
+        // and should be orange (#953800).
+        let old_lines = vec!["// old"];
+        let new_lines = vec![
+            "CortexStatsig.checkGate(context, 'flag', false)",
+        ];
+
+        let chunk = vec![
+            LineEntry { lhs: None, rhs: Some(side(0, vec![])) },
+        ];
+        let hunks = vec![DiffHunk { old_start: 1, old_count: 0, new_start: 1, new_count: 1 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+
+        assert!(html.contains("color:#953800\">CortexStatsig"),
+            "constructor/class name should be orange (#953800):\n{}",
             &html[..html.len().min(2000)]);
     }
 }

@@ -273,7 +273,7 @@ img { max-width: 100%; }
     border-collapse: collapse;
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     font-size: 12px;
-    line-height: 20px;
+    line-height: 24px;
     color: #1f2328;
     table-layout: fixed;
 }
@@ -476,7 +476,7 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     // Tree-sitter captures are hierarchical: "keyword.function", "string.special", etc.
     // Match the most specific prefix first.
     if capture.starts_with("comment") {
-        return ("#59636e", true);
+        return ("#59636e", false);
     }
     if capture.starts_with("string") {
         return ("#0a3069", false);
@@ -493,7 +493,7 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
         return ("#0550ae", false);
     }
     if capture.starts_with("function") || capture.starts_with("method") {
-        return ("#6639ba", false);
+        return ("#0550ae", false);
     }
     if capture.starts_with("variable") || capture.starts_with("parameter") || capture.starts_with("field")
         || capture.starts_with("property")

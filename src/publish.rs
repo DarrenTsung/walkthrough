@@ -6,38 +6,38 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 
-/// Derive the GitHub Pages URL from a git remote URL.
-/// e.g. "git@github.com:User/repo.git" → "https://user.github.io/repo/"
-/// e.g. "https://github.com/User/repo.git" → "https://user.github.io/repo/"
-fn github_pages_url(remote_url: &str) -> Option<String> {
-    // SSH format: git@github.com:User/repo.git
-    if let Some(rest) = remote_url.strip_prefix("git@github.com:") {
-        let rest = rest.trim_end_matches(".git").trim();
-        let parts: Vec<&str> = rest.splitn(2, '/').collect();
-        if parts.len() == 2 {
-            return Some(format!(
-                "https://{}.github.io/{}/",
-                parts[0].to_lowercase(),
-                parts[1]
-            ));
-        }
-    }
-    // HTTPS format: https://github.com/User/repo.git
-    if let Some(rest) = remote_url
-        .strip_prefix("https://github.com/")
-        .or_else(|| remote_url.strip_prefix("http://github.com/"))
-    {
-        let rest = rest.trim_end_matches(".git").trim();
-        let parts: Vec<&str> = rest.splitn(2, '/').collect();
-        if parts.len() == 2 {
-            return Some(format!(
-                "https://{}.github.io/{}/",
-                parts[0].to_lowercase(),
-                parts[1]
-            ));
-        }
-    }
-    None
+/// Get the GitHub Pages base URL via `gh api repos/{owner}/{repo}/pages`.
+/// Extracts {owner}/{repo} from the git remote URL.
+fn github_pages_url(publish_dir: &Path) -> Option<String> {
+    // Get owner/repo from remote
+    let remote = Command::new("git")
+        .args(&["remote", "get-url", "origin"])
+        .current_dir(publish_dir)
+        .output()
+        .ok()?;
+    let remote_url = String::from_utf8_lossy(&remote.stdout).trim().to_string();
+
+    let owner_repo = if let Some(rest) = remote_url.strip_prefix("git@github.com:") {
+        rest.trim_end_matches(".git").trim().to_string()
+    } else if let Some(rest) = remote_url.strip_prefix("https://github.com/") {
+        rest.trim_end_matches(".git").trim().to_string()
+    } else {
+        return None;
+    };
+
+    // Query GitHub API for the Pages URL
+    let output = Command::new("gh")
+        .args(&["api", &format!("repos/{}/pages", owner_repo), "--jq", ".html_url"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() { return None; }
+
+    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if url.is_empty() { return None; }
+
+    // Ensure trailing slash
+    Some(if url.ends_with('/') { url } else { format!("{}/", url) })
 }
 
 pub fn run(html_path: &Path) -> Result<()> {
@@ -82,10 +82,19 @@ pub fn run(html_path: &Path) -> Result<()> {
     git(&["push"])?;
     eprintln!("Pushed to remote");
 
-    // Derive GitHub Pages URL and poll until the page is live
-    let remote_url = git(&["remote", "get-url", "origin"]).unwrap_or_default();
-    if let Some(base_url) = github_pages_url(&remote_url) {
-        let page_url = format!("{}{}", base_url, file_name.to_string_lossy());
+    // Derive GitHub Pages URL and poll until the page is live.
+    // The URL path is the file's path relative to the repo root,
+    // not just the filename (e.g. walkthroughs/file.html).
+    let repo_root = git(&["rev-parse", "--show-toplevel"]).unwrap_or_default();
+    let relative_path = if !repo_root.is_empty() {
+        dest.strip_prefix(&repo_root)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| file_name.to_string_lossy().to_string())
+    } else {
+        file_name.to_string_lossy().to_string()
+    };
+    if let Some(base_url) = github_pages_url(publish_dir) {
+        let page_url = format!("{}{}", base_url, relative_path);
         eprintln!("Waiting for GitHub Pages deploy: {}", page_url);
 
         let max_attempts = 30; // 30 * 5s = 150s max

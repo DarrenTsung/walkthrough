@@ -495,9 +495,10 @@ fn github_color_for_capture(capture: &str) -> (&'static str, bool) {
     if capture.starts_with("function") || capture.starts_with("method") {
         return ("#6639ba", false);
     }
-    if capture.starts_with("variable") || capture.starts_with("parameter") || capture.starts_with("field")
-        || capture.starts_with("property")
-    {
+    if capture.starts_with("property") || capture.starts_with("field") {
+        return ("#0550ae", false);
+    }
+    if capture.starts_with("variable") || capture.starts_with("parameter") {
         return ("#953800", false);
     }
     if capture.starts_with("operator") || capture.starts_with("punctuation") {
@@ -2496,6 +2497,38 @@ mod tests {
         // bootstrapViaWorkspaceCreate should be purple (#6639ba)
         assert!(html.contains("color:#6639ba"),
             "function name should be purple (#6639ba) in HTML:\n{}",
+            &html[..html.len().min(2000)]);
+    }
+
+    #[test]
+    fn property_names_are_blue() {
+        // In `workloadName: workloadConfig.workloadName,`:
+        // - property key (workloadName:) should be blue (#0550ae)
+        // - dot-access property (.workloadName) should be blue (#0550ae)
+        // - the object (workloadConfig) should be default text
+        let old_lines = vec!["// old"];
+        let new_lines = vec![
+            "const x = {",
+            "  workloadName: workloadConfig.workloadName,",
+            "}",
+        ];
+
+        let chunk = vec![
+            LineEntry { lhs: None, rhs: Some(side(0, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(1, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(2, vec![])) },
+        ];
+        let hunks = vec![DiffHunk { old_start: 1, old_count: 0, new_start: 1, new_count: 3 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+
+        // Property names (workloadName) should be blue, variable (workloadConfig) orange
+        assert!(html.contains("color:#0550ae\">workloadName"),
+            "property key should be blue (#0550ae):\n{}",
+            &html[..html.len().min(2000)]);
+        assert!(html.contains("color:#953800\">workloadConfig"),
+            "object variable should be orange (#953800):\n{}",
             &html[..html.len().min(2000)]);
     }
 }

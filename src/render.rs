@@ -377,6 +377,9 @@ tr.line-paired-full .sign-rhs { color: #1a7f37; }
     border-bottom: 1px solid var(--border);
 }
 
+/* Source blocks: single-column variant of diff-table */
+.src-single .code-lhs { width: 100%; }
+
 /* Service badges: `@sboxd` in markdown */
 .service-badge {
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -1987,6 +1990,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
 
     let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
+    let src_re = Regex::new(r"^src\s+(\S+):(\d+)-(\d+)(?:\s+(old))?")?;
 
     let mut hl = Highlighter::new();
 
@@ -2080,6 +2084,64 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         enriched_md.push_str(line);
                         enriched_md.push('\n');
                         enriched_md.push_str(&text_diff);
+                        enriched_md.push_str(&"`".repeat(backtick_count));
+                        enriched_md.push('\n');
+                    } else {
+                        eprintln!("Warning: no data for file '{}', passing through", file);
+                        processed_md.push_str(line);
+                        processed_md.push('\n');
+                        enriched_md.push_str(line);
+                        enriched_md.push('\n');
+                    }
+                    in_difft_block = true;
+                    continue;
+                }
+
+                // Source block: ```src filepath:start-end [old]
+                if let Some(caps) = src_re.captures(info.trim()) {
+                    let file = caps[1].to_string();
+                    let start: usize = caps[2].parse().unwrap_or(1);
+                    let end: usize = caps[3].parse().unwrap_or(1);
+                    let use_old = caps.get(4).is_some();
+
+                    if let Some(difft) = data.get(&file) {
+                        let lines = if use_old { &difft.old_lines } else { &difft.new_lines };
+                        let lang = arborium::detect_language(&file);
+                        let hl_lines = syntax_highlight_lines(lines, &mut hl, lang);
+
+                        // Render source block using diff-block styling with single column
+                        let mut src_html = String::new();
+                        src_html.push_str(&format!(
+                            "<div class=\"diff-block\"><div class=\"diff-header\">{}</div>",
+                            html_escape(&file)
+                        ));
+                        src_html.push_str(
+                            "<table class=\"diff-table src-single\"><colgroup>\
+                             <col class=\"ln-col\"><col class=\"code-col\">\
+                             </colgroup><tbody>"
+                        );
+                        for ln in start..=end {
+                            let idx = ln.saturating_sub(1);
+                            let content = hl_lines.get(idx).map(|s| s.as_str()).unwrap_or("");
+                            src_html.push_str(&format!(
+                                "<tr class=\"line-context\"><td class=\"ln ln-lhs\">{}</td><td class=\"code-lhs\">{}</td></tr>",
+                                ln, content
+                            ));
+                        }
+                        src_html.push_str("</tbody></table></div>");
+
+                        let placeholder_id = diff_blocks.len();
+                        diff_blocks.push(src_html);
+                        processed_md.push_str(&format!("<!-- DIFF_PLACEHOLDER_{} -->\n", placeholder_id));
+
+                        // Enrich markdown with source lines
+                        enriched_md.push_str(line);
+                        enriched_md.push('\n');
+                        for ln in start..=end {
+                            let idx = ln.saturating_sub(1);
+                            let content = lines.get(idx).map(|s| s.as_str()).unwrap_or("");
+                            enriched_md.push_str(&format!("{:>4} {}\n", ln, content));
+                        }
                         enriched_md.push_str(&"`".repeat(backtick_count));
                         enriched_md.push('\n');
                     } else {

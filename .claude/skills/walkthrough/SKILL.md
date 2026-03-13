@@ -103,6 +103,28 @@ already there, so focus on:
 
 5. Use `chunks=all` for new files, deleted files, or files with only one or two chunks.
 
+### Source blocks
+
+Use `` ```src `` code blocks to show existing code for context alongside diffs. This is
+useful when the narrative needs to show the old implementation being replaced, or related
+code that helps the reader understand what the diff is changing.
+
+````markdown
+```src services/cortex/lib/support/foundry_api.ts:128-159 old
+```
+````
+
+The syntax is `src <filepath>:<start>-<end>` where start/end are 1-based line numbers.
+Add `old` to show the pre-change version of the file (default is the new/current version).
+
+The renderer pulls lines from the collected difft JSON data, syntax highlights them, and
+renders as a single-column code block with the same styling as diff blocks.
+
+Use source blocks to:
+- Show the old implementation being replaced by new code
+- Show related code that provides context for the change
+- Show configuration or type definitions referenced by the diff
+
 ### Service badges
 
 Use `` `@service-name` `` in inline code to render service names as styled badges

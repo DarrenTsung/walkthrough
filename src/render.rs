@@ -1102,6 +1102,55 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         }
         items.sort_by_key(|&(k, _)| k);
 
+        // Check for old-side ordering issues and decompose if needed
+        let old_out_of_order = {
+            let mut prev: Option<u64> = None;
+            items.iter().any(|(_, item)| {
+                let cur = match item {
+                    TextItem::DifftRow(row) => row.lhs.map(|s| s.line_number),
+                    TextItem::RemovedLine(o) => Some(*o as u64),
+                    TextItem::PairedLine(o, _) => Some(*o as u64),
+                    _ => None,
+                };
+                if let Some(c) = cur {
+                    let bad = prev.map_or(false, |p| c < p);
+                    prev = Some(c);
+                    bad
+                } else {
+                    false
+                }
+            })
+        };
+
+        if old_out_of_order {
+            let mut removed: Vec<usize> = Vec::new();
+            let mut added: Vec<usize> = Vec::new();
+            for &(_, ref item) in &items {
+                match item {
+                    TextItem::DifftRow(row) => {
+                        if let Some(lhs) = row.lhs { removed.push(lhs.line_number as usize); }
+                        if let Some(rhs) = row.rhs { added.push(rhs.line_number as usize); }
+                    }
+                    TextItem::RemovedLine(o) => { removed.push(*o); }
+                    TextItem::AddedLine(n) => { added.push(*n); }
+                    TextItem::PairedLine(o, n) => { removed.push(*o); added.push(*n); }
+                }
+            }
+            removed.sort();
+            removed.dedup();
+            added.sort();
+            added.dedup();
+
+            items.clear();
+            for &o in &removed {
+                items.push((o as u64, TextItem::RemovedLine(o)));
+            }
+            for &n in &added {
+                items.push((old_last as u64 + 1 + n as u64, TextItem::AddedLine(n)));
+            }
+            items.sort_by_key(|&(k, _)| k);
+        }
+
         // Collect ALL item line numbers before filtering so filtered-out
         // changed lines don't become context rows.
         let mut item_old_lines_t: std::collections::HashSet<usize> = std::collections::HashSet::new();
@@ -1427,6 +1476,63 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             items.push((new_0 as u64, RenderItem::AddedLine(new_0)));
         }
         items.sort_by_key(|&(k, _)| k);
+
+        // Check if old-side line numbers would be out of order. This happens
+        // when difft's structural matching pairs lines non-consecutively (e.g.
+        // old 317→new 377, old 320→None maps to new 376, appearing before 377).
+        // If so, decompose all paired items into separate removed + added,
+        // rendering removed lines first (sorted by old-line) then added lines
+        // (sorted by new-line), like difft's CLI does.
+        let old_out_of_order = {
+            let mut prev: Option<u64> = None;
+            items.iter().any(|(_, item)| {
+                let cur = match item {
+                    RenderItem::DifftRow(row) => row.lhs.map(|s| s.line_number),
+                    RenderItem::RemovedLine(o) => Some(*o as u64),
+                    RenderItem::PairedLine(o, _) => Some(*o as u64),
+                    _ => None,
+                };
+                if let Some(c) = cur {
+                    let bad = prev.map_or(false, |p| c < p);
+                    prev = Some(c);
+                    bad
+                } else {
+                    false
+                }
+            })
+        };
+
+        if old_out_of_order {
+            eprintln!("Warning: old-side line numbers out of order in chunk, decomposing into removed+added");
+            // Decompose: collect all old-side and new-side lines separately
+            let mut removed: Vec<usize> = Vec::new();
+            let mut added: Vec<usize> = Vec::new();
+            for &(_, ref item) in &items {
+                match item {
+                    RenderItem::DifftRow(row) => {
+                        if let Some(lhs) = row.lhs { removed.push(lhs.line_number as usize); }
+                        if let Some(rhs) = row.rhs { added.push(rhs.line_number as usize); }
+                    }
+                    RenderItem::RemovedLine(o) => { removed.push(*o); }
+                    RenderItem::AddedLine(n) => { added.push(*n); }
+                    RenderItem::PairedLine(o, n) => { removed.push(*o); added.push(*n); }
+                }
+            }
+            removed.sort();
+            removed.dedup();
+            added.sort();
+            added.dedup();
+
+            // Rebuild items: removed first (sorted by old-line), then added (sorted by new-line)
+            items.clear();
+            for &o in &removed {
+                items.push((o as u64, RenderItem::RemovedLine(o)));
+            }
+            for &n in &added {
+                items.push((old_last as u64 + 1 + n as u64, RenderItem::AddedLine(n)));
+            }
+            items.sort_by_key(|&(k, _)| k);
+        }
 
         // Collect ALL item line numbers before filtering, so the gap filler
         // never renders filtered-out changed lines as context rows.
@@ -2593,5 +2699,71 @@ mod tests {
         assert!(html.contains("color:#953800\">CortexStatsig"),
             "constructor/class name should be orange (#953800):\n{}",
             &html[..html.len().min(2000)]);
+    }
+
+    #[test]
+    fn line_numbers_are_consecutive_on_each_side() {
+        // When difft pairs lines non-consecutively (e.g. old 317→new 377, old 320→None,
+        // old 321→new 380), the rendered left-side line numbers must still be consecutive
+        // (non-decreasing). Out-of-order line numbers confuse readers.
+        let html = extract_rows_html_from_real_data();
+        let rows = extract_rows(&html);
+
+        let old_lns: Vec<u64> = rows.iter().filter_map(|(_, o, _)| *o).collect();
+        let new_lns: Vec<u64> = rows.iter().filter_map(|(_, _, n)| *n).collect();
+
+        // Check old side is non-decreasing
+        for i in 1..old_lns.len() {
+            assert!(old_lns[i] >= old_lns[i-1],
+                "old-side line numbers out of order: {} followed by {} (at position {})",
+                old_lns[i-1], old_lns[i], i);
+        }
+
+        // Check new side is non-decreasing
+        for i in 1..new_lns.len() {
+            assert!(new_lns[i] >= new_lns[i-1],
+                "new-side line numbers out of order: {} followed by {} (at position {})",
+                new_lns[i-1], new_lns[i], i);
+        }
+    }
+
+    /// Build render output from the problematic chunk pattern:
+    /// difft pairs old comments with new comments non-consecutively,
+    /// leaving gaps that cause sort-key collisions.
+    fn extract_rows_html_from_real_data() -> String {
+        let old_lines: Vec<&str> = (0..335).map(|_| "old line").collect();
+        let mut new_lines_vec: Vec<String> = (0..400).map(|_| "new line".to_string()).collect();
+        // Make some lines distinct so we can trace them
+        for i in 376..396 {
+            new_lines_vec[i] = format!("new content {}", i);
+        }
+        let new_lines: Vec<&str> = new_lines_vec.iter().map(|s| s.as_str()).collect();
+
+        // Reproduce the problematic chunk: difft pairs old 316-324 with new 376-394,
+        // but skips old 320 (removed-only) which maps to the same new-side position
+        // as paired entry [7].
+        let chunk = vec![
+            LineEntry { lhs: None, rhs: Some(side(383, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(384, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(385, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(387, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(388, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(389, vec![])) },
+            LineEntry { lhs: None, rhs: Some(side(394, vec![])) },
+            LineEntry { lhs: Some(side(316, vec![])), rhs: Some(side(376, vec![])) },
+            LineEntry { lhs: Some(side(317, vec![])), rhs: Some(side(377, vec![])) },
+            LineEntry { lhs: Some(side(318, vec![])), rhs: Some(side(378, vec![])) },
+            LineEntry { lhs: Some(side(319, vec![])), rhs: Some(side(379, vec![])) },
+            LineEntry { lhs: Some(side(320, vec![])), rhs: None },  // removed-only
+            LineEntry { lhs: Some(side(321, vec![])), rhs: Some(side(380, vec![])) },
+            LineEntry { lhs: Some(side(322, vec![])), rhs: Some(side(381, vec![])) },
+            LineEntry { lhs: Some(side(323, vec![])), rhs: Some(side(382, vec![])) },
+            LineEntry { lhs: Some(side(324, vec![])), rhs: Some(side(390, vec![])) },
+        ];
+
+        let hunks = vec![DiffHunk { old_start: 317, old_count: 13, new_start: 377, new_count: 18 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        test_render_chunks(&difft, &[0], "test.ts", None)
     }
 }

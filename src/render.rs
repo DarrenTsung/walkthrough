@@ -107,6 +107,10 @@ h1 + * {
     margin-top: 1.2em;
 }
 
+h2, h3, h4, h5, h6 {
+    scroll-margin-top: 60px;
+}
+
 h2 {
     font-size: 1.35em;
     font-weight: 650;
@@ -546,7 +550,7 @@ const JS: &str = r#"
     function updateActive() {
         var current = null;
         for (var i = 0; i < headings.length; i++) {
-            if (headings[i].getBoundingClientRect().top <= 60) {
+            if (headings[i].getBoundingClientRect().top <= 80) {
                 current = i;
             }
         }

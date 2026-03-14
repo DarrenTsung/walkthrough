@@ -1482,12 +1482,17 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
 
         let rows = consolidate_chunk(chunk);
         let mut items: Vec<(u64, TextItem)> = Vec::new();
+        let mut prev_rhs_t: Option<u64> = None;
+        let mut removed_seq_t: u64 = 0;
         for row in &rows {
             let key = if let Some(rhs) = row.rhs {
+                prev_rhs_t = Some(rhs.line_number);
+                removed_seq_t = 0;
                 rhs.line_number * 3
-            } else if let Some(lhs) = row.lhs {
-                old_to_new_line(lhs.line_number + 1, hunks) * 3 + 1
-            } else { 0 };
+            } else {
+                removed_seq_t += 1;
+                prev_rhs_t.map_or(removed_seq_t, |p| p * 3 + removed_seq_t)
+            };
             items.push((key, TextItem::DifftRow(row)));
         }
 
@@ -1497,21 +1502,26 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         );
         for &(old_0, new_0) in &gap_paired {
             items.push((new_0 as u64 * 3, TextItem::GapPaired(old_0, new_0)));
-            old_first = old_first.min(old_0);
-            old_last = old_last.max(old_0);
-            new_first = new_first.min(new_0);
-            new_last = new_last.max(new_0);
+            old_first = old_first.min(old_0); old_last = old_last.max(old_0);
+            new_first = new_first.min(new_0); new_last = new_last.max(new_0);
         }
         for &old_0 in &gap_removed {
-            let mapped = old_to_new_line(old_0 as u64 + 1, hunks);
-            items.push((mapped * 3 + 1, TextItem::GapRemoved(old_0)));
-            old_first = old_first.min(old_0);
-            old_last = old_last.max(old_0);
+            let nearest_key = items.iter()
+                .filter_map(|&(k, ref item)| match item {
+                    TextItem::DifftRow(row) => row.lhs.map(|s| {
+                        let dist = (s.line_number as i64 - old_0 as i64).unsigned_abs();
+                        (dist, k)
+                    }),
+                    _ => None,
+                })
+                .min_by_key(|&(dist, _)| dist)
+                .map(|(_, k)| k);
+            items.push((nearest_key.unwrap_or(0), TextItem::GapRemoved(old_0)));
+            old_first = old_first.min(old_0); old_last = old_last.max(old_0);
         }
         for &new_0 in &gap_added {
             items.push((new_0 as u64 * 3 + 2, TextItem::GapAdded(new_0)));
-            new_first = new_first.min(new_0);
-            new_last = new_last.max(new_0);
+            new_first = new_first.min(new_0); new_last = new_last.max(new_0);
         }
         items.sort_by(|a, b| {
             a.0.cmp(&b.0).then_with(|| {
@@ -1527,6 +1537,28 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
                 };
                 old_a.cmp(&old_b)
             })
+        });
+
+        // Remove gap lines that violate old-side ordering
+        let get_old_t = |item: &TextItem| -> Option<u64> {
+            match item {
+                TextItem::DifftRow(r) => r.lhs.map(|s| s.line_number),
+                TextItem::GapRemoved(o) | TextItem::GapPaired(o, _) => Some(*o as u64),
+                TextItem::GapAdded(_) => None,
+            }
+        };
+        let mut max_old_t: Option<u64> = None;
+        items.retain(|&(_, ref item)| {
+            if let Some(o) = get_old_t(item) {
+                if let Some(m) = max_old_t {
+                    if o < m {
+                        return !matches!(item,
+                            TextItem::GapRemoved(_) | TextItem::GapAdded(_) | TextItem::GapPaired(_, _));
+                    }
+                }
+                max_old_t = Some(o);
+            }
+            true
         });
 
         // Collect ALL item line numbers before filtering so filtered-out
@@ -1733,21 +1765,23 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             GapPaired(usize, usize), // (old_0, new_0)
         }
 
-        // Sort all entries by new-file position. Entries with a right side
-        // use rhs directly. Removed-only entries use old_to_new_line to find
-        // their equivalent new-file position. Key spacing of *3 prevents
-        // collisions: paired/added at *3, removed at *3+1, gap-added at *3+2.
+        // Sort entries by new-file position with *3 spacing to separate types.
+        // Difft removed-only entries use prev_rhs (structural position from the
+        // preceding entry in chunk order). Gap lines use anchor keys from the
+        // nearest preceding difft entry, offset by old-line distance.
         let rows = consolidate_chunk(chunk);
         let mut items: Vec<(u64, RenderItem)> = Vec::new();
 
+        let mut prev_rhs: Option<u64> = None;
+        let mut removed_seq: u64 = 0; // increments for consecutive removed entries
         for row in &rows {
             let key = if let Some(rhs) = row.rhs {
+                prev_rhs = Some(rhs.line_number);
+                removed_seq = 0;
                 rhs.line_number * 3
-            } else if let Some(lhs) = row.lhs {
-                let mapped = old_to_new_line(lhs.line_number + 1, hunks);
-                mapped * 3 + 1
             } else {
-                0
+                removed_seq += 1;
+                prev_rhs.map_or(removed_seq, |p| p * 3 + removed_seq)
             };
             items.push((key, RenderItem::DifftRow(row)));
         }
@@ -1759,7 +1793,13 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             &difft.old_lines, &difft.new_lines,
         );
 
-        // Gap lines use the same *3 key scheme as difft entries.
+        // Gap removed lines use the same key as the difft removed entries
+        // they're adjacent to (prev_rhs * 3 + seq), continuing the sequence.
+        // This ensures they sort together with difft removed entries and the
+        // old-line tiebreaker handles ordering correctly.
+        //
+        // To find the right key: find the difft entry closest to the gap line
+        // in old-line order and use the same base key (adjusted by offset).
         for &(old_0, new_0) in &gap_paired {
             items.push((new_0 as u64 * 3, RenderItem::GapPaired(old_0, new_0)));
             old_first = old_first.min(old_0);
@@ -1768,8 +1808,20 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             new_last = new_last.max(new_0);
         }
         for &old_0 in &gap_removed {
-            let mapped = old_to_new_line(old_0 as u64 + 1, hunks);
-            items.push((mapped * 3 + 1, RenderItem::GapRemoved(old_0)));
+            // Use same key as nearby difft removed entries so they interleave
+            // by old-line via the tiebreaker. Find the nearest difft entry.
+            let nearest_key = items.iter()
+                .filter_map(|&(k, ref item)| match item {
+                    RenderItem::DifftRow(row) => row.lhs.map(|s| {
+                        let dist = (s.line_number as i64 - old_0 as i64).unsigned_abs();
+                        (dist, k)
+                    }),
+                    _ => None,
+                })
+                .min_by_key(|&(dist, _)| dist)
+                .map(|(_, k)| k);
+            let key = nearest_key.unwrap_or(0);
+            items.push((key, RenderItem::GapRemoved(old_0)));
             old_first = old_first.min(old_0);
             old_last = old_last.max(old_0);
         }
@@ -1794,6 +1846,28 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 };
                 old_a.cmp(&old_b)
             })
+        });
+
+        // Remove gap lines that violate old-side ordering.
+        let get_old = |item: &RenderItem| -> Option<u64> {
+            match item {
+                RenderItem::DifftRow(r) => r.lhs.map(|s| s.line_number),
+                RenderItem::GapRemoved(o) | RenderItem::GapPaired(o, _) => Some(*o as u64),
+                RenderItem::GapAdded(_) => None,
+            }
+        };
+        let mut max_old: Option<u64> = None;
+        items.retain(|&(_, ref item)| {
+            if let Some(o) = get_old(item) {
+                if let Some(m) = max_old {
+                    if o < m {
+                        return !matches!(item,
+                            RenderItem::GapRemoved(_) | RenderItem::GapAdded(_) | RenderItem::GapPaired(_, _));
+                    }
+                }
+                max_old = Some(o);
+            }
+            true
         });
 
         // Collect ALL item line numbers before filtering, so gap lines and
@@ -3311,17 +3385,22 @@ mod tests {
 
         let rows = consolidate_chunk(chunk);
         let mut items: Vec<(u64, &'static str, Option<u64>, Option<u64>)> = Vec::new();
-        // Same *3 keying as renderer
+        // Same keying as renderer: prev_rhs*3+1 for difft removed, anchor+offset for gap
         let (gap_paired, gap_removed, gap_added) = hunk_gap_lines(
             chunk, hunks, old_first, old_last, new_first, new_last,
             &difft.old_lines, &difft.new_lines,
         );
+        let mut prev_rhs_e: Option<u64> = None;
+        let mut removed_seq_e: u64 = 0;
         for row in &rows {
             let key = if let Some(rhs) = row.rhs {
+                prev_rhs_e = Some(rhs.line_number);
+                removed_seq_e = 0;
                 rhs.line_number * 3
-            } else if let Some(lhs) = row.lhs {
-                old_to_new_line(lhs.line_number + 1, hunks) * 3 + 1
-            } else { 0 };
+            } else {
+                removed_seq_e += 1;
+                prev_rhs_e.map_or(removed_seq_e, |p| p * 3 + removed_seq_e)
+            };
             let row_type = if row.lhs.is_some() && row.rhs.is_some() {
                 "line-paired"
             } else if row.rhs.is_some() {
@@ -3333,10 +3412,16 @@ mod tests {
             let new_ln = row.rhs.map(|s| s.line_number + 1);
             items.push((key, row_type, old_ln, new_ln));
         }
-        // Gap-paired render as context, excluded from expected non-context
+        // Gap-paired render as context, excluded
         for &old_0 in &gap_removed {
-            let mapped = old_to_new_line(old_0 as u64 + 1, hunks);
-            items.push((mapped * 3 + 1, "line-removed", Some(old_0 as u64 + 1), None));
+            let nearest_key = items.iter()
+                .filter_map(|&(k, _, ol, _)| ol.map(|o| {
+                    let dist = ((o - 1) as i64 - old_0 as i64).unsigned_abs();
+                    (dist, k)
+                }))
+                .min_by_key(|&(dist, _)| dist)
+                .map(|(_, k)| k);
+            items.push((nearest_key.unwrap_or(0), "line-removed", Some(old_0 as u64 + 1), None));
         }
         for &new_0 in &gap_added {
             items.push((new_0 as u64 * 3 + 2, "line-added", None, Some(new_0 as u64 + 1)));
@@ -3402,34 +3487,26 @@ mod tests {
             }
         }
 
-        // 2. Old-side non-decreasing.
-        // Note: gap removed lines positioned by old_to_new_line can cause
-        // old-side disorder when multiple old lines map to the same hunk
-        // boundary. This is inherent to the mapping and only affects gap
-        // lines. We check all non-context rows but log as warning for
-        // gap-caused violations.
+        // 2. Old-side non-decreasing
         let old_lns: Vec<u64> = non_context.iter().filter_map(|(_, o, _)| *o).collect();
         for i in 1..old_lns.len() {
             if old_lns[i] < old_lns[i - 1] {
-                eprintln!(
-                    "  warning: {} chunk {} old-side out of order: {} followed by {} at position {}",
-                    file_path, chunk_idx, old_lns[i - 1], old_lns[i], i,
-                );
+                errors.push(format!(
+                    "old-side out of order: {} followed by {} at position {}",
+                    old_lns[i - 1], old_lns[i], i,
+                ));
                 break;
             }
         }
 
-        // 2b. New-side non-decreasing (non-context rows only).
-        // Note: difft's structural matching can pair lines non-consecutively,
-        // and gap lines placed after difft entries can cause new-side ordering
-        // issues. This check logs warnings but doesn't fail the test.
+        // 2b. New-side non-decreasing
         let new_lns: Vec<u64> = non_context.iter().filter_map(|(_, _, n)| *n).collect();
         for i in 1..new_lns.len() {
             if new_lns[i] < new_lns[i - 1] {
-                eprintln!(
-                    "  warning: {} chunk {} new-side out of order: {} followed by {} at position {}",
-                    file_path, chunk_idx, new_lns[i - 1], new_lns[i], i,
-                );
+                errors.push(format!(
+                    "new-side out of order: {} followed by {} at position {}",
+                    new_lns[i - 1], new_lns[i], i,
+                ));
                 break;
             }
         }

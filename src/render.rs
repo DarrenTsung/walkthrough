@@ -477,6 +477,13 @@ tr.annotated td:last-child {
     max-width: calc(100vw - 260px);
 }
 .diff-single { table-layout: auto; width: 100%; }
+.diff-single tr.line-removed td:last-child { border-right: 1px solid var(--removed-bg); }
+.diff-single tr.line-removed-partial td:last-child { border-right: 1px solid var(--bg); }
+.diff-single tr.line-added td:last-child { border-right: 1px solid var(--added-bg); }
+.diff-single tr.line-added-partial td:last-child { border-right: 1px solid var(--bg); }
+.diff-single tr.line-context td:last-child { border-right: 1px solid var(--bg); }
+.diff-single tr.line-paired td:last-child { border-right: 1px solid var(--bg); }
+.diff-single tr.line-paired-full td:last-child { border-right: 1px solid var(--removed-bg); }
 .diff-single col.code-col { width: auto; }
 .diff-single .line-added .code-rhs,
 .diff-single .line-added .sign-rhs { background: var(--added-bg); }

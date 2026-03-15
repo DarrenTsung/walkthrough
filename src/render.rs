@@ -476,7 +476,7 @@ tr.annotated td:last-child {
     min-width: calc((100vw - 260px) * 0.6);
     max-width: calc(100vw - 260px);
 }
-.diff-single { table-layout: auto; width: auto; }
+.diff-single { table-layout: auto; width: 100%; }
 .diff-single col.code-col { width: auto; }
 .diff-single .line-added .code-rhs,
 .diff-single .line-added .sign-rhs { background: var(--added-bg); }

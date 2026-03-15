@@ -66,16 +66,20 @@ slotted after their preceding paired entry via `prev_rhs * 2 + 1`).
      -            if let Some(lhs) = &entry.lhs { difft_old_lines.insert(lhs.line_number as usize); }
      -            if let Some(rhs) = &entry.rhs { difft_new_lines.insert(rhs.line_number as usize); }
      -        }
+     -
      -        let mut extra_removed: Vec<usize> = Vec::new();
      -        let mut extra_added: Vec<usize> = Vec::new();
      -        let mut extra_paired: Vec<(usize, usize)> = Vec::new();
+     -
      -        for h in hunks {
      -            let h_old_start_0 = (h.old_start as usize).saturating_sub(1);
      -            let h_old_end_0 = h_old_start_0 + h.old_count as usize;
      -            let h_new_start_0 = (h.new_start as usize).saturating_sub(1);
      -            let h_new_end_0 = h_new_start_0 + h.new_count as usize;
+     -
      -            let overlaps_old = h_old_end_0 > old_first.saturating_sub(1) && h_old_start_0 <= old_last + 1;
      -            let overlaps_new = h_new_end_0 > new_first.saturating_sub(1) && h_new_start_0 <= new_last + 1;
+     -
      -            if overlaps_old || overlaps_new {
      -                let mut hunk_removed: Vec<usize> = Vec::new();
      -                let mut hunk_added: Vec<usize> = Vec::new();
@@ -93,6 +97,7 @@ slotted after their preceding paired entry via `prev_rhs * 2 + 1`).
      -                for &a in &hunk_added[pair_count..] { extra_added.push(a); }
      -            }
      -        }
+     -
      -        let mut old_first = old_first;
      -        let mut old_last = old_last;
      -        let mut new_first = new_first;
@@ -103,9 +108,9 @@ slotted after their preceding paired entry via `prev_rhs * 2 + 1`).
      -            old_first = old_first.min(old_0); old_last = old_last.max(old_0);
      -            new_first = new_first.min(new_0); new_last = new_last.max(new_0);
      -        }
+     -
               let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
               let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
-              let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
   ...
               // Build unified item list (same logic as HTML renderer)
               #[derive(Clone, Copy)]
@@ -126,6 +131,7 @@ slotted after their preceding paired entry via `prev_rhs * 2 + 1`).
    6 +            } else {
    7 -            items.push((i as u64, TextItem::DifftRow(row)));
    7 +                prev_rhs.map_or(0, |p| p * 2 + 1)
+   1 -        }
    8 +            };
    9 +            items.push((key, TextItem::DifftRow(row)));
   11 -        let base = rows.len() as u64;
@@ -283,20 +289,27 @@ renderer's logic for the plain-text diff written back into the markdown file.
   21 -                difft_new_lines.insert(rhs.line_number as usize);
   21 -            }
   21 -        }
+  21 -
   21 -        // Find unified diff hunk lines that overlap this chunk's range but difft missed.
   21 -        // These are removed/added lines that difft's structural matching didn't flag.
   21 -        // Must be computed BEFORE context so we can extend boundaries to include hunk lines.
   21 -        let mut extra_removed: Vec<usize> = Vec::new(); // 0-based old line indices
   21 -        let mut extra_added: Vec<usize> = Vec::new(); // 0-based new line indices
   21 -        let mut extra_paired: Vec<(usize, usize)> = Vec::new(); // (old_0, new_0)
+  21 -
   21 -        for h in hunks {
   21 -            let h_old_start_0 = (h.old_start as usize).saturating_sub(1); // 0-based
   21 -            let h_old_end_0 = h_old_start_0 + h.old_count as usize;
+  28 -        // Render difft entries in chunk order (preserving difft's structural
+  28 +        // Sort by new-side line number (matching difft CLI's render order).
   21 -            let h_new_start_0 = (h.new_start as usize).saturating_sub(1);
   21 -            let h_new_end_0 = h_new_start_0 + h.new_count as usize;
   21 -            let overlaps_old = h_old_end_0 > old_first.saturating_sub(1) && h_old_start_0 <= old_last + 1;
+  29 -        // matching), then append hunk-gap extras sorted by line number.
+  29 +        // For removed-only entries, use the previous entry's rhs to keep them
   21 -            let overlaps_new = h_new_end_0 > new_first.saturating_sub(1) && h_new_start_0 <= new_last + 1;
   21 -            if overlaps_old || overlaps_new {
+  30 +        // positioned between their neighboring paired entries.
   21 -                let mut hunk_removed: Vec<usize> = Vec::new();
   21 -                let mut hunk_added: Vec<usize> = Vec::new();
   21 -                for line_0 in h_old_start_0..h_old_end_0 {
@@ -310,64 +323,61 @@ renderer's logic for the plain-text diff written back into the markdown file.
   21 -                    }
   21 -                }
   21 -                // Pair removed/added lines from the same hunk together
+  34 -        // Difft rows get sequential keys to preserve chunk order
+  34 +        let mut prev_rhs: Option<u64> = None;
   21 -                let pair_count = hunk_removed.len().min(hunk_added.len());
   21 -                for i in 0..pair_count {
+  35 +        for row in &rows {
   21 -                    extra_paired.push((hunk_removed[i], hunk_added[i]));
   21 -                }
   21 -                for &r in &hunk_removed[pair_count..] {
   21 -                    extra_removed.push(r);
+  36 -        for (i, row) in rows.iter().enumerate() {
+  36 +            let key = if let Some(rhs) = row.rhs {
   21 -                }
   21 -                for &a in &hunk_added[pair_count..] {
+  37 +                prev_rhs = Some(rhs.line_number);
   21 -                    extra_added.push(a);
   21 -                }
   21 -            }
+  38 +                rhs.line_number * 2
   21 -        }
   21 -        // Extend chunk boundaries to include hunk-only lines so context doesn't
   21 -        // overlap with changed lines.
+  39 +            } else {
   21 -        let mut old_first = old_first;
   21 -        let mut old_last = old_last;
   21 -        let mut new_first = new_first;
+  40 +                // Removed-only: place just after the previous entry's rhs
   21 -        let mut new_last = new_last;
   21 -        for &old_0 in &extra_removed {
   21 -            old_first = old_first.min(old_0);
+  41 +                prev_rhs.map_or(0, |p| p * 2 + 1)
   21 -            old_last = old_last.max(old_0);
   21 -        }
   21 -        for &new_0 in &extra_added {
+  42 +            };
   21 -            new_first = new_first.min(new_0);
   21 -            new_last = new_last.max(new_0);
   21 -        }
   21 -        for &(old_0, new_0) in &extra_paired {
+  43 -            items.push((i as u64, RenderItem::DifftRow(row)));
+  43 +            items.push((key, RenderItem::DifftRow(row)));
+  34 -        }
   21 -            old_first = old_first.min(old_0);
   21 -            old_last = old_last.max(old_0);
   21 -            new_first = new_first.min(new_0);
   21 -            new_last = new_last.max(new_0);
   21 -        }
   21 -        // Build a unified list of render items: difft rows + hunk-only lines.
-  25 -            RemovedLine(usize),        // 0-based old line
-  25 -            AddedLine(usize),          // 0-based new line
-  25 -            PairedLine(usize, usize),  // (old_0, new_0) from same hunk
-  28 -        // Render difft entries in chunk order (preserving difft's structural
-  28 +        // Sort by new-side line number (matching difft CLI's render order).
-  29 -        // matching), then append hunk-gap extras sorted by line number.
-  29 +        // For removed-only entries, use the previous entry's rhs to keep them
-  30 +        // positioned between their neighboring paired entries.
-  34 -        // Difft rows get sequential keys to preserve chunk order
-  34 +        let mut prev_rhs: Option<u64> = None;
-  35 +        for row in &rows {
-  36 -        for (i, row) in rows.iter().enumerate() {
-  36 +            let key = if let Some(rhs) = row.rhs {
-  37 +                prev_rhs = Some(rhs.line_number);
-  38 +                rhs.line_number * 2
-  39 +            } else {
-  40 +                // Removed-only: place just after the previous entry's rhs
-  41 +                prev_rhs.map_or(0, |p| p * 2 + 1)
-  42 +            };
-  43 -            items.push((i as u64, RenderItem::DifftRow(row)));
-  43 +            items.push((key, RenderItem::DifftRow(row)));
   45 -        let base = rows.len() as u64;
   45 +        items.sort_by_key(|&(k, _)| k);
+  34 -
+  25 -            RemovedLine(usize),        // 0-based old line
   34 -        // Hunk-gap extras are sorted by new-side line and placed after difft rows
+  25 -            AddedLine(usize),          // 0-based new line
   34 -        let mut extras: Vec<(u64, RenderItem)> = Vec::new();
+  25 -            PairedLine(usize, usize),  // (old_0, new_0) from same hunk
   34 -        for &(old_0, new_0) in &extra_paired {
   34 -            extras.push((new_0 as u64, RenderItem::PairedLine(old_0, new_0)));
   34 -        }
@@ -437,6 +447,7 @@ lines from difft's own entries.
 1335 -            // Fill gap with context lines, skipping any that overlap with items
 1335 -            let expected_old = prev_old.map(|p| p + 1);
 1335 -            let expected_new = prev_new.map(|p| p + 1);
+1335 -
 1335 -            if let (Some(exp_o), Some(cur_o)) = (expected_old, cur_old) {
 1335 -                if cur_o > exp_o {
 1335 -                    let exp_n = expected_new.unwrap_or_else(|| {
@@ -464,6 +475,7 @@ lines from difft's own entries.
 1335 -                    }
 1335 -                }
 1335 -            }
+1335 -
 1336              // Render the item
 1337              match item {
 1338                  RenderItem::DifftRow(row) => {
@@ -569,5 +581,12 @@ line (old:321) appears in the correct position between its neighbors.
   60 +                "new 382 should come before new 383, got pos {} vs {}",
   61 +                p382, p383);
   62 +        }
-  63      }
+   2 +
+  24 +
+  30 +
+  38 +
+  48 +
+  54 +
+  63 +    }
+  64  }
 ```

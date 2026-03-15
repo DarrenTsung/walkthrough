@@ -424,6 +424,21 @@ tr.annotated td:last-child {
     }
 }
 
+/* Single-column diff (add-only or remove-only blocks) */
+.diff-block:has(.diff-single) {
+    width: fit-content;
+    min-width: calc((100vw - 260px) * 0.6);
+    max-width: calc(100vw - 260px);
+}
+.diff-single { table-layout: auto; width: auto; }
+.diff-single col.code-col { width: auto; }
+.diff-single .line-added .code-rhs,
+.diff-single .line-added .sign-rhs { background: var(--added-bg); }
+.diff-single .line-added .ln-rhs { background: var(--added-num-bg); }
+.diff-single .line-removed .code-lhs,
+.diff-single .line-removed .sign-lhs { background: var(--removed-bg); }
+.diff-single .line-removed .ln-lhs { background: var(--removed-num-bg); }
+
 /* Source blocks: single-column variant of diff-table */
 .src-single .code-lhs { width: 100%; }
 
@@ -610,6 +625,22 @@ const JS: &str = r#"
                 currentKey = '';
             }, 50);
         });
+    });
+})();
+
+// Size single-column diff blocks to their content width.
+// CSS can't do "grow to content, then wrap at max" because pre-wrap
+// tells the browser wrapping is always OK, so the table never pushes wider.
+// We measure with white-space:pre, set the block width, then restore wrapping.
+(function() {
+    document.querySelectorAll('.diff-block:has(.diff-single)').forEach(function(block) {
+        var table = block.querySelector('.diff-single');
+        var cells = table.querySelectorAll('td[class*="code"]');
+        cells.forEach(function(c) { c.style.whiteSpace = 'pre'; c.style.overflowWrap = 'normal'; });
+        var need = table.scrollWidth + 2;
+        cells.forEach(function(c) { c.style.whiteSpace = ''; c.style.overflowWrap = ''; });
+        var maxW = parseFloat(getComputedStyle(block).maxWidth) || block.parentElement.offsetWidth;
+        block.style.width = Math.min(need, maxW) + 'px';
     });
 })();
 "#;
@@ -1195,6 +1226,44 @@ fn render_context_row(old_idx: usize, new_idx: usize, old_hl: &[String], new_hl:
     )
 }
 
+/// Render a single-column context row (for add-only or remove-only blocks).
+fn render_single_context_row(idx: usize, hl_lines: &[String]) -> String {
+    let content = hl_lines.get(idx).map(|s| s.as_str()).unwrap_or("");
+    format!(
+        "<tr class=\"line-context\"><td class=\"ln\">{}</td><td class=\"sign\"></td><td class=\"code\">{}</td></tr>",
+        idx + 1, content
+    )
+}
+
+/// Render a single-column diff row (for add-only or remove-only blocks).
+fn render_single_diff_row(row: &DiffRow, layout: DiffLayout, old_hl: &[String], new_hl: &[String]) -> String {
+    match layout {
+        DiffLayout::AddOnly => {
+            if let Some(rhs) = row.rhs {
+                let content = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+                format!(
+                    "<tr class=\"line-added\"><td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td></tr>",
+                    rhs.line_number + 1, content
+                )
+            } else {
+                String::new()
+            }
+        }
+        DiffLayout::RemoveOnly => {
+            if let Some(lhs) = row.lhs {
+                let content = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+                format!(
+                    "<tr class=\"line-removed\"><td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td></tr>",
+                    lhs.line_number + 1, content
+                )
+            } else {
+                String::new()
+            }
+        }
+        DiffLayout::SideBySide => String::new(), // shouldn't be called
+    }
+}
+
 /// Get the min/max 0-based line numbers referenced in a chunk, for each side.
 fn chunk_line_range(chunk: &[LineEntry]) -> (Option<(u64, u64)>, Option<(u64, u64)>) {
     let mut lhs_min: Option<u64> = None;
@@ -1708,22 +1777,59 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
     out
 }
 
+/// Layout mode for a diff block: side-by-side (6 cols) or single-column (3 cols).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DiffLayout {
+    SideBySide,
+    AddOnly,
+    RemoveOnly,
+}
+
+fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize]) -> DiffLayout {
+    let mut has_lhs = false;
+    let mut has_rhs = false;
+    for &idx in chunk_indices {
+        let Some(chunk) = difft.chunks.get(idx) else { continue };
+        for entry in chunk {
+            if entry.lhs.is_some() { has_lhs = true; }
+            if entry.rhs.is_some() { has_rhs = true; }
+            if has_lhs && has_rhs { return DiffLayout::SideBySide; }
+        }
+    }
+    if has_rhs && !has_lhs { DiffLayout::AddOnly }
+    else if has_lhs && !has_rhs { DiffLayout::RemoveOnly }
+    else { DiffLayout::SideBySide }
+}
+
 fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, hl: &mut Highlighter) -> String {
     let lang = arborium::detect_language(file_path);
     let old_hl = syntax_highlight_lines(&difft.old_lines, hl, lang);
     let new_hl = syntax_highlight_lines(&difft.new_lines, hl, lang);
+
+    let layout = detect_diff_layout(difft, chunk_indices);
+    let single = layout != DiffLayout::SideBySide;
 
     let mut html = String::new();
     html.push_str(&format!(
         "<div class=\"diff-block\"><div class=\"diff-header\">{}</div>",
         html_escape(file_path)
     ));
-    html.push_str(
-        "<table class=\"diff-table\"><colgroup>\
-         <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
-         <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
-         </colgroup><tbody>",
-    );
+    if single {
+        let layout_class = if layout == DiffLayout::AddOnly { "diff-add-only" } else { "diff-remove-only" };
+        html.push_str(&format!(
+            "<table class=\"diff-table diff-single {}\"><colgroup>\
+             <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
+             </colgroup><tbody>",
+            layout_class
+        ));
+    } else {
+        html.push_str(
+            "<table class=\"diff-table\"><colgroup>\
+             <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
+             <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
+             </colgroup><tbody>",
+        );
+    }
 
     let hunks = &difft.hunks;
 
@@ -1958,7 +2064,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 },
             };
             if has_gap {
-                html.push_str("<tr class=\"chunk-sep\"><td colspan=\"6\"></td></tr>");
+                let colspan = if single { 3 } else { 6 };
+                html.push_str(&format!("<tr class=\"chunk-sep\"><td colspan=\"{}\"></td></tr>", colspan));
             }
         }
         first_chunk = false;
@@ -1966,12 +2073,27 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         // Render context lines BEFORE the chunk.
         let old_pre_count = old_first.saturating_sub(old_ctx_start);
         let new_pre_count = new_first.saturating_sub(new_ctx_start);
-        let pre_count = old_pre_count.min(new_pre_count);
+        let pre_count = match layout {
+            DiffLayout::AddOnly => new_pre_count,
+            DiffLayout::RemoveOnly => old_pre_count,
+            DiffLayout::SideBySide => old_pre_count.min(new_pre_count),
+        };
 
         for i in 0..pre_count {
             let o = old_first - pre_count + i;
             let n = new_first - pre_count + i;
-            if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
+            if single {
+                let (idx, hl_lines) = if layout == DiffLayout::AddOnly {
+                    (n, &new_hl)
+                } else {
+                    (o, &old_hl)
+                };
+                if (layout == DiffLayout::AddOnly && !item_new_lines.contains(&idx))
+                    || (layout == DiffLayout::RemoveOnly && !item_old_lines.contains(&idx))
+                {
+                    html.push_str(&render_single_context_row(idx, hl_lines));
+                }
+            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
                 html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
             }
         }
@@ -1992,31 +2114,61 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             };
 
             // Render the item
-            match item {
-                RenderItem::DifftRow(row) => {
-                    html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines, &old_hl, &new_hl));
+            if single {
+                match item {
+                    RenderItem::DifftRow(row) => {
+                        html.push_str(&render_single_diff_row(row, layout, &old_hl, &new_hl));
+                    }
+                    RenderItem::GapRemoved(old_0) => {
+                        let content = old_hl.get(*old_0).map(|s| s.as_str()).unwrap_or("");
+                        html.push_str(&format!(
+                            "<tr class=\"line-removed\"><td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td></tr>",
+                            old_0 + 1, content
+                        ));
+                    }
+                    RenderItem::GapAdded(new_0) => {
+                        let content = new_hl.get(*new_0).map(|s| s.as_str()).unwrap_or("");
+                        html.push_str(&format!(
+                            "<tr class=\"line-added\"><td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td></tr>",
+                            new_0 + 1, content
+                        ));
+                    }
+                    RenderItem::GapPaired(old_0, new_0) => {
+                        let (idx, hl_lines) = if layout == DiffLayout::AddOnly {
+                            (*new_0, &new_hl)
+                        } else {
+                            (*old_0, &old_hl)
+                        };
+                        html.push_str(&render_single_context_row(idx, hl_lines));
+                    }
                 }
-                RenderItem::GapRemoved(old_0) => {
-                    let content = old_hl.get(*old_0).map(|s| s.as_str()).unwrap_or("");
-                    html.push_str(&format!(
-                        "<tr class=\"line-removed\"><td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>\
-                         <td class=\"ln ln-rhs\"></td><td class=\"sign sign-rhs\"></td><td class=\"code-rhs\"></td></tr>",
-                        old_0 + 1, content
-                    ));
-                }
-                RenderItem::GapAdded(new_0) => {
-                    let content = new_hl.get(*new_0).map(|s| s.as_str()).unwrap_or("");
-                    html.push_str(&format!(
-                        "<tr class=\"line-added\"><td class=\"ln ln-lhs\"></td><td class=\"sign sign-lhs\"></td><td class=\"code-lhs\"></td>\
-                         <td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td></tr>",
-                        new_0 + 1, content
-                    ));
-                }
-                RenderItem::GapPaired(old_0, new_0) => {
-                    // Gap-paired lines matched by trimmed content: only whitespace
-                    // differs. Render as context (no color, no signs) since the
-                    // content is effectively unchanged, just repositioned.
-                    html.push_str(&render_context_row(*old_0, *new_0, &old_hl, &new_hl));
+            } else {
+                match item {
+                    RenderItem::DifftRow(row) => {
+                        html.push_str(&render_diff_row(row, &difft.old_lines, &difft.new_lines, &old_hl, &new_hl));
+                    }
+                    RenderItem::GapRemoved(old_0) => {
+                        let content = old_hl.get(*old_0).map(|s| s.as_str()).unwrap_or("");
+                        html.push_str(&format!(
+                            "<tr class=\"line-removed\"><td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\">\u{2212}</td><td class=\"code-lhs\">{}</td>\
+                             <td class=\"ln ln-rhs\"></td><td class=\"sign sign-rhs\"></td><td class=\"code-rhs\"></td></tr>",
+                            old_0 + 1, content
+                        ));
+                    }
+                    RenderItem::GapAdded(new_0) => {
+                        let content = new_hl.get(*new_0).map(|s| s.as_str()).unwrap_or("");
+                        html.push_str(&format!(
+                            "<tr class=\"line-added\"><td class=\"ln ln-lhs\"></td><td class=\"sign sign-lhs\"></td><td class=\"code-lhs\"></td>\
+                             <td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\">+</td><td class=\"code-rhs\">{}</td></tr>",
+                            new_0 + 1, content
+                        ));
+                    }
+                    RenderItem::GapPaired(old_0, new_0) => {
+                        // Gap-paired lines matched by trimmed content: only whitespace
+                        // differs. Render as context (no color, no signs) since the
+                        // content is effectively unchanged, just repositioned.
+                        html.push_str(&render_context_row(*old_0, *new_0, &old_hl, &new_hl));
+                    }
                 }
             }
 
@@ -2029,12 +2181,25 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         let new_post_start = new_last + 1;
         let old_post_count = old_ctx_after.saturating_sub(old_post_start);
         let new_post_count = new_ctx_after.saturating_sub(new_post_start);
-        let post_count = old_post_count.min(new_post_count);
+        let post_count = match layout {
+            DiffLayout::AddOnly => new_post_count,
+            DiffLayout::RemoveOnly => old_post_count,
+            DiffLayout::SideBySide => old_post_count.min(new_post_count),
+        };
 
         for i in 0..post_count {
             let o = old_post_start + i;
             let n = new_post_start + i;
-            if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
+            if single {
+                let (idx, hl_lines, item_lines) = if layout == DiffLayout::AddOnly {
+                    (n, &new_hl, &item_new_lines)
+                } else {
+                    (o, &old_hl, &item_old_lines)
+                };
+                if !item_lines.contains(&idx) {
+                    html.push_str(&render_single_context_row(idx, hl_lines));
+                }
+            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
                 html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
             }
         }
@@ -2636,6 +2801,8 @@ mod tests {
     fn extract_rows(html: &str) -> Vec<(String, Option<u64>, Option<u64>)> {
         let row_re = Regex::new(r#"<tr class="([^"]+)">"#).unwrap();
         let td_re = Regex::new(r#"<td class="ln[^"]*"[^>]*>(\d*)</td>"#).unwrap();
+        let is_single = html.contains("diff-single");
+        let single_is_add = html.contains("diff-add-only");
 
         let mut rows = Vec::new();
         for row_cap in row_re.captures_iter(html) {
@@ -2657,9 +2824,19 @@ mod tests {
                 })
                 .collect();
 
-            let old_ln = lns.first().copied().flatten();
-            let new_ln = lns.get(1).copied().flatten();
-            rows.push((class, old_ln, new_ln));
+            if is_single && lns.len() == 1 {
+                // Single-column: the one ln cell maps to the active side
+                let ln = lns[0];
+                if single_is_add {
+                    rows.push((class, None, ln));
+                } else {
+                    rows.push((class, ln, None));
+                }
+            } else {
+                let old_ln = lns.first().copied().flatten();
+                let new_ln = lns.get(1).copied().flatten();
+                rows.push((class, old_ln, new_ln));
+            }
         }
         rows
     }

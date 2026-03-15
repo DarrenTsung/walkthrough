@@ -482,8 +482,21 @@ const JS: &str = r#"
     var blocks = document.querySelectorAll('.diff-block');
     var pinnedY = null;
     var activeBlock = null;
+    var lastWheelTime = 0;
+    var navCooldownUntil = 0;
+
+    // After hash navigation (TOC click), suppress block capture briefly
+    // so the user can scroll freely from the new position.
+    window.addEventListener('hashchange', function() {
+        pinnedY = null;
+        activeBlock = null;
+        navCooldownUntil = Date.now() + 600;
+    });
 
     window.addEventListener('wheel', function(e) {
+        lastWheelTime = Date.now();
+        if (Date.now() < navCooldownUntil) return;
+
         // If we have an active block, keep the page pinned and scroll it
         if (activeBlock) {
             var maxScroll = activeBlock.scrollHeight - activeBlock.clientHeight;
@@ -534,10 +547,17 @@ const JS: &str = r#"
         }
     }, { passive: false });
 
-    // Also pin on scroll events caused by momentum
+    // Pin on scroll events caused by trackpad momentum, but only
+    // shortly after a wheel event. Non-wheel scrolls (TOC clicks,
+    // keyboard navigation) clear the pin instead of fighting them.
     window.addEventListener('scroll', function() {
         if (pinnedY !== null) {
-            window.scrollTo(0, pinnedY);
+            if (Date.now() - lastWheelTime < 200) {
+                window.scrollTo(0, pinnedY);
+            } else {
+                pinnedY = null;
+                activeBlock = null;
+            }
         }
     });
 })();

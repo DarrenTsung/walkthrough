@@ -42,6 +42,22 @@ Difft code blocks reference collected data by file path and chunk indices:
 
 The optional `lines=START-END` parameter (1-based, inclusive, relative to the chunk) filters a chunk to only show a portion. Line 1 is the first changed line in the chunk. This lets you split a large chunk across multiple sections with interleaved prose.
 
+### Code folds
+
+A `folds` block placed immediately after a difft block collapses line ranges into clickable pseudocode summaries. Line numbers use the same relative numbering as notes (1-based, relative to the first new-file line in the chunk):
+
+````markdown
+```difft src/foo.rs chunks=0
+```
+
+```folds
+5-15: Set up test fixtures and mock data
+20-30: Assert expected results
+```
+````
+
+Collapsed folds show italic pseudocode text with a yellow background and left yellow border. Clicking expands to reveal the original code, with the yellow left border continuing along the expanded lines.
+
 ## External dependencies
 
 - **difftastic** (`difft`) must be installed and on PATH. Used with `--display json --color never` and `DFT_UNSTABLE=yes`.

@@ -31,9 +31,12 @@ The key addition is `bootstrap?: BootstrapConfig` on `WorkspaceCreateRequest`. W
   15 +  sandboxGitEnabled?: boolean
   16 +  git: GitConfig
   17 +}
-  18  
+   2 +
+   8 +
+  18 +
   19  export interface WorkspaceCreateRequest {
   20    rootPath?: string
+  22    args?: Record<string, string>
   23 +  bootstrap?: BootstrapConfig
   24  }
   25  
@@ -139,7 +142,13 @@ Next, `bootstrapViaWorkspaceCreate` is the new function that constructs a `Boots
   54 +    client.close()
   55 +  }
   56 +}
-  57  
+  12 +
+  25 +
+  27 +
+  29 +
+  35 +
+  41 +
+  57 +
   58  /**
   59   * Client for interacting with the Foundry controller API
 ```
@@ -173,10 +182,13 @@ Finally, the existing bootstrap call site is restructured. Previously it only ca
   14 +          statsD.increment('foundry_api_client.workspace_bootstrapped', 1, tags)
   15 -        !sandboxResponse.newlyProvisioned &&
   15 +        } else if (!sandboxResponse.newlyProvisioned && !sandboxResponse.warm) {
+   1 -        !sandboxResponse.warm
+   1 -      ) {
   19 +      }
-  20  
-  21        return {
-  22          id: sandboxResponse.id,
+  11 +
+  16            await reconcileSboxdReady(rewrittenSboxdUrl, controllerToken, envVars)
+  17            statsD.increment('foundry_api_client.sboxd_reconciled', 1, tags)
+  18 +        }
 ```
 
 ## 4. Feature flag and dependency

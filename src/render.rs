@@ -88,8 +88,10 @@ article {
     border: 1px solid var(--border);
     border-radius: 6px;
     max-height: 75vh;
-    overflow: hidden;
+    overflow: auto;
+    scrollbar-width: none;
 }
+.diff-block::-webkit-scrollbar { display: none; }
 
 h1 {
     font-size: 1.2em;
@@ -470,6 +472,84 @@ tr.annotated td:last-child {
     }
 }
 
+/* Code folds: collapsible pseudocode summaries */
+tr.fold-line[hidden] {
+    content-visibility: hidden;
+    line-height: 0;
+    font-size: 0;
+}
+tr.fold-line[hidden] td {
+    padding: 0 !important;
+    height: 0;
+    border: none !important;
+    overflow: hidden;
+}
+tr.fold-line.fold-expanded td:first-child {
+    border-left: 3px solid #f0c000;
+}
+tr.fold-summary td {
+    background: #fef9e7;
+    cursor: pointer;
+    user-select: none;
+}
+tr.fold-summary td:first-child {
+    border-left: 3px solid #f0c000;
+}
+tr.fold-summary td.fold-text {
+    white-space: pre-wrap;
+    padding: 1px 0.6rem;
+}
+.fold-label {
+    font-style: italic;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #5a4a00;
+    display: inline-block;
+    max-width: 40ch;
+    vertical-align: top;
+}
+tr.fold-summary:hover td {
+    background: #fcf3d0;
+}
+.fold-arrow {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 0.7em;
+    vertical-align: middle;
+    margin-right: 0.4em;
+}
+tr.fold-summary.fold-expanded .fold-arrow {
+    transform: rotate(90deg);
+}
+td.fold-count {
+    color: #9a8a40;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+tr.fold-summary td.sign {
+    vertical-align: middle;
+}
+@media (prefers-color-scheme: dark) {
+    tr.fold-summary td {
+        background: #2a2400;
+    }
+    tr.fold-summary td:first-child {
+        border-left-color: #c0a000;
+    }
+    .fold-label {
+        color: #e8d080;
+    }
+    tr.fold-summary:hover td {
+        background: #332e00;
+    }
+    td.fold-count { color: #8a7a30; }
+    tr.fold-line.fold-expanded td:first-child {
+        border-left-color: #c0a000;
+    }
+}
+
 /* Single-column diff (add-only or remove-only blocks) */
 .diff-block:has(.diff-single) {
     width: fit-content;
@@ -765,6 +845,56 @@ const JS: &str = r#"
 
         body.addEventListener('beforematch', function() {
             expand();
+        });
+    });
+})();
+
+// Code folds: click to expand/collapse pseudocode summaries
+(function() {
+    function expandFold(table, id) {
+        var summary = table.querySelector('tr.fold-summary[data-fold-id="' + id + '"]');
+        if (summary) summary.classList.add('fold-expanded');
+        table.querySelectorAll('tr.fold-line[data-fold-id="' + id + '"]').forEach(function(line) {
+            line.removeAttribute('hidden');
+            line.classList.add('fold-expanded');
+        });
+    }
+    function collapseFold(table, id) {
+        var summary = table.querySelector('tr.fold-summary[data-fold-id="' + id + '"]');
+        if (summary) summary.classList.remove('fold-expanded');
+        table.querySelectorAll('tr.fold-line[data-fold-id="' + id + '"]').forEach(function(line) {
+            line.setAttribute('hidden', 'until-found');
+            line.classList.remove('fold-expanded');
+        });
+    }
+    document.querySelectorAll('tr.fold-summary').forEach(function(row) {
+        row.addEventListener('click', function() {
+            var id = row.getAttribute('data-fold-id');
+            var table = row.closest('table');
+            if (row.classList.contains('fold-expanded')) {
+                collapseFold(table, id);
+            } else {
+                expandFold(table, id);
+            }
+        });
+    });
+    // Auto-expand fold when browser find matches hidden content
+    document.querySelectorAll('tr.fold-line').forEach(function(line) {
+        line.addEventListener('beforematch', function() {
+            var id = line.getAttribute('data-fold-id');
+            var table = line.closest('table');
+            expandFold(table, id);
+            // Scroll the diff block to show the matched row
+            setTimeout(function() {
+                var block = line.closest('.diff-block');
+                if (block) {
+                    var blockTop = block.getBoundingClientRect().top;
+                    var lineTop = line.getBoundingClientRect().top;
+                    if (lineTop < blockTop || lineTop > blockTop + block.clientHeight) {
+                        block.scrollTop += lineTop - blockTop - 40;
+                    }
+                }
+            }, 0);
         });
     });
 })();
@@ -2472,6 +2602,8 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
     let mut in_notes_block = false;
     let mut notes_body = String::new();
     let mut notes_backtick_count = 0;
+    let mut in_folds_block = false;
+    let mut folds_body = String::new();
     let mut last_block_base_line: usize = 0; // base new-line (0-based) for relative→absolute
     let mut referenced: std::collections::HashSet<(String, usize)> = std::collections::HashSet::new();
 
@@ -2541,6 +2673,125 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
             } else {
                 notes_body.push_str(line);
                 notes_body.push('\n');
+                enriched_md.push_str(line);
+                enriched_md.push('\n');
+            }
+            continue;
+        }
+        if in_folds_block {
+            if line.trim_start().starts_with("```") {
+                in_folds_block = false;
+                enriched_md.push_str(line);
+                enriched_md.push('\n');
+
+                // Parse folds and inject into most recent diff block
+                let fold_re = Regex::new(r"^(\d+)(?:-(\d+))?:\s*(.+)$").unwrap();
+                let mut folds: Vec<(u64, u64, String)> = Vec::new();
+                for fold_line in folds_body.lines() {
+                    let trimmed = fold_line.trim();
+                    if trimmed.is_empty() { continue; }
+                    if let Some(caps) = fold_re.captures(trimmed) {
+                        let rel_start: usize = caps[1].parse().unwrap_or(0);
+                        let rel_end: usize = caps.get(2).map_or(rel_start, |m| m.as_str().parse().unwrap_or(rel_start));
+                        let text = caps[3].to_string();
+                        let abs_start = (last_block_base_line + rel_start) as u64;
+                        let abs_end = (last_block_base_line + rel_end) as u64;
+                        folds.push((abs_start, abs_end, text));
+                    }
+                }
+
+                if !folds.is_empty() {
+                    if let Some(last_block) = diff_blocks.last_mut() {
+                        let is_single = last_block.contains("diff-single");
+
+                        for (fold_idx, (start, end, text)) in folds.iter().enumerate() {
+                            let escaped_text = html_escape(text);
+                            let fold_id = fold_idx.to_string();
+
+                            // Mark matching rows with fold-line class, count how many.
+                            // Search patterns: "ln ln-rhs", "ln ln-lhs" (diff blocks),
+                            // and plain "ln" (src blocks).
+                            let mut fold_count: usize = 0;
+                            for ln in *start..=*end {
+                                let needles = [
+                                    format!("class=\"ln ln-rhs\">{}</td>", ln),
+                                    format!("class=\"ln ln-lhs\">{}</td>", ln),
+                                    format!("class=\"ln\">{}</td>", ln),
+                                ];
+                                for needle in &needles {
+                                    if let Some(td_pos) = last_block.find(needle.as_str()) {
+                                        if let Some(tr_pos) = last_block[..td_pos].rfind("<tr") {
+                                            let tr_close = tr_pos + last_block[tr_pos..].find('>').unwrap_or(0);
+                                            let old_tag = last_block[tr_pos..tr_close].to_string();
+
+                                            if old_tag.contains("chunk-sep") || old_tag.contains("fold-line") {
+                                                break;
+                                            }
+
+                                            let new_tag = old_tag.replacen(
+                                                "class=\"",
+                                                "class=\"fold-line ",
+                                                1,
+                                            );
+                                            let new_tag = format!("{} data-fold-id=\"{}\" hidden=\"until-found\"", new_tag, fold_id);
+                                            let before = last_block[..tr_pos].to_string();
+                                            let after = last_block[tr_close..].to_string();
+                                            *last_block = format!("{}{}{}", before, new_tag, after);
+                                            fold_count += 1;
+                                            break; // found the row, no need to check other patterns
+                                        }
+                                    }
+                                }
+                            }
+
+                            if fold_count == 0 { continue; }
+
+                            // Extract indentation from the first folded row's code cell
+                            let mut indent = String::new();
+                            let fold_marker = format!("data-fold-id=\"{}\"", fold_id);
+                            if let Some(marker_pos) = last_block.find(&fold_marker) {
+                                // Find a code cell in this row
+                                if let Some(code_pos) = last_block[marker_pos..].find("class=\"code") {
+                                    let abs_code_pos = marker_pos + code_pos;
+                                    if let Some(gt_pos) = last_block[abs_code_pos..].find('>') {
+                                        let content_start = abs_code_pos + gt_pos + 1;
+                                        for ch in last_block[content_start..].chars() {
+                                            if ch == ' ' {
+                                                indent.push(' ');
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Build summary row: indentation in monospace, label in sans-serif
+                            let line_label = if fold_count == 1 { "line" } else { "lines" };
+                            let code_colspan = if is_single { 1 } else { 4 };
+                            let summary = format!(
+                                "<tr class=\"fold-summary\" data-fold-id=\"{}\">\
+                                 <td class=\"ln fold-count\">{} {}</td><td class=\"sign\"></td>\
+                                 <td class=\"fold-text\" colspan=\"{}\">{}\
+                                 <span class=\"fold-arrow\">\u{25B6}</span> \
+                                 <span class=\"fold-label\">{}</span></td></tr>",
+                                fold_id, fold_count, line_label, code_colspan, indent, escaped_text
+                            );
+
+                            // Insert fold summary row before the first fold-line of this group
+                            if let Some(marker_pos) = last_block.find(&fold_marker) {
+                                if let Some(tr_pos) = last_block[..marker_pos].rfind("<tr") {
+                                    let before = last_block[..tr_pos].to_string();
+                                    let after = last_block[tr_pos..].to_string();
+                                    *last_block = format!("{}{}{}", before, summary, after);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                folds_body.push_str(line);
+                folds_body.push('\n');
                 enriched_md.push_str(line);
                 enriched_md.push('\n');
             }
@@ -2686,6 +2937,10 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         diff_blocks.push(src_html);
                         processed_md.push_str(&format!("<!-- DIFF_PLACEHOLDER_{} -->\n", placeholder_id));
 
+                        // Track base line for relative fold/note line numbers.
+                        // For src blocks, relative line 1 = the first displayed line.
+                        last_block_base_line = start.saturating_sub(1);
+
                         // Enrich markdown with source lines
                         enriched_md.push_str(line);
                         enriched_md.push('\n');
@@ -2712,6 +2967,15 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                     in_notes_block = true;
                     notes_body.clear();
                     notes_backtick_count = backtick_count;
+                    enriched_md.push_str(line);
+                    enriched_md.push('\n');
+                    continue;
+                }
+
+                // Folds block: ```folds
+                if info.trim() == "folds" {
+                    in_folds_block = true;
+                    folds_body.clear();
                     enriched_md.push_str(line);
                     enriched_md.push('\n');
                     continue;

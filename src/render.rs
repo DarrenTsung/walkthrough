@@ -305,6 +305,24 @@ img { max-width: 100%; }
 .diff-block:not(.collapsed) .collapse-disclaimer { display: none; }
 .collapsed { max-height: none !important; overflow: visible !important; }
 .collapsed .diff-header { border-bottom: none; }
+
+/* Viewed checkbox */
+.viewed-label {
+    float: right;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+}
+.viewed-label:hover { color: var(--text); }
+.viewed-check { margin: 0; cursor: pointer; }
+.viewed-label span { position: relative; top: 0.1px; font-size: 0.8rem; }
+.diff-block.viewed .diff-header { opacity: 0.6; }
 .collapsed-hidden { display: none !important; }
 
 .diff-table {
@@ -715,28 +733,44 @@ const JS: &str = r#"
         var body = block.querySelector('.diff-body');
         if (!header || !body) return;
 
-        function toggle() {
-            var isCollapsed = block.classList.contains('collapsed');
-            if (isCollapsed) {
-                block.classList.remove('collapsed');
-                body.removeAttribute('hidden');
-                body.classList.remove('collapsed-hidden');
+        function collapse() {
+            block.classList.add('collapsed');
+            var mode = block.getAttribute('data-collapse');
+            if (mode === 'hidden') {
+                body.classList.add('collapsed-hidden');
             } else {
-                block.classList.add('collapsed');
-                var mode = block.getAttribute('data-collapse');
-                if (mode === 'hidden') {
-                    body.classList.add('collapsed-hidden');
-                } else {
-                    body.setAttribute('hidden', 'until-found');
-                }
+                body.setAttribute('hidden', 'until-found');
             }
         }
-        header.addEventListener('click', toggle);
+        function expand() {
+            block.classList.remove('collapsed');
+            body.removeAttribute('hidden');
+            body.classList.remove('collapsed-hidden');
+        }
+        function toggle() {
+            if (block.classList.contains('collapsed')) { expand(); } else { collapse(); }
+        }
+        header.addEventListener('click', function(e) {
+            if (e.target.closest('.viewed-label')) return;
+            toggle();
+        });
         var disclaimer = block.querySelector('.collapse-disclaimer');
         if (disclaimer) disclaimer.addEventListener('click', toggle);
 
+        var checkbox = block.querySelector('.viewed-check');
+        if (checkbox) {
+            checkbox.addEventListener('change', function() {
+                if (checkbox.checked) {
+                    block.classList.add('viewed');
+                    collapse();
+                } else {
+                    block.classList.remove('viewed');
+                }
+            });
+        }
+
         body.addEventListener('beforematch', function() {
-            block.classList.remove('collapsed');
+            expand();
         });
     });
 })();
@@ -1932,7 +1966,10 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
 
     let mut html = String::new();
     html.push_str(&format!(
-        "<div class=\"{}\" {}><div class=\"diff-header\"><span class=\"collapse-arrow\">{}</span> {}</div>{}",
+        "<div class=\"{}\" {}><div class=\"diff-header\">\
+         <span class=\"collapse-arrow\">{}</span> {}\
+         <label class=\"viewed-label\"><input type=\"checkbox\" class=\"viewed-check\"><span>Viewed</span></label>\
+         </div>{}",
         block_class, collapse_attr, arrow, html_escape(file_path), disclaimer
     ));
 
@@ -2630,7 +2667,10 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         // Render source block using diff-block styling with single column
                         let mut src_html = String::new();
                         src_html.push_str(&format!(
-                            "<div class=\"diff-block\" data-collapse=\"none\"><div class=\"diff-header\"><span class=\"collapse-arrow\">\u{25B6}</span> {}</div><div class=\"diff-body\">",
+                            "<div class=\"diff-block\" data-collapse=\"none\"><div class=\"diff-header\">\
+                             <span class=\"collapse-arrow\">\u{25B6}</span> {}\
+                             <label class=\"viewed-label\"><input type=\"checkbox\" class=\"viewed-check\"><span>Viewed</span></label>\
+                             </div><div class=\"diff-body\">",
                             html_escape(&file)
                         ));
                         src_html.push_str(

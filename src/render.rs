@@ -475,8 +475,9 @@ tr.annotated td:last-child {
     width: fit-content;
     min-width: calc((100vw - 260px) * 0.6);
     max-width: calc(100vw - 260px);
+    overflow-x: auto;
 }
-.diff-single { table-layout: auto; width: 100%; }
+.diff-single { table-layout: auto; width: max-content; min-width: 100%; }
 .diff-single tr.line-removed td:last-child { border-right: 1px solid var(--removed-bg); }
 .diff-single tr.line-removed-partial td:last-child { border-right: 1px solid var(--bg); }
 .diff-single tr.line-added td:last-child { border-right: 1px solid var(--added-bg); }
@@ -485,6 +486,7 @@ tr.annotated td:last-child {
 .diff-single tr.line-paired td:last-child { border-right: 1px solid var(--bg); }
 .diff-single tr.line-paired-full td:last-child { border-right: 1px solid var(--removed-bg); }
 .diff-single col.code-col { width: auto; }
+.diff-single td[class*="code"] { white-space: pre; overflow-wrap: normal; }
 .diff-single .line-added .code-rhs,
 .diff-single .line-added .sign-rhs { background: var(--added-bg); }
 .diff-single .line-added .ln-rhs { background: var(--added-num-bg); }
@@ -492,8 +494,7 @@ tr.annotated td:last-child {
 .diff-single .line-removed .sign-lhs { background: var(--removed-bg); }
 .diff-single .line-removed .ln-lhs { background: var(--removed-num-bg); }
 
-/* Source blocks: single-column variant of diff-table */
-.src-single .code-lhs { width: 100%; }
+/* Source blocks now reuse diff-single styling */
 
 /* Service badges: `@sboxd` in markdown */
 .service-badge {
@@ -716,22 +717,8 @@ const JS: &str = r#"
     });
 })();
 
-// Size single-column diff blocks to their content width.
-// CSS can't do "grow to content, then wrap at max" because pre-wrap
-// tells the browser wrapping is always OK, so the table never pushes wider.
-// We measure with white-space:pre, set the block width, then restore wrapping.
-(function() {
-    document.querySelectorAll('.diff-block:has(.diff-single)').forEach(function(block) {
-        if (block.classList.contains('collapsed')) return;
-        var table = block.querySelector('.diff-single');
-        var cells = table.querySelectorAll('td[class*="code"]');
-        cells.forEach(function(c) { c.style.whiteSpace = 'pre'; c.style.overflowWrap = 'normal'; });
-        var need = table.scrollWidth + 2;
-        cells.forEach(function(c) { c.style.whiteSpace = ''; c.style.overflowWrap = ''; });
-        var maxW = parseFloat(getComputedStyle(block).maxWidth) || block.parentElement.offsetWidth;
-        block.style.width = Math.min(need, maxW) + 'px';
-    });
-})();
+// Single-column blocks use CSS fit-content + max-content table for
+// width sizing. No JS measurement needed.
 
 // Collapsible diff blocks: click header to toggle, search to auto-expand
 (function() {
@@ -2681,15 +2668,15 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                             html_escape(&file)
                         ));
                         src_html.push_str(
-                            "<table class=\"diff-table src-single\"><colgroup>\
-                             <col class=\"ln-col\"><col class=\"code-col\">\
+                            "<table class=\"diff-table diff-single diff-add-only\"><colgroup>\
+                             <col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\">\
                              </colgroup><tbody>"
                         );
                         for ln in start..=end {
                             let idx = ln.saturating_sub(1);
                             let content = hl_lines.get(idx).map(|s| s.as_str()).unwrap_or("");
                             src_html.push_str(&format!(
-                                "<tr class=\"line-context\"><td class=\"ln ln-lhs\">{}</td><td class=\"code-lhs\">{}</td></tr>",
+                                "<tr class=\"line-context\"><td class=\"ln\">{}</td><td class=\"sign\"></td><td class=\"code\">{}</td></tr>",
                                 ln, content
                             ));
                         }

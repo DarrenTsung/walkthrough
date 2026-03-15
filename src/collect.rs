@@ -251,6 +251,50 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
             }
         }
 
+        // Ensure chunks field exists (difft omits it for binary/large files).
+        // For deleted/added files with 0 chunks, synthesize a chunk from file
+        // contents so there's something to render.
+        if let Some(obj) = json.as_object_mut() {
+            obj.entry("chunks".to_string())
+                .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+
+            let needs_synthetic = obj.get("chunks")
+                .and_then(|c| c.as_array())
+                .map_or(false, |a| a.is_empty());
+
+            if needs_synthetic {
+                let is_deleted = obj.get("status")
+                    .and_then(|s| s.as_str()) == Some("deleted");
+                let is_added = obj.get("status")
+                    .and_then(|s| s.as_str()) == Some("added");
+                let line_count = if is_deleted {
+                    obj.get("old_lines").and_then(|v| v.as_array()).map(|a| a.len())
+                } else if is_added {
+                    obj.get("new_lines").and_then(|v| v.as_array()).map(|a| a.len())
+                } else {
+                    None
+                };
+                if let Some(count) = line_count {
+                    if count > 0 {
+                        let entries: Vec<serde_json::Value> = (0..count)
+                            .map(|i| {
+                                let side = serde_json::json!({
+                                    "line_number": i,
+                                    "changes": []
+                                });
+                                if is_deleted {
+                                    serde_json::json!({"lhs": side, "rhs": null})
+                                } else {
+                                    serde_json::json!({"lhs": null, "rhs": side})
+                                }
+                            })
+                            .collect();
+                        obj.insert("chunks".to_string(), serde_json::json!([entries]));
+                    }
+                }
+            }
+        }
+
         let chunk_count = json
             .get("chunks")
             .and_then(|c| c.as_array())

@@ -277,7 +277,35 @@ img { max-width: 100%; }
     font-weight: 600;
     border-bottom: 1px solid var(--border);
     z-index: 1;
+    cursor: pointer;
+    user-select: none;
 }
+
+/* Collapsible diff blocks */
+.collapse-arrow {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 0.7em;
+    vertical-align: middle;
+}
+.diff-block:not(.collapsed) .collapse-arrow { transform: rotate(90deg); }
+.collapse-disclaimer {
+    font-weight: 400;
+    font-style: italic;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.8rem;
+    color: #5a4a00;
+    background: #fef9e7;
+    border-bottom: 1px solid #e8d44d;
+    cursor: pointer;
+}
+@media (prefers-color-scheme: dark) {
+    .collapse-disclaimer { color: #e8d080; background: #2a2400; border-color: #4a4010; }
+}
+.diff-block:not(.collapsed) .collapse-disclaimer { display: none; }
+.collapsed { max-height: none !important; overflow: visible !important; }
+.collapsed .diff-header { border-bottom: none; }
+.collapsed-hidden { display: none !important; }
 
 .diff-table {
     width: 100%;
@@ -532,6 +560,7 @@ const JS: &str = r#"
         // Check if any block should become active
         for (var i = 0; i < blocks.length; i++) {
             var block = blocks[i];
+            if (block.classList.contains('collapsed')) continue;
             var rect = block.getBoundingClientRect();
 
             var maxScroll = block.scrollHeight - block.clientHeight;
@@ -668,6 +697,7 @@ const JS: &str = r#"
 // We measure with white-space:pre, set the block width, then restore wrapping.
 (function() {
     document.querySelectorAll('.diff-block:has(.diff-single)').forEach(function(block) {
+        if (block.classList.contains('collapsed')) return;
         var table = block.querySelector('.diff-single');
         var cells = table.querySelectorAll('td[class*="code"]');
         cells.forEach(function(c) { c.style.whiteSpace = 'pre'; c.style.overflowWrap = 'normal'; });
@@ -675,6 +705,39 @@ const JS: &str = r#"
         cells.forEach(function(c) { c.style.whiteSpace = ''; c.style.overflowWrap = ''; });
         var maxW = parseFloat(getComputedStyle(block).maxWidth) || block.parentElement.offsetWidth;
         block.style.width = Math.min(need, maxW) + 'px';
+    });
+})();
+
+// Collapsible diff blocks: click header to toggle, search to auto-expand
+(function() {
+    document.querySelectorAll('.diff-block').forEach(function(block) {
+        var header = block.querySelector('.diff-header');
+        var body = block.querySelector('.diff-body');
+        if (!header || !body) return;
+
+        function toggle() {
+            var isCollapsed = block.classList.contains('collapsed');
+            if (isCollapsed) {
+                block.classList.remove('collapsed');
+                body.removeAttribute('hidden');
+                body.classList.remove('collapsed-hidden');
+            } else {
+                block.classList.add('collapsed');
+                var mode = block.getAttribute('data-collapse');
+                if (mode === 'hidden') {
+                    body.classList.add('collapsed-hidden');
+                } else {
+                    body.setAttribute('hidden', 'until-found');
+                }
+            }
+        }
+        header.addEventListener('click', toggle);
+        var disclaimer = block.querySelector('.collapse-disclaimer');
+        if (disclaimer) disclaimer.addEventListener('click', toggle);
+
+        body.addEventListener('beforematch', function() {
+            block.classList.remove('collapsed');
+        });
     });
 })();
 "#;
@@ -1811,6 +1874,14 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
     out
 }
 
+/// Collapse mode for a diff/code block.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CollapseMode {
+    None,
+    Searchable,  // hidden="until-found" (deleted files: searchable when collapsed)
+    Hidden,      // display:none (generated files: not searchable when collapsed)
+}
+
 /// Layout mode for a diff block: side-by-side (6 cols) or single-column (3 cols).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DiffLayout {
@@ -1835,7 +1906,7 @@ fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize]) -> DiffLayou
     else { DiffLayout::SideBySide }
 }
 
-fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, hl: &mut Highlighter) -> String {
+fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, hl: &mut Highlighter, collapse: CollapseMode) -> String {
     let lang = arborium::detect_language(file_path);
     let old_hl = syntax_highlight_lines(&difft.old_lines, hl, lang);
     let new_hl = syntax_highlight_lines(&difft.new_lines, hl, lang);
@@ -1843,11 +1914,34 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     let layout = detect_diff_layout(difft, chunk_indices);
     let single = layout != DiffLayout::SideBySide;
 
+    let collapsed = collapse != CollapseMode::None;
+    let block_class = if collapsed { "diff-block collapsed" } else { "diff-block" };
+    let collapse_attr = match collapse {
+        CollapseMode::None => "data-collapse=\"none\"",
+        CollapseMode::Searchable => "data-collapse=\"searchable\"",
+        CollapseMode::Hidden => "data-collapse=\"hidden\"",
+    };
+    let arrow = "\u{25B6}"; // rotated 90deg via CSS when expanded
+    let disclaimer = match collapse {
+        CollapseMode::Searchable =>
+            "<div class=\"collapse-disclaimer\">Automatically collapsed (file deleted). Click to expand.</div>",
+        CollapseMode::Hidden =>
+            "<div class=\"collapse-disclaimer\">Automatically collapsed (generated file). Click to expand.</div>",
+        CollapseMode::None => "",
+    };
+
     let mut html = String::new();
     html.push_str(&format!(
-        "<div class=\"diff-block\"><div class=\"diff-header\">{}</div>",
-        html_escape(file_path)
+        "<div class=\"{}\" {}><div class=\"diff-header\"><span class=\"collapse-arrow\">{}</span> {}</div>{}",
+        block_class, collapse_attr, arrow, html_escape(file_path), disclaimer
     ));
+
+    let body_attr = match collapse {
+        CollapseMode::None => "",
+        CollapseMode::Searchable => " hidden=\"until-found\"",
+        CollapseMode::Hidden => " class=\"collapsed-hidden\"",
+    };
+    html.push_str(&format!("<div class=\"diff-body\"{}>", body_attr));
     if single {
         let layout_class = if layout == DiffLayout::AddOnly { "diff-add-only" } else { "diff-remove-only" };
         html.push_str(&format!(
@@ -2114,8 +2208,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         };
 
         for i in 0..pre_count {
-            let o = old_first - pre_count + i;
-            let n = new_first - pre_count + i;
+            let o = old_first.saturating_sub(pre_count) + i;
+            let n = new_first.saturating_sub(pre_count) + i;
             if single {
                 let (idx, hl_lines) = if layout == DiffLayout::AddOnly {
                     (n, &new_hl)
@@ -2247,7 +2341,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         }
     }
 
-    html.push_str("</tbody></table></div>");
+    html.push_str("</tbody></table></div></div>");
     html
 }
 
@@ -2463,6 +2557,8 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         Some((base + rel_start - 1, base + rel_end - 1))
                     });
 
+                    let is_generated = info.contains(" generated");
+
                     if let Some(difft) = data.get(&file) {
                         let indices: Vec<usize> = if chunks_spec == "all" {
                             (0..difft.chunks.len()).collect()
@@ -2476,7 +2572,14 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         for &idx in &indices {
                             referenced.insert((file.clone(), idx));
                         }
-                        let rendered_html = render_chunks(difft, &indices, &file, line_filter, &mut hl);
+                        let collapse = if is_generated {
+                            CollapseMode::Hidden
+                        } else if difft.status.as_deref() == Some("deleted") {
+                            CollapseMode::Searchable
+                        } else {
+                            CollapseMode::None
+                        };
+                        let rendered_html = render_chunks(difft, &indices, &file, line_filter, &mut hl, collapse);
                         let placeholder_id = diff_blocks.len();
                         diff_blocks.push(rendered_html);
                         processed_md
@@ -2527,7 +2630,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         // Render source block using diff-block styling with single column
                         let mut src_html = String::new();
                         src_html.push_str(&format!(
-                            "<div class=\"diff-block\"><div class=\"diff-header\">{}</div>",
+                            "<div class=\"diff-block\" data-collapse=\"none\"><div class=\"diff-header\"><span class=\"collapse-arrow\">\u{25B6}</span> {}</div><div class=\"diff-body\">",
                             html_escape(&file)
                         ));
                         src_html.push_str(
@@ -2543,7 +2646,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                                 ln, content
                             ));
                         }
-                        src_html.push_str("</tbody></table></div>");
+                        src_html.push_str("</tbody></table></div></div>");
 
                         let placeholder_id = diff_blocks.len();
                         diff_blocks.push(src_html);
@@ -2811,7 +2914,7 @@ mod tests {
     /// Helper to call render_chunks with default syntax highlighting.
     fn test_render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter) -> String {
         let mut hl = Highlighter::new();
-        render_chunks(difft, chunk_indices, file_path, line_filter, &mut hl)
+        render_chunks(difft, chunk_indices, file_path, line_filter, &mut hl, CollapseMode::None)
     }
 
     fn make_difft(
@@ -3674,7 +3777,7 @@ mod tests {
 
         // Render HTML
         let mut hl = Highlighter::new();
-        let html = render_chunks(difft, &[chunk_idx], file_path, None, &mut hl);
+        let html = render_chunks(difft, &[chunk_idx], file_path, None, &mut hl, CollapseMode::None);
         let rendered = extract_rows(&html);
 
         let non_context: Vec<_> = rendered.iter()
@@ -4118,7 +4221,7 @@ mod tests {
                     }
                     // Collect rendered rows for difft CLI comparison
                     let mut hl = Highlighter::new();
-                    let html = render_chunks(&difft, &[chunk_idx], file_path, None, &mut hl);
+                    let html = render_chunks(&difft, &[chunk_idx], file_path, None, &mut hl, CollapseMode::None);
                     all_rendered.push(extract_rows(&html));
                 }
 

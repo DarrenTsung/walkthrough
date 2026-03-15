@@ -518,6 +518,8 @@ tr.fold-summary:hover td {
     font-size: 0.7em;
     vertical-align: middle;
     margin-right: 0.4em;
+    position: relative;
+    top: -2px;
 }
 tr.fold-summary.fold-expanded .fold-arrow {
     transform: rotate(90deg);

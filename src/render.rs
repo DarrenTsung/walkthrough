@@ -486,11 +486,25 @@ const JS: &str = r#"
     var navCooldownUntil = 0;
 
     // After hash navigation (TOC click), suppress block capture briefly
-    // so the user can scroll freely from the new position.
+    // so the user can scroll freely from the new position. Also scroll
+    // diff blocks above the target to bottom and below to top so you
+    // see the end of the previous section and start of the next.
     window.addEventListener('hashchange', function() {
         pinnedY = null;
         activeBlock = null;
         navCooldownUntil = Date.now() + 600;
+        var target = document.getElementById(location.hash.slice(1));
+        if (!target) return;
+        var targetY = target.getBoundingClientRect().top + window.scrollY;
+        for (var i = 0; i < blocks.length; i++) {
+            var block = blocks[i];
+            var blockY = block.offsetTop + block.offsetHeight / 2;
+            if (blockY < targetY) {
+                block.scrollTop = block.scrollHeight;
+            } else {
+                block.scrollTop = 0;
+            }
+        }
     });
 
     window.addEventListener('wheel', function(e) {

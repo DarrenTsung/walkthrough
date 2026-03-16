@@ -2743,26 +2743,50 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                                 }
                             }
 
-                            if fold_count == 0 { continue; }
+                            if fold_count == 0 {
+                                eprintln!(
+                                    "Warning: fold {}-{} matched 0 rows in the diff block \
+                                     (line numbers are relative, 1-based from the first \
+                                     new-file line in the chunk)",
+                                    start, end
+                                );
+                                continue;
+                            }
 
-                            // Extract indentation from the first folded row's code cell
+                            // Extract indentation from the first non-empty folded row's code cell
                             let mut indent = String::new();
                             let fold_marker = format!("data-fold-id=\"{}\"", fold_id);
-                            if let Some(marker_pos) = last_block.find(&fold_marker) {
-                                // Find a code cell in this row
-                                if let Some(code_pos) = last_block[marker_pos..].find("class=\"code") {
-                                    let abs_code_pos = marker_pos + code_pos;
+                            let mut search_from = 0usize;
+                            while let Some(marker_pos) = last_block[search_from..].find(&fold_marker) {
+                                let abs_marker = search_from + marker_pos;
+                                if let Some(code_pos) = last_block[abs_marker..].find("class=\"code") {
+                                    let abs_code_pos = abs_marker + code_pos;
                                     if let Some(gt_pos) = last_block[abs_code_pos..].find('>') {
                                         let content_start = abs_code_pos + gt_pos + 1;
+                                        let mut row_indent = String::new();
+                                        let mut has_content = false;
                                         for ch in last_block[content_start..].chars() {
                                             if ch == ' ' {
-                                                indent.push(' ');
+                                                row_indent.push(' ');
+                                            } else if ch == '<' {
+                                                // Check if this is </td> (empty cell) or
+                                                // a <span> tag (syntax-highlighted content)
+                                                has_content = !last_block[content_start + row_indent.len()..].starts_with("</td>");
+                                                break;
+                                            } else if ch == '\n' {
+                                                break;
                                             } else {
+                                                has_content = true;
                                                 break;
                                             }
                                         }
+                                        if has_content {
+                                            indent = row_indent;
+                                            break;
+                                        }
                                     }
                                 }
+                                search_from = abs_marker + fold_marker.len();
                             }
 
                             // Build summary row with multi-line support.
@@ -2772,12 +2796,34 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
                             // Render fold text: syntax-highlight as the same language.
                             // Single-line folds get the extracted indent prefix.
-                            // Multi-line folds use the markdown's own indentation.
+                            // Multi-line folds: replace the markdown's minimum indentation
+                            // with the code's actual indentation so the fold aligns with
+                            // surrounding code.
                             let is_multiline = text.contains('\n');
-                            let text_lines: Vec<String> = text.split('\n')
-                                .filter(|l| !l.is_empty() || is_multiline)
-                                .map(String::from)
-                                .collect();
+                            let text_lines: Vec<String> = if is_multiline {
+                                // Find minimum indentation in the markdown fold text
+                                let min_indent = text.split('\n')
+                                    .filter(|l| !l.trim().is_empty())
+                                    .map(|l| l.len() - l.trim_start().len())
+                                    .min()
+                                    .unwrap_or(0);
+                                // Replace markdown indent with code indent
+                                text.split('\n')
+                                    .map(|l| {
+                                        if l.trim().is_empty() {
+                                            String::new()
+                                        } else {
+                                            let stripped = &l[min_indent.min(l.len())..];
+                                            format!("{}{}", indent, stripped)
+                                        }
+                                    })
+                                    .collect()
+                            } else {
+                                text.split('\n')
+                                    .filter(|l| !l.is_empty())
+                                    .map(String::from)
+                                    .collect()
+                            };
                             let lang = arborium::detect_language(&last_block_file);
                             let hl_lines = syntax_highlight_lines(&text_lines, &mut hl, lang);
                             let mut fold_content = String::new();

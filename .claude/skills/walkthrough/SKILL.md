@@ -311,9 +311,9 @@ If the render output reports uncovered chunks, add sections referencing them and
 
 ## Step 6: Review loop
 
-The review loop ensures the narrative is accurate, complete, and clear. Spawn two reviewer
+The review loop ensures the narrative is accurate, complete, and clear. Spawn four reviewer
 agents in parallel. Each reads the rendered markdown (with enriched diffs) and produces a
-verdict. The loop continues until both reviewers pass.
+verdict. The loop continues until all reviewers pass.
 
 **Budget:** Maximum 3 review iterations. If reviewers are still failing after 3 rounds,
 present the current state to the user and ask whether to continue or stop.
@@ -457,9 +457,64 @@ End with a verdict:
 Output ONLY the review, no preamble.
 ```
 
+### Reviewer 4: Test Pseudocode
+
+Spawns an agent (subagent_type: general-purpose, model: sonnet) with this prompt:
+
+```
+You are a test readability reviewer for a code walkthrough. Read the walkthrough
+markdown file at {OUTPUT_PATH}.
+
+The file contains prose sections interleaved with difft code blocks (showing diffs)
+and src code blocks (showing source code). Some blocks may have `folds` blocks after
+them that collapse code ranges into pseudocode summaries.
+
+Your job is to check that every test function shown in the walkthrough has pseudocode
+folds that make it readable at a glance. Tests are verbose by nature (setup, mocking,
+assertions, teardown) and benefit greatly from pseudocode that summarizes the intent.
+
+For each test function in a difft or src block, check:
+
+1. **Missing folds** — the test body is shown as raw code with no `folds` block.
+   Every test should have folds that cover the entire body (except the function
+   signature and closing brace, which should remain visible for structure).
+
+2. **Prose-style folds** — fold text that reads like English descriptions instead
+   of simplified code. Bad: "Set up test fixtures and mock data". Good:
+   "mock_api = create_mock_api; setup_test(mock_api)". Pseudocode should look
+   like simplified real code with the same variable names.
+
+3. **Incomplete coverage** — folds that only cover part of the test body, leaving
+   large blocks of raw test code visible. The goal is that with all folds
+   collapsed, the reader sees: function signature, pseudocode summaries, closing
+   brace.
+
+4. **Over-folding structure** — folds that hide the function signature
+   (`async fn test_name() {`) or closing brace (`}`). These should stay visible
+   so the reader sees the test's boundaries.
+
+For each issue, suggest a specific fix with the fold ranges and pseudocode text.
+Write the pseudocode as simplified code: keep variable names from the real code,
+collapse verbose patterns (Box::pin, async move, Arc::clone) into intent, keep
+comments that explain non-obvious behavior.
+
+Use multi-line fold syntax for multi-line pseudocode:
+    5-20:
+        mock_api.expect_checkpoint(|bytes| {
+            assert(bytes.has(rounded_rect(10, 10)))
+            Err("Failed!")
+        })
+
+End with a verdict:
+- PASS — all tests have readable pseudocode folds
+- FAIL — {N} tests need pseudocode folds
+
+Output ONLY the review, no preamble.
+```
+
 ### Processing review results
 
-After all three reviewers complete:
+After all four reviewers complete:
 
 1. If **all PASS**: proceed to Step 7.
 2. If **any FAIL**: triage and address the findings (see below), then re-run the

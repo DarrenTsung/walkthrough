@@ -133,9 +133,12 @@ block shows what it replaced.
 
 ### Code folds (pseudocode)
 
-Use `` ```folds `` blocks after a difft or src block to collapse verbose code into
-pseudocode summaries. This is especially useful for **tests**, where setup, mock
+Use `` ```folds `` blocks immediately after a difft or src block to collapse verbose code
+into pseudocode summaries. This is especially useful for **tests**, where setup, mock
 configuration, and teardown boilerplate obscure the interesting logic.
+
+**Line numbers are relative** (1-based, from the first new-file line in the chunk), the
+same numbering shown in the enriched text diff. Do NOT use absolute file line numbers.
 
 The pseudocode should look like simplified real code (not prose descriptions). It gets
 syntax-highlighted using the same language as the file. Readers can click to expand and
@@ -492,6 +495,13 @@ For each test function in a difft or src block, check:
 4. **Over-folding structure** — folds that hide the function signature
    (`async fn test_name() {`) or closing brace (`}`). These should stay visible
    so the reader sees the test's boundaries.
+
+5. **Absolute line numbers** — fold line numbers MUST be relative (1-based,
+   where line 1 = the first line shown in the code block), NOT absolute file
+   line numbers. For a `src` block showing lines 12-103, fold line 1 refers
+   to file line 12. Check the enriched text in the code block body: the left
+   column shows absolute file line numbers, fold references should be the
+   offset from the block's start.
 
 For each issue, suggest a specific fix with the fold ranges and pseudocode text.
 Write the pseudocode as simplified code: keep variable names from the real code,

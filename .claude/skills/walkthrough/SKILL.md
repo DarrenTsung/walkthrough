@@ -131,6 +131,61 @@ correspondence themselves. A sentence like "The config is a direct port of the e
 explaining each field mapping in prose. The diff already shows the new code; the `src`
 block shows what it replaced.
 
+### Code folds (pseudocode)
+
+Use `` ```folds `` blocks after a difft or src block to collapse verbose code into
+pseudocode summaries. This is especially useful for **tests**, where setup, mock
+configuration, and teardown boilerplate obscure the interesting logic.
+
+The pseudocode should look like simplified real code (not prose descriptions). It gets
+syntax-highlighted using the same language as the file. Readers can click to expand and
+see the original code.
+
+**Single-line folds** (auto-indented to match the code):
+
+````markdown
+```folds
+5-15: setup_test(mock_api)
+20-30: assert(result.has(expected_value))
+```
+````
+
+**Multi-line folds** (leave the first line empty, control indentation yourself):
+
+````markdown
+```folds
+15-44:
+    mock_api.expect_one_checkpoint().return(|checkpoint_bytes, activities| {
+        assert(checkpoint_bytes.has(rounded_rect((10, 10))));
+        assert!(activities.has_user(connection.user_id()).with_one_edits());
+        // Send more changes while checkpoint is in-flight.
+        connection.send_node_changes(frame((10, 12)));
+        Err("Failed to checkpoint!")
+    })
+46-50:
+    // Modify the document and trigger checkpoint.
+    connection.send_node_changes(rounded_rect((10, 10)));
+    event_loop.checkpoint().await;
+```
+````
+
+**When to use folds:**
+- Test setup/teardown boilerplate (mock creation, event loop setup, cleanup)
+- Mock expectation bodies with verbose assertion chains
+- Builder patterns with many chained calls
+- Any code section where the WHAT matters more than the HOW
+
+**When NOT to use folds:**
+- Core logic that the walkthrough is explaining (show the real code)
+- Short code sections (< 5 lines) where folding adds no value
+
+**Writing good pseudocode:**
+- Write it like simplified real code, not prose descriptions
+- Keep variable names from the real code for recognition
+- Collapse verbose Rust patterns (Box::pin, async move, Arc::clone) into intent
+- Keep comments that explain non-obvious behavior
+- Don't fold function signatures or closing braces (leave those visible for structure)
+
 ### Service badges
 
 Use `` `@service-name` `` in inline code to render service names as styled badges

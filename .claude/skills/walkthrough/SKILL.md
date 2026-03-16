@@ -462,12 +462,44 @@ Output ONLY the review, no preamble.
 After all three reviewers complete:
 
 1. If **all PASS**: proceed to Step 7.
-2. If **any FAIL**: read their findings. Edit the narrative prose in
-   `OUTPUT_PATH` to address the issues (do NOT edit code block bodies, they get
-   repopulated). Re-run the render command, then re-spawn all reviewers on the
-   updated file. Increment the iteration counter.
+2. If **any FAIL**: triage and address the findings (see below), then re-run the
+   render command and re-spawn all reviewers. Increment the iteration counter.
 3. After **3 iterations** without all passing: present the remaining issues to
    the user and ask whether to continue iterating or accept the current state.
+
+#### Triage: classify each issue before editing
+
+For each reviewer issue, classify it as one of:
+- **add-to-overview**: domain context or definitions that belong in the introduction
+- **add-annotation**: a brief note on a specific line (use `notes` or `folds` block)
+- **remove-prose**: code-touring or redundant text to cut
+- **out-of-scope**: rabbit-hole questions about the broader codebase that aren't about
+  this change's design (e.g. "explain the SequenceNumber numbering scheme" when the
+  change is about a race fix)
+
+Address **Simplicity removals first** (cut the cruft), then add Open Questions context
+into the cleaned-up space. This prevents adding new prose that Simplicity immediately
+flags as code-touring. Prefer adding context to the overview or as annotations rather
+than as new paragraphs next to diffs.
+
+#### Preventing reviewer recursion on iteration 2+
+
+On subsequent iterations, include the previous iteration's feedback in each reviewer's
+prompt by appending:
+
+```
+IMPORTANT: The following issues were raised in the previous iteration and have
+been addressed in the current version. Do NOT re-flag these issues or ask for
+deeper explanations of concepts that are now defined. Only flag genuinely NEW
+issues or issues that were NOT addressed at all.
+
+Previous iteration feedback:
+{previous_feedback}
+```
+
+This prevents the pattern where Open Questions asks "explain X", the walkthrough adds
+an explanation, and the next iteration asks "explain X more deeply." Once a concept is
+defined, the reviewer should accept the definition and move on.
 
 ## Step 7: Present
 

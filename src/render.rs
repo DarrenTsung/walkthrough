@@ -2496,6 +2496,25 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     }
 
     html.push_str("</tbody></table></div></div>");
+
+    // Strip common leading indentation from all code cells.
+    // Find the minimum indent across both LHS and RHS non-empty cells,
+    // then remove that many spaces from every cell so deeply-nested code
+    // doesn't waste horizontal space.
+    let code_cell_re = Regex::new(r#"class="code[^"]*">( +)"#).unwrap();
+    let min_indent = code_cell_re.captures_iter(&html)
+        .map(|c| c[1].len())
+        .min()
+        .unwrap_or(0);
+    if min_indent > 0 {
+        // Build a pattern that matches the indent after any code cell opening tag
+        let strip_re = Regex::new(&format!(
+            r#"(class="code[^"]*">){}"#,
+            " ".repeat(min_indent)
+        )).unwrap();
+        html = strip_re.replace_all(&html, "${1}").to_string();
+    }
+
     html
 }
 

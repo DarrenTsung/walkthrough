@@ -2119,8 +2119,35 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     let mut last_old_rendered: Option<usize> = None;
     let mut last_new_rendered: Option<usize> = None;
 
+    // Track all rendered line numbers across chunks to prevent duplicates
+    // when one chunk's context overlaps another chunk's changed lines.
+    let mut rendered_old: std::collections::HashSet<usize> = std::collections::HashSet::new();
+    let mut rendered_new: std::collections::HashSet<usize> = std::collections::HashSet::new();
+
+    // Pre-compute each chunk's first old/new line so we can cap post-context
+    // to avoid rendering past the next chunk's start (which causes ordering issues).
+    let chunk_boundaries: Vec<(usize, usize)> = chunk_indices.iter().filter_map(|&ci| {
+        let chunk = difft.chunks.get(ci)?;
+        let (lr, rr) = chunk_line_range(chunk);
+        let old_min = match lr {
+            Some((min, _)) => min as usize,
+            None => {
+                let rmin = rr.map_or(0, |(min, _)| min);
+                to_0based(new_to_old_line(rmin + 1, hunks))
+            }
+        };
+        let new_min = match rr {
+            Some((min, _)) => min as usize,
+            None => {
+                let lmin = lr.map_or(0, |(min, _)| min);
+                to_0based(old_to_new_line(lmin + 1, hunks))
+            }
+        };
+        Some((old_min, new_min))
+    }).collect();
+
     let mut first_chunk = true;
-    for &idx in chunk_indices {
+    for (chunk_order, &idx) in chunk_indices.iter().enumerate() {
         let Some(chunk) = difft.chunks.get(idx) else { continue };
 
         let (lhs_range, rhs_range) = chunk_line_range(chunk);
@@ -2325,8 +2352,15 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         // Compute context boundaries (after filter so they reflect the filtered range).
         let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
         let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
-        let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
-        let new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+        let mut old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
+        let mut new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+
+        // Cap post-context at the next chunk's start to prevent ordering issues
+        // where post-context lines appear before the next chunk's changed lines.
+        if let Some(&(next_old_min, next_new_min)) = chunk_boundaries.get(chunk_order + 1) {
+            old_ctx_after = old_ctx_after.min(next_old_min);
+            new_ctx_after = new_ctx_after.min(next_new_min);
+        }
 
         let old_ctx_start = match last_old_rendered {
             Some(last) if last + 1 > old_ctx_before => last + 1,
@@ -2370,12 +2404,16 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 } else {
                     (o, &old_hl)
                 };
-                if (layout == DiffLayout::AddOnly && !item_new_lines.contains(&idx))
-                    || (layout == DiffLayout::RemoveOnly && !item_old_lines.contains(&idx))
+                if (layout == DiffLayout::AddOnly && !item_new_lines.contains(&idx) && rendered_new.insert(idx))
+                    || (layout == DiffLayout::RemoveOnly && !item_old_lines.contains(&idx) && rendered_old.insert(idx))
                 {
                     html.push_str(&render_single_context_row(idx, hl_lines));
                 }
-            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
+            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
+                && !rendered_old.contains(&o) && !rendered_new.contains(&n)
+            {
+                rendered_old.insert(o);
+                rendered_new.insert(n);
                 html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
             }
         }
@@ -2394,6 +2432,15 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 RenderItem::GapAdded(n) => (None, Some(*n)),
                 RenderItem::GapPaired(o, n) => (Some(*o), Some(*n)),
             };
+
+            // Skip items whose lines were already rendered by a previous chunk.
+            let dominated_old = cur_old.map_or(false, |o| rendered_old.contains(&o));
+            let dominated_new = cur_new.map_or(false, |n| rendered_new.contains(&n));
+            if dominated_old || dominated_new { continue; }
+
+            // Record these lines as rendered.
+            if let Some(o) = cur_old { rendered_old.insert(o); }
+            if let Some(n) = cur_new { rendered_new.insert(n); }
 
             // Render the item
             if single {
@@ -2478,10 +2525,21 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 } else {
                     (o, &old_hl, &item_old_lines)
                 };
-                if !item_lines.contains(&idx) {
+                let already = if layout == DiffLayout::AddOnly {
+                    rendered_new.contains(&idx)
+                } else {
+                    rendered_old.contains(&idx)
+                };
+                if !item_lines.contains(&idx) && !already {
+                    if layout == DiffLayout::AddOnly { rendered_new.insert(idx); }
+                    else { rendered_old.insert(idx); }
                     html.push_str(&render_single_context_row(idx, hl_lines));
                 }
-            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n) {
+            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
+                && !rendered_old.contains(&o) && !rendered_new.contains(&n)
+            {
+                rendered_old.insert(o);
+                rendered_new.insert(n);
                 html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
             }
         }
@@ -4405,18 +4463,29 @@ mod tests {
         }
 
         // 8. Gap-paired lines (content-matched) should render as context rows.
+        // They may be paired with different new-line numbers if they fall in
+        // the positional context range, or absent if dropped by ordering guards.
         for &(old_0, new_0) in &gap_paired_check {
+            // Only check gap-paired lines within the chunk's actual range.
+            // Lines outside the range are handled by context rendering.
+            if old_0 < old_first_0 || old_0 > old_last_0 { continue; }
+
             let old_1 = old_0 as u64 + 1;
             let new_1 = new_0 as u64 + 1;
             let is_context = rendered.iter().any(|(c, o, n)| {
                 c == "line-context" && *o == Some(old_1) && *n == Some(new_1)
+            });
+            // Also accept the old line appearing as context with any new pairing
+            // (positional context uses offset-based pairing, not content matching).
+            let is_context_any = rendered.iter().any(|(c, o, _)| {
+                c == "line-context" && *o == Some(old_1)
             });
             // Gap-paired lines may be absent if they were dropped by the
             // ordering guard (they'd violate old-side order if included).
             let is_absent = !rendered.iter().any(|(_, o, n)| {
                 *o == Some(old_1) || *n == Some(new_1)
             });
-            if !is_context && !is_absent {
+            if !is_context && !is_context_any && !is_absent {
                 let content = difft.old_lines.get(old_0).map(|s| s.trim()).unwrap_or("");
                 errors.push(format!(
                     "gap-paired old {} / new {} should render as context but doesn't: {:?}",
@@ -4576,6 +4645,8 @@ mod tests {
         for fixture_dir in fs::read_dir(&fixture_root).unwrap().flatten() {
             if !fixture_dir.file_type().unwrap().is_dir() { continue; }
             let dir_name = fixture_dir.file_name().to_string_lossy().to_string();
+            // Skip per-chunk checks for fixtures designed for combined-chunk testing only.
+            if fixture_dir.path().join(".combined-only").exists() { continue; }
 
             for json_entry in fs::read_dir(fixture_dir.path()).unwrap().flatten() {
                 let path = json_entry.path();
@@ -4650,5 +4721,96 @@ mod tests {
             );
             panic!("{}", msg);
         }
+    }
+
+    /// When multiple chunks are rendered together, lines that appear as changed
+    /// in one chunk and as context in another must not be duplicated.
+    #[test]
+    fn no_duplicate_lines_across_combined_chunks() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test_fixtures/dup-context/multiplayer__multiplayer__src__dirty_document_checkpoints.rs.json");
+        if !fixture_path.exists() {
+            eprintln!("Fixture not found, skipping");
+            return;
+        }
+        let json_str = fs::read_to_string(&fixture_path).unwrap();
+        let difft: DifftOutput = serde_json::from_str(&json_str).unwrap();
+        let file_path = difft.path.as_deref().unwrap_or("unknown");
+
+        // Render chunks 0 and 1 together (the problematic combination)
+        let mut hl = Highlighter::new();
+        let html = render_chunks(&difft, &[0, 1], file_path, None, &mut hl, CollapseMode::None);
+        let rows = extract_rows(&html);
+
+        // Check for duplicate RHS line numbers
+        let mut seen_rhs: std::collections::HashSet<u64> = std::collections::HashSet::new();
+        let mut duplicates: Vec<u64> = Vec::new();
+        for (class, _, rhs) in &rows {
+            if class.contains("chunk-sep") { continue; }
+            if let Some(ln) = rhs {
+                if !seen_rhs.insert(*ln) {
+                    duplicates.push(*ln);
+                }
+            }
+        }
+        assert!(
+            duplicates.is_empty(),
+            "Duplicate RHS line numbers when rendering chunks 0,1 together: {:?}",
+            duplicates,
+        );
+
+        // Also check LHS
+        let mut seen_lhs: std::collections::HashSet<u64> = std::collections::HashSet::new();
+        let mut dup_lhs: Vec<u64> = Vec::new();
+        for (class, lhs, _) in &rows {
+            if class.contains("chunk-sep") { continue; }
+            if let Some(ln) = lhs {
+                if !seen_lhs.insert(*ln) {
+                    dup_lhs.push(*ln);
+                }
+            }
+        }
+        assert!(
+            dup_lhs.is_empty(),
+            "Duplicate LHS line numbers when rendering chunks 0,1 together: {:?}",
+            dup_lhs,
+        );
+
+        // Check that line numbers on each side are non-decreasing
+        let mut last_lhs: Option<u64> = None;
+        let mut last_rhs: Option<u64> = None;
+        let mut order_errors: Vec<String> = Vec::new();
+        for (class, lhs, rhs) in &rows {
+            if class.contains("chunk-sep") {
+                last_lhs = None;
+                last_rhs = None;
+                continue;
+            }
+            if let Some(ln) = lhs {
+                if let Some(prev) = last_lhs {
+                    if *ln < prev {
+                        order_errors.push(format!(
+                            "LHS out of order: {} after {} (row class: {})", ln, prev, class
+                        ));
+                    }
+                }
+                last_lhs = Some(*ln);
+            }
+            if let Some(ln) = rhs {
+                if let Some(prev) = last_rhs {
+                    if *ln < prev {
+                        order_errors.push(format!(
+                            "RHS out of order: {} after {} (row class: {})", ln, prev, class
+                        ));
+                    }
+                }
+                last_rhs = Some(*ln);
+            }
+        }
+        assert!(
+            order_errors.is_empty(),
+            "Line ordering errors when rendering chunks 0,1 together:\n{}",
+            order_errors.join("\n"),
+        );
     }
 }

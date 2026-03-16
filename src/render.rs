@@ -488,7 +488,7 @@ tr.fold-line.fold-expanded td:first-child {
     border-left: 3px solid #f0c000;
 }
 tr.fold-summary td {
-    background: #fef9e7;
+    background: #fefdf8;
     cursor: pointer;
     user-select: none;
 }
@@ -498,19 +498,10 @@ tr.fold-summary td:first-child {
 tr.fold-summary td.fold-text {
     white-space: pre-wrap;
     padding: 1px 0.6rem;
-}
-.fold-label {
-    font-style: italic;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    font-size: 0.85rem;
-    line-height: 1.4;
     color: #5a4a00;
-    display: inline-block;
-    max-width: 40ch;
-    vertical-align: top;
 }
 tr.fold-summary:hover td {
-    background: #fcf3d0;
+    background: #fefbef;
 }
 .fold-arrow {
     display: inline-block;
@@ -535,16 +526,16 @@ tr.fold-summary td.sign {
 }
 @media (prefers-color-scheme: dark) {
     tr.fold-summary td {
-        background: #2a2400;
+        background: #1a1800;
     }
     tr.fold-summary td:first-child {
         border-left-color: #c0a000;
     }
-    .fold-label {
+    tr.fold-summary td.fold-text {
         color: #e8d080;
     }
     tr.fold-summary:hover td {
-        background: #332e00;
+        background: #2a2400;
     }
     td.fold-count { color: #8a7a30; }
     tr.fold-line.fold-expanded td:first-child {
@@ -2607,6 +2598,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
     let mut in_folds_block = false;
     let mut folds_body = String::new();
     let mut last_block_base_line: usize = 0; // base new-line (0-based) for relative→absolute
+    let mut last_block_file = String::new(); // file path for syntax-highlighting folds
     let mut referenced: std::collections::HashSet<(String, usize)> = std::collections::HashSet::new();
 
     for line in md_content.lines() {
@@ -2687,7 +2679,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                 enriched_md.push('\n');
 
                 // Parse folds and inject into most recent diff block
-                let fold_re = Regex::new(r"^(\d+)(?:-(\d+))?:\s*(.+)$").unwrap();
+                let fold_re = Regex::new(r"^(\d+)(?:-(\d+))?:\s*(.*)$").unwrap();
                 let mut folds: Vec<(u64, u64, String)> = Vec::new();
                 for fold_line in folds_body.lines() {
                     let trimmed = fold_line.trim();
@@ -2699,6 +2691,11 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         let abs_start = (last_block_base_line + rel_start) as u64;
                         let abs_end = (last_block_base_line + rel_end) as u64;
                         folds.push((abs_start, abs_end, text));
+                    } else if !folds.is_empty() {
+                        // Continuation line: append to previous fold's text
+                        let last = folds.last_mut().unwrap();
+                        if !last.2.is_empty() { last.2.push('\n'); }
+                        last.2.push_str(fold_line);
                     }
                 }
 
@@ -2768,16 +2765,36 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                                 }
                             }
 
-                            // Build summary row: indentation in monospace, label in sans-serif
+                            // Build summary row with multi-line support.
+                            // Arrow + line count in the gutter, pseudocode in the code cell.
                             let line_label = if fold_count == 1 { "line" } else { "lines" };
                             let code_colspan = if is_single { 1 } else { 4 };
+
+                            // Render fold text: syntax-highlight as the same language.
+                            // Single-line folds get the extracted indent prefix.
+                            // Multi-line folds use the markdown's own indentation.
+                            let is_multiline = text.contains('\n');
+                            let text_lines: Vec<String> = text.split('\n')
+                                .filter(|l| !l.is_empty() || is_multiline)
+                                .map(String::from)
+                                .collect();
+                            let lang = arborium::detect_language(&last_block_file);
+                            let hl_lines = syntax_highlight_lines(&text_lines, &mut hl, lang);
+                            let mut fold_content = String::new();
+                            for (i, hl_line) in hl_lines.iter().enumerate() {
+                                if i > 0 { fold_content.push('\n'); }
+                                if !is_multiline {
+                                    fold_content.push_str(&indent);
+                                }
+                                fold_content.push_str(hl_line);
+                            }
+
                             let summary = format!(
                                 "<tr class=\"fold-summary\" data-fold-id=\"{}\">\
-                                 <td class=\"ln fold-count\">{} {}</td><td class=\"sign\"></td>\
-                                 <td class=\"fold-text\" colspan=\"{}\">{}\
-                                 <span class=\"fold-arrow\">\u{25B6}</span> \
-                                 <span class=\"fold-label\">{}</span></td></tr>",
-                                fold_id, fold_count, line_label, code_colspan, indent, escaped_text
+                                 <td class=\"ln fold-count\">{} {}</td>\
+                                 <td class=\"sign\"><span class=\"fold-arrow\">\u{25B6}</span></td>\
+                                 <td class=\"fold-text\" colspan=\"{}\">{}</td></tr>",
+                                fold_id, fold_count, line_label, code_colspan, fold_content
                             );
 
                             // Insert fold summary row before the first fold-line of this group
@@ -2881,6 +2898,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                             }
                         }
                         last_block_base_line = if base == usize::MAX { 0 } else { base };
+                        last_block_file = file.clone();
 
                         // Write enriched markdown: opening fence + text diff + closing fence
                         let text_diff = render_chunks_text(difft, &indices, line_filter);
@@ -2942,6 +2960,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
                         // Track base line for relative fold/note line numbers.
                         // For src blocks, relative line 1 = the first displayed line.
                         last_block_base_line = start.saturating_sub(1);
+                        last_block_file = file.clone();
 
                         // Enrich markdown with source lines
                         enriched_md.push_str(line);

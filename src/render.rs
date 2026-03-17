@@ -2664,7 +2664,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
 
     let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
-    let src_re = Regex::new(r"^src\s+(\S+):(\d+)-(\d+)")?;
+    let src_re = Regex::new(r"^src\s+(\S+):(\d+)-(\d+)(?:\s+(old))?")?;
 
     let mut hl = Highlighter::new();
 
@@ -3068,20 +3068,26 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                     let file = caps[1].to_string();
                     let start: usize = caps[2].parse().unwrap_or(1);
                     let end: usize = caps[3].parse().unwrap_or(1);
+                    let use_old = caps.get(4).is_some();
 
                     if let Some(difft) = data.get(&file) {
-                        let lines = &difft.new_lines;
+                        let lines = if use_old { &difft.old_lines } else { &difft.new_lines };
                         let lang = arborium::detect_language(&file);
                         let hl_lines = syntax_highlight_lines(lines, &mut hl, lang);
 
                         // Render source block using diff-block styling with single column
                         let mut src_html = String::new();
+                        let header_label = if use_old {
+                            format!("{} (old)", html_escape(&file))
+                        } else {
+                            html_escape(&file)
+                        };
                         src_html.push_str(&format!(
                             "<div class=\"diff-block\" data-collapse=\"none\"><div class=\"diff-header\">\
                              <span class=\"collapse-arrow\">\u{25B6}</span> {}\
                              <label class=\"viewed-label\"><input type=\"checkbox\" class=\"viewed-check\"><span>Viewed</span></label>\
                              </div><div class=\"diff-body\">",
-                            html_escape(&file)
+                            header_label
                         ));
                         src_html.push_str(
                             "<table class=\"diff-table diff-single diff-add-only\"><colgroup>\

@@ -52,6 +52,10 @@ enum Commands {
         /// Output HTML file path
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Render without diff data (pure markdown mode)
+        #[arg(long)]
+        no_diff_data: bool,
     },
 
     /// Publish walkthrough HTML to $WALKTHROUGH_PUBLISH_PATH
@@ -80,9 +84,10 @@ fn main() {
             walkthrough,
             data_dir,
             output,
+            no_diff_data,
         } => {
             let output_path = output.unwrap_or_else(|| walkthrough.with_extension("html"));
-            render::run(&walkthrough, &data_dir, &output_path)
+            render::run(&walkthrough, &data_dir, &output_path, no_diff_data)
         }
 
         Commands::Publish { html } => publish::run(&html),

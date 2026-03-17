@@ -18,7 +18,7 @@ walkthrough styling (tables, mermaid diagrams, source blocks with syntax highlig
 code folds with pseudocode). To render plain markdown:
 
 ```bash
-walkthrough render doc.md --data-dir /nonexistent -o doc.html
+walkthrough render doc.md --no-diff-data -o doc.html
 ```
 
 ## Arguments
@@ -42,8 +42,7 @@ Derive two values from this:
 
 - A path to a `.md` file that doesn't require diff data: render it directly.
   Skip Steps 2-4 (collect, summary, write narrative) and go straight to Step 5 (render).
-  The `--data-dir` can point to a nonexistent directory; the renderer gracefully handles
-  missing data and omits the coverage badge.
+  Use `--no-diff-data` to skip loading diff data and omit the coverage badge.
 
 ## Step 1: Check prerequisites
 

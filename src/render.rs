@@ -2659,7 +2659,7 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Result<()> {
+pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff_data: bool) -> Result<()> {
     let md_content = fs::read_to_string(walkthrough_path)
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
 
@@ -2668,9 +2668,9 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
     let mut hl = Highlighter::new();
 
-    // Load all difft JSON data (gracefully handle missing/empty data dir)
+    // Load all difft JSON data (skip when --no-diff-data is set)
     let mut data: HashMap<String, DifftOutput> = HashMap::new();
-    if data_dir.is_dir() {
+    if !no_diff_data {
         for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
             let entry = entry?;
             if entry.path().extension().map_or(false, |e| e == "json") {
@@ -3659,7 +3659,7 @@ mod tests {
         fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=1-5\n```\n").unwrap();
 
         let html_path = data_dir.join("test.html");
-        run(&md_path, &data_dir, &html_path).unwrap();
+        run(&md_path, &data_dir, &html_path, false).unwrap();
 
         let html = fs::read_to_string(&html_path).unwrap();
         let rows = extract_rows(&html);
@@ -3673,7 +3673,7 @@ mod tests {
 
         // Now test lines=8-15 which should hit only line 110 (relative 11)
         fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=8-15\n```\n").unwrap();
-        run(&md_path, &data_dir, &html_path).unwrap();
+        run(&md_path, &data_dir, &html_path, false).unwrap();
 
         let html = fs::read_to_string(&html_path).unwrap();
         let rows = extract_rows(&html);

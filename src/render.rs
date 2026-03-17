@@ -255,10 +255,10 @@ article table:not(.diff-table) tr:nth-child(even) td {
 /* Floating table of contents */
 .toc {
     position: fixed;
-    top: 68px;
+    top: var(--toc-top, 68px);
     left: 16px;
     width: 200px;
-    max-height: calc(100vh - 92px);
+    max-height: calc(100vh - var(--toc-top, 68px) - 16px);
     overflow: visible;
     font-size: 12px;
     line-height: 1.5;
@@ -750,12 +750,34 @@ const JS: &str = r#"
     for (var i = 0; i < headings.length; i++) {
         var h = headings[i];
         var a = document.createElement('a');
-        a.href = '#' + h.id;
-        a.textContent = h.textContent;
         a.className = 'toc-' + h.tagName.toLowerCase();
+        if (h.tagName === 'H1') {
+            // h1 is sticky, so use scroll-to-top instead of anchor
+            a.href = '#';
+            // Exclude subtitle span text
+            var clone = h.cloneNode(true);
+            var sub = clone.querySelector('.subtitle');
+            if (sub) sub.remove();
+            a.textContent = clone.textContent;
+        } else {
+            a.href = '#' + h.id;
+            a.textContent = h.textContent;
+        }
         nav.appendChild(a);
     }
     document.body.appendChild(nav);
+
+    // Position TOC below the sticky h1 via CSS variable
+    function updateTocTop() {
+        var h1 = document.querySelector('article h1');
+        if (h1) {
+            var top = h1.offsetHeight + 12;
+            document.documentElement.style.setProperty('--toc-top', top + 'px');
+        }
+    }
+    updateTocTop();
+    // Re-measure after fonts load (may change h1 height)
+    if (document.fonts) document.fonts.ready.then(updateTocTop);
 
     var links = nav.querySelectorAll('a');
     var ticking = false;

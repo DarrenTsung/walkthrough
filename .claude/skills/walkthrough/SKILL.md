@@ -1,8 +1,8 @@
 ---
 name: walkthrough
-description: "Generate a narrative walkthrough of code changes with difftastic diffs and verified complete coverage"
+description: "Generate a narrative walkthrough of code changes with difftastic diffs and verified complete coverage. Also works as a general markdown renderer with source blocks, folds, tables, and mermaid diagrams."
 allowed-tools: "Bash, Read, Write, Edit, Glob, Grep, Agent"
-argument-hint: "[diff-source] [--output path]"
+argument-hint: "[diff-source | markdown-file] [--output path]"
 ---
 
 # Walkthrough Generator
@@ -12,9 +12,20 @@ side-by-side difftastic diffs. Every change chunk must be referenced in the walk
 ensuring complete coverage. The narrative goes through an adversarial review loop to
 ensure accuracy and clarity.
 
+The renderer also works as a **general-purpose markdown-to-HTML tool** without any diff
+data. Use it for technical documents, design docs, or explanations that benefit from the
+walkthrough styling (tables, mermaid diagrams, source blocks with syntax highlighting,
+code folds with pseudocode). To render plain markdown:
+
+```bash
+walkthrough render doc.md --data-dir /nonexistent -o doc.html
+```
+
 ## Arguments
 
-Parse `$ARGUMENTS` to determine the diff source and output path:
+Parse `$ARGUMENTS` to determine the mode:
+
+### Diff walkthrough mode (default)
 
 - **No args**: working tree changes (`git diff`)
 - `staged` or `--cached`: staged changes (`git diff --cached`)
@@ -26,6 +37,13 @@ Parse `$ARGUMENTS` to determine the diff source and output path:
 Derive two values from this:
 - `DIFF_ARGS`: the arguments to pass after `git diff` (e.g. `--cached`, `HEAD~1 HEAD`, etc.)
 - `OUTPUT_PATH`: where to write the walkthrough markdown
+
+### Plain markdown mode
+
+- A path to a `.md` file that doesn't require diff data: render it directly.
+  Skip Steps 2-4 (collect, summary, write narrative) and go straight to Step 5 (render).
+  The `--data-dir` can point to a nonexistent directory; the renderer gracefully handles
+  missing data and omits the coverage badge.
 
 ## Step 1: Check prerequisites
 

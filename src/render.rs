@@ -2668,16 +2668,18 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
 
     let mut hl = Highlighter::new();
 
-    // Load all difft JSON data
+    // Load all difft JSON data (gracefully handle missing/empty data dir)
     let mut data: HashMap<String, DifftOutput> = HashMap::new();
-    for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
-        let entry = entry?;
-        if entry.path().extension().map_or(false, |e| e == "json") {
-            let json_str = fs::read_to_string(entry.path())?;
-            let difft: DifftOutput = serde_json::from_str(&json_str)
-                .with_context(|| format!("Failed to parse {}", entry.path().display()))?;
-            if let Some(ref path) = difft.path {
-                data.insert(path.clone(), difft);
+    if data_dir.is_dir() {
+        for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
+            let entry = entry?;
+            if entry.path().extension().map_or(false, |e| e == "json") {
+                let json_str = fs::read_to_string(entry.path())?;
+                let difft: DifftOutput = serde_json::from_str(&json_str)
+                    .with_context(|| format!("Failed to parse {}", entry.path().display()))?;
+                if let Some(ref path) = difft.path {
+                    data.insert(path.clone(), difft);
+                }
             }
         }
     }
@@ -3265,64 +3267,67 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
     }).to_string();
 
     // Verify coverage: check all chunks in all files are referenced.
-    let mut total_chunks: usize = 0;
-    let mut uncovered: Vec<(String, usize)> = Vec::new();
-    for (file, difft) in &data {
-        let chunk_count = difft.chunks.len();
-        total_chunks += chunk_count;
-        for i in 0..chunk_count {
-            if !referenced.contains(&(file.clone(), i)) {
-                uncovered.push((file.clone(), i));
+    // Skip coverage badge entirely when there's no diff data (pure markdown mode).
+    if !data.is_empty() {
+        let mut total_chunks: usize = 0;
+        let mut uncovered: Vec<(String, usize)> = Vec::new();
+        for (file, difft) in &data {
+            let chunk_count = difft.chunks.len();
+            total_chunks += chunk_count;
+            for i in 0..chunk_count {
+                if !referenced.contains(&(file.clone(), i)) {
+                    uncovered.push((file.clone(), i));
+                }
             }
         }
-    }
-    let all_covered = uncovered.is_empty();
-    let file_count = data.len();
+        let all_covered = uncovered.is_empty();
+        let file_count = data.len();
 
-    // Read diff source from .meta.json if available
-    let diff_source = fs::read_to_string(data_dir.join(".meta.json"))
-        .ok()
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-        .and_then(|v| {
-            v.get("diff_args")?.as_array().map(|args| {
-                args.iter()
-                    .filter_map(|a| a.as_str().map(String::from))
-                    .collect::<Vec<_>>()
-                    .join(" ")
+        // Read diff source from .meta.json if available
+        let diff_source = fs::read_to_string(data_dir.join(".meta.json"))
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .and_then(|v| {
+                v.get("diff_args")?.as_array().map(|args| {
+                    args.iter()
+                        .filter_map(|a| a.as_str().map(String::from))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
             })
-        })
-        .unwrap_or_default();
+            .unwrap_or_default();
 
-    let source_text = if diff_source.is_empty() {
-        String::new()
-    } else {
-        format!(" in <code>{}</code>", html_escape(&diff_source))
-    };
+        let source_text = if diff_source.is_empty() {
+            String::new()
+        } else {
+            format!(" in <code>{}</code>", html_escape(&diff_source))
+        };
 
-    let badge_html = if all_covered {
-        format!(
-            "<div class=\"coverage-badge pass\">\u{2705} All {} chunks across {} files{} are present</div>",
-            total_chunks, file_count, source_text
-        )
-    } else {
-        format!(
-            "<div class=\"coverage-badge fail\">\u{274c} {} uncovered chunks (out of {} across {} files{})</div>",
-            uncovered.len(), total_chunks, file_count, source_text
-        )
-    };
+        let badge_html = if all_covered {
+            format!(
+                "<div class=\"coverage-badge pass\">\u{2705} All {} chunks across {} files{} are present</div>",
+                total_chunks, file_count, source_text
+            )
+        } else {
+            format!(
+                "<div class=\"coverage-badge fail\">\u{274c} {} uncovered chunks (out of {} across {} files{})</div>",
+                uncovered.len(), total_chunks, file_count, source_text
+            )
+        };
 
-    if !all_covered {
-        eprintln!("{} uncovered chunks:", uncovered.len());
-        for (file, idx) in &uncovered {
-            eprintln!("  {} chunk {}", file, idx);
+        if !all_covered {
+            eprintln!("{} uncovered chunks:", uncovered.len());
+            for (file, idx) in &uncovered {
+                eprintln!("  {} chunk {}", file, idx);
+            }
         }
-    }
 
-    // Inject badge after the first h1 closing tag
-    let badge_anchor = "</h1>";
-    if let Some(pos) = html_body.find(badge_anchor) {
-        let insert_at = pos + badge_anchor.len();
-        html_body.insert_str(insert_at, &format!("\n{}", badge_html));
+        // Inject badge after the first h1 closing tag
+        let badge_anchor = "</h1>";
+        if let Some(pos) = html_body.find(badge_anchor) {
+            let insert_at = pos + badge_anchor.len();
+            html_body.insert_str(insert_at, &format!("\n{}", badge_html));
+        }
     }
 
     let full_html = format!(

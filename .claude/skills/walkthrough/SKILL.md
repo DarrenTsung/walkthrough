@@ -129,9 +129,14 @@ code that helps the reader understand what the diff is changing.
 ````markdown
 ```src services/cortex/lib/support/foundry_api.ts:128-159
 ```
+
+```src services/cortex/lib/support/foundry_api.ts:128-159 old
+```
 ````
 
-The syntax is `src <filepath>:<start>-<end>` where start/end are 1-based line numbers.
+The syntax is `src <filepath>:<start>-<end> [old]` where start/end are 1-based line numbers.
+Adding `old` shows the pre-change version of the file (the header displays "(old)" to
+distinguish it). Without `old`, the new (post-change) version is shown.
 
 The renderer pulls lines from the collected difft JSON data, syntax highlights them, and
 renders as a single-column code block with the same styling as diff blocks.

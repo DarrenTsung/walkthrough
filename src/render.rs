@@ -105,6 +105,20 @@ h1 {
     top: 0;
     z-index: 20;
 }
+.subtitle {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+}
+.subtitle a {
+    color: var(--text-muted);
+    text-decoration: none;
+}
+.subtitle a:hover {
+    color: var(--text);
+}
 h1 + * {
     margin-top: 1.2em;
 }
@@ -2660,8 +2674,32 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
 }
 
 pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff_data: bool) -> Result<()> {
-    let md_content = fs::read_to_string(walkthrough_path)
+    let raw_content = fs::read_to_string(walkthrough_path)
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
+
+    // Parse optional YAML frontmatter (between --- delimiters)
+    let mut metadata: HashMap<String, String> = HashMap::new();
+    let md_content = if raw_content.starts_with("---\n") || raw_content.starts_with("---\r\n") {
+        let end_marker = if raw_content.starts_with("---\r\n") { "\r\n---" } else { "\n---" };
+        if let Some(end_pos) = raw_content[4..].find(end_marker) {
+            let frontmatter = &raw_content[4..4 + end_pos];
+            for line in frontmatter.lines() {
+                if let Some((key, value)) = line.split_once(':') {
+                    metadata.insert(
+                        key.trim().to_string(),
+                        value.trim().to_string(),
+                    );
+                }
+            }
+            // Skip past the closing ---
+            let content_start = 4 + end_pos + end_marker.len();
+            raw_content[content_start..].trim_start_matches('\n').trim_start_matches("\r\n").to_string()
+        } else {
+            raw_content
+        }
+    } else {
+        raw_content
+    };
 
     let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
     let src_re = Regex::new(r"^src\s+(?:old\s+)?(\S+):(\d+)-(\d+)(?:\s+old)?")?;
@@ -2689,6 +2727,15 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
     // Also track which (file, chunk) pairs are referenced for verification.
     let mut processed_md = String::new();
     let mut enriched_md = String::new();
+
+    // Preserve frontmatter in enriched markdown
+    if !metadata.is_empty() {
+        enriched_md.push_str("---\n");
+        for (key, value) in &metadata {
+            enriched_md.push_str(&format!("{}: {}\n", key, value));
+        }
+        enriched_md.push_str("---\n\n");
+    }
     let mut diff_blocks: Vec<String> = Vec::new();
     let mut in_difft_block = false;
     let mut in_notes_block = false;
@@ -3333,6 +3380,40 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
         if let Some(pos) = html_body.find(badge_anchor) {
             let insert_at = pos + badge_anchor.len();
             html_body.insert_str(insert_at, &format!("\n{}", badge_html));
+        }
+    }
+
+    // Inject metadata subtitle inside the h1 (before </h1>)
+    if !metadata.is_empty() {
+        let mut subtitle_parts: Vec<String> = Vec::new();
+        if let Some(pr) = metadata.get("pr") {
+            // Auto-link PR numbers
+            let pr_text = if pr.starts_with("http") {
+                format!("<a href=\"{}\">{}</a>", html_escape(pr), html_escape(pr))
+            } else if let Some(stripped) = pr.strip_prefix('#') {
+                format!("PR #{}", stripped)
+            } else {
+                format!("PR #{}", pr)
+            };
+            subtitle_parts.push(pr_text);
+        }
+        if let Some(author) = metadata.get("author") {
+            subtitle_parts.push(html_escape(author));
+        }
+        // Include any other metadata keys
+        for (key, value) in &metadata {
+            if key != "pr" && key != "author" {
+                subtitle_parts.push(format!("{}: {}", html_escape(key), html_escape(value)));
+            }
+        }
+        if !subtitle_parts.is_empty() {
+            let subtitle_html = format!(
+                "<span class=\"subtitle\">{}</span>",
+                subtitle_parts.join(" \u{b7} ")
+            );
+            if let Some(pos) = html_body.find("</h1>") {
+                html_body.insert_str(pos, &subtitle_html);
+            }
         }
     }
 

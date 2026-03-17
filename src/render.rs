@@ -193,23 +193,23 @@ hr {
 
 img { max-width: 100%; }
 
-/* Markdown tables */
-article table {
+/* Markdown tables (exclude diff tables) */
+article table:not(.diff-table) {
     border-collapse: collapse;
     margin: 0 0 0.75em;
     font-size: 0.9em;
 }
-article table th,
-article table td {
+article table:not(.diff-table) th,
+article table:not(.diff-table) td {
     border: 1px solid var(--border);
     padding: 6px 12px;
     text-align: left;
 }
-article table th {
+article table:not(.diff-table) th {
     background: var(--bg-secondary);
     font-weight: 600;
 }
-article table tr:nth-child(even) td {
+article table:not(.diff-table) tr:nth-child(even) td {
     background: var(--bg-secondary);
 }
 

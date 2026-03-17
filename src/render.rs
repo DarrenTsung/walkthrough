@@ -114,7 +114,9 @@ h1 {
 }
 .subtitle a {
     color: var(--text-muted);
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-color: var(--border);
+    text-underline-offset: 2px;
 }
 .subtitle a:hover {
     color: var(--text);
@@ -3389,11 +3391,13 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
         if let Some(pr) = metadata.get("pr") {
             // Auto-link PR numbers
             let pr_text = if pr.starts_with("http") {
-                format!("<a href=\"{}\">{}</a>", html_escape(pr), html_escape(pr))
+                // Extract PR number from URL (e.g. .../pull/711123)
+                let pr_num = pr.rsplit('/').next().unwrap_or(pr);
+                format!("<a href=\"{}\">#{}</a>", html_escape(pr), html_escape(pr_num))
             } else if let Some(stripped) = pr.strip_prefix('#') {
-                format!("PR #{}", stripped)
+                format!("#{}", stripped)
             } else {
-                format!("PR #{}", pr)
+                format!("#{}", pr)
             };
             subtitle_parts.push(pr_text);
         }

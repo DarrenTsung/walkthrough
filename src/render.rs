@@ -193,6 +193,26 @@ hr {
 
 img { max-width: 100%; }
 
+/* Markdown tables */
+article table {
+    border-collapse: collapse;
+    margin: 0 0 0.75em;
+    font-size: 0.9em;
+}
+article table th,
+article table td {
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    text-align: left;
+}
+article table th {
+    background: var(--bg-secondary);
+    font-weight: 600;
+}
+article table tr:nth-child(even) td {
+    background: var(--bg-secondary);
+}
+
 /* Coverage badge */
 .coverage-badge {
     display: inline-flex;
@@ -3141,7 +3161,8 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path) -> Resu
     eprintln!("Wrote enriched markdown back to {}", walkthrough_path.display());
 
     // Second pass: convert markdown (with placeholders) to HTML
-    let options = Options::empty();
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
     let parser = Parser::new_ext(&processed_md, options);
     let mut html_body = String::new();
     pulldown_cmark::html::push_html(&mut html_body, parser);

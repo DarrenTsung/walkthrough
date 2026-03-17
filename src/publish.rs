@@ -106,7 +106,8 @@ pub fn run(html_path: &Path) -> Result<()> {
 
             if let Ok(output) = result {
                 let status = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if status == "200" {
+                // 302 means private GitHub Pages redirecting to auth; page is live
+                if status == "200" || status == "302" {
                     published = true;
                     break;
                 }

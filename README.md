@@ -12,8 +12,41 @@ Requires [difftastic](https://github.com/Wilfred/difftastic) (`brew install diff
 
 ## Quick start
 
+### 1. Install the CLI and skill
+
 ```bash
-# Generate a walkthrough from recent commits
+# Install the walkthrough binary
+cargo install --path .
+
+# Symlink the skill into your project so Claude Code can use it
+ln -s /path/to/walkthrough/.claude/skills/walkthrough ~/.claude/skills/walkthrough
+```
+
+### 2. Generate a walkthrough with Claude Code
+
+Open Claude Code in your repo and use the `/walkthrough` slash command:
+
+```
+/walkthrough HEAD~3..HEAD
+```
+
+Claude will:
+1. Collect difft data for the changes
+2. Write a narrative walkthrough with prose, diffs, and diagrams
+3. Run adversarial reviewers to verify accuracy and completeness
+4. Open the rendered HTML in your browser
+
+Other examples:
+```
+/walkthrough                    # working tree changes
+/walkthrough staged             # staged changes
+/walkthrough abc123             # a specific commit
+/walkthrough abc123..def456     # a range
+```
+
+### 3. Manual usage (without Claude Code)
+
+```bash
 walkthrough collect -- HEAD~3..HEAD
 walkthrough render walkthrough.md -o walkthrough.html
 

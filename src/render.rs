@@ -510,7 +510,6 @@ tr.fold-line.fold-expanded td:first-child {
 tr.fold-summary td {
     background: #fefdf8;
     cursor: pointer;
-    user-select: none;
 }
 tr.fold-summary td:first-child {
     border-left: 3px solid #f0c000;
@@ -540,6 +539,7 @@ td.fold-count {
     font-size: 0.7rem;
     white-space: nowrap;
     vertical-align: middle;
+    user-select: none;
 }
 tr.fold-summary td.sign {
     vertical-align: middle;

@@ -771,7 +771,7 @@ const JS: &str = r#"
     function updateTocTop() {
         var h1 = document.querySelector('article h1');
         if (h1) {
-            var top = h1.offsetHeight + 12;
+            var top = h1.offsetHeight + 42;
             document.documentElement.style.setProperty('--toc-top', top + 'px');
         }
     }

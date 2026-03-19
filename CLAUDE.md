@@ -44,7 +44,7 @@ The optional `lines=START-END` parameter (1-based, inclusive, relative to the ch
 
 ### Code folds
 
-A `folds` block placed immediately after a difft block collapses line ranges into clickable pseudocode summaries. Line numbers use the same relative numbering as notes (1-based, relative to the first new-file line in the chunk):
+A `folds` block placed immediately after a difft block collapses line ranges into clickable pseudocode summaries. Line numbers are 1-based, relative to the first line on the targeted side of the chunk:
 
 ````markdown
 ```difft src/foo.rs chunks=0
@@ -55,6 +55,13 @@ A `folds` block placed immediately after a difft block collapses line ranges int
 20-30: Assert expected results
 ```
 ````
+
+Each fold line can optionally specify which side of a side-by-side diff it targets:
+
+- `5-15: ...` or `new 5-15: ...` targets new-file (rhs) line numbers (default)
+- `old 5-15: ...` targets old-file (lhs) line numbers
+
+Old-side folds are needed for deleted-only chunks where there are no new-file lines. In side-by-side diffs, the fold summary renders on the targeted side's columns with the other side left empty.
 
 Collapsed folds show italic pseudocode text with a yellow background and left yellow border. Clicking expands to reveal the original code, with the yellow left border continuing along the expanded lines.
 

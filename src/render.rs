@@ -376,7 +376,7 @@ article table:not(.diff-table) tr:nth-child(even) td {
 
 col.ln-col { width: 3.5em; }
 col.sign-col { width: 1.5em; }
-col.code-col { width: calc(50% - 5em); }
+col.code-col { width: calc(100% - 5em); }
 
 .diff-table td {
     padding: 1px 0.6rem;
@@ -408,9 +408,24 @@ tr.line-removed .sign-lhs { color: #cf222e; }
 tr.line-paired .sign-lhs { color: #cf222e; }
 tr.line-paired .sign-rhs { color: #1a7f37; }
 
-.diff-table td.code-lhs {
+.diff-sides {
+    display: flex;
+    width: 100%;
+}
+.diff-side {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+}
+.diff-side-old {
     border-right: 1px solid var(--border);
 }
+
+/* Placeholder rows: zero-height empty rows on the "other" side of a
+   one-sided change. They exist so height-sync can align rows when the
+   corresponding fold is expanded. */
+tr.placeholder { visibility: collapse; }
+tr.placeholder td { padding: 0; border: none; line-height: 0; font-size: 0; }
 
 /* Context lines (unchanged) */
 tr.line-context td { background: var(--bg); }
@@ -539,6 +554,11 @@ tr.fold-summary td.fold-text {
 tr.fold-summary:hover td {
     background: #fefbef;
 }
+tr.fold-summary.placeholder td,
+tr.fold-summary.placeholder:hover td {
+    background: transparent;
+    cursor: default;
+}
 .fold-arrow {
     display: inline-block;
     transition: transform 0.15s ease;
@@ -561,6 +581,20 @@ td.fold-count {
 tr.fold-summary td.sign {
     vertical-align: middle;
 }
+/* Added-side folds: soft green (distinct from bright green diff lines) */
+tr.fold-summary.fold-add td { background: #e6f6e6; }
+tr.fold-summary.fold-add td:first-child { border-left-color: #2d8a4e; }
+tr.fold-summary.fold-add td.fold-text { color: #1a4a2a; }
+tr.fold-summary.fold-add:hover td { background: #d8f0d8; }
+tr.fold-summary.fold-add td.fold-count { color: #2d8a4e; }
+tr.fold-line.fold-expanded.fold-add td:first-child { border-left-color: #2d8a4e; }
+/* Removed-side folds: soft pink (distinct from bright red diff lines) */
+tr.fold-summary.fold-del td { background: #f6e0e8; }
+tr.fold-summary.fold-del td:first-child { border-left-color: #b03060; }
+tr.fold-summary.fold-del td.fold-text { color: #5a1a30; }
+tr.fold-summary.fold-del:hover td { background: #f0d4de; }
+tr.fold-summary.fold-del td.fold-count { color: #b03060; }
+tr.fold-line.fold-expanded.fold-del td:first-child { border-left-color: #b03060; }
 @media (prefers-color-scheme: dark) {
     tr.fold-summary td {
         background: #1a1800;
@@ -574,10 +608,28 @@ tr.fold-summary td.sign {
     tr.fold-summary:hover td {
         background: #2a2400;
     }
+    tr.fold-summary.placeholder td,
+    tr.fold-summary.placeholder:hover td {
+        background: transparent;
+    }
     td.fold-count { color: #8a7a30; }
     tr.fold-line.fold-expanded td:first-child {
         border-left-color: #c0a000;
     }
+    /* Dark: added-side folds (green) */
+    tr.fold-summary.fold-add td { background: #0d220d; }
+    tr.fold-summary.fold-add td:first-child { border-left-color: #3fb950; }
+    tr.fold-summary.fold-add td.fold-text { color: #7ee890; }
+    tr.fold-summary.fold-add:hover td { background: #163016; }
+    tr.fold-summary.fold-add td.fold-count { color: #3fb950; }
+    tr.fold-line.fold-expanded.fold-add td:first-child { border-left-color: #3fb950; }
+    /* Dark: removed-side folds (pink) */
+    tr.fold-summary.fold-del td { background: #260d18; }
+    tr.fold-summary.fold-del td:first-child { border-left-color: #e06090; }
+    tr.fold-summary.fold-del td.fold-text { color: #f0a0c0; }
+    tr.fold-summary.fold-del:hover td { background: #341428; }
+    tr.fold-summary.fold-del td.fold-count { color: #e06090; }
+    tr.fold-line.fold-expanded.fold-del td:first-child { border-left-color: #e06090; }
 }
 
 /* Single-column diff (add-only or remove-only blocks) */
@@ -910,6 +962,8 @@ const JS: &str = r#"
             line.removeAttribute('hidden');
             line.classList.add('fold-expanded');
         });
+        var sides = table.closest('.diff-sides');
+        if (sides) sides.dispatchEvent(new Event('fold-toggle'));
     }
     function collapseFold(table, id) {
         var summary = table.querySelector('tr.fold-summary[data-fold-id="' + id + '"]');
@@ -918,6 +972,8 @@ const JS: &str = r#"
             line.setAttribute('hidden', 'until-found');
             line.classList.remove('fold-expanded');
         });
+        var sides = table.closest('.diff-sides');
+        if (sides) sides.dispatchEvent(new Event('fold-toggle'));
     }
     document.querySelectorAll('tr.fold-summary').forEach(function(row) {
         row.addEventListener('click', function() {
@@ -947,6 +1003,87 @@ const JS: &str = r#"
                     }
                 }
             }, 0);
+        });
+    });
+})();
+
+// Height-sync for two-table side-by-side diffs
+(function() {
+    document.querySelectorAll('.diff-sides').forEach(function(sides) {
+        var lhsTable = sides.querySelector('.diff-table-lhs');
+        var rhsTable = sides.querySelector('.diff-table-rhs');
+        if (!lhsTable || !rhsTable) return;
+
+        function syncHeights() {
+            var lhsRows = lhsTable.querySelectorAll('tbody tr[data-row-idx]');
+            var rhsRows = rhsTable.querySelectorAll('tbody tr[data-row-idx]');
+            var rhsMap = {};
+            for (var i = 0; i < rhsRows.length; i++) {
+                rhsMap[rhsRows[i].getAttribute('data-row-idx')] = rhsRows[i];
+            }
+            // Reset all inline heights and re-collapse placeholders
+            for (var j = 0; j < lhsRows.length; j++) {
+                lhsRows[j].style.height = '';
+                lhsRows[j].style.visibility = '';
+            }
+            for (var j = 0; j < rhsRows.length; j++) {
+                rhsRows[j].style.height = '';
+                rhsRows[j].style.visibility = '';
+            }
+            // Measure and sync rows by data-row-idx
+            for (var j = 0; j < lhsRows.length; j++) {
+                var lRow = lhsRows[j];
+                var idx = lRow.getAttribute('data-row-idx');
+                var rRow = rhsMap[idx];
+                if (!rRow) continue;
+                // Skip if either side is hidden (inside a fold)
+                if (lRow.hasAttribute('hidden') || rRow.hasAttribute('hidden')) continue;
+                var lh = lRow.getBoundingClientRect().height;
+                var rh = rRow.getBoundingClientRect().height;
+                var max = Math.max(lh, rh);
+                if (max > 0 && lh !== rh) {
+                    if (lh < max) {
+                        lRow.style.height = max + 'px';
+                        if (lRow.classList.contains('placeholder')) lRow.style.visibility = 'visible';
+                    }
+                    if (rh < max) {
+                        rRow.style.height = max + 'px';
+                        if (rRow.classList.contains('placeholder')) rRow.style.visibility = 'visible';
+                    }
+                }
+            }
+            // Sync fold-summary placeholders with their real counterparts
+            // (these don't have data-row-idx, matched by data-fold-id instead)
+            lhsTable.querySelectorAll('tr.fold-summary').forEach(function(lSum) {
+                var fid = lSum.getAttribute('data-fold-id');
+                var rSum = rhsTable.querySelector('tr.fold-summary[data-fold-id="' + fid + '"]');
+                if (!rSum) return;
+                lSum.style.height = '';
+                lSum.style.visibility = '';
+                rSum.style.height = '';
+                rSum.style.visibility = '';
+                var lh = lSum.getBoundingClientRect().height;
+                var rh = rSum.getBoundingClientRect().height;
+                var max = Math.max(lh, rh);
+                if (max > 0 && lh !== rh) {
+                    if (lh < max) {
+                        lSum.style.height = max + 'px';
+                        if (lSum.classList.contains('placeholder')) lSum.style.visibility = 'visible';
+                    }
+                    if (rh < max) {
+                        rSum.style.height = max + 'px';
+                        if (rSum.classList.contains('placeholder')) rSum.style.visibility = 'visible';
+                    }
+                }
+            });
+        }
+        syncHeights();
+        window.addEventListener('resize', function() {
+            requestAnimationFrame(syncHeights);
+        });
+        sides.addEventListener('fold-toggle', function() {
+            // Delay sync to after fold DOM changes take effect
+            requestAnimationFrame(syncHeights);
         });
     });
 })();
@@ -2126,6 +2263,147 @@ fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize]) -> DiffLayou
     else { DiffLayout::SideBySide }
 }
 
+/// Split a 6-column side-by-side diff table into two 3-column tables in a flex container.
+/// Only operates on `<table class="diff-table">` (not `diff-single`).
+fn split_into_two_tables(html: &str) -> String {
+    // Find the table tag. Only split side-by-side tables (no "diff-single" in the class).
+    let table_start_needle = "<table class=\"diff-table\">";
+    let table_start = match html.find(table_start_needle) {
+        Some(pos) => pos,
+        None => return html.to_string(),
+    };
+
+    // Find <tbody> and </tbody>
+    let tbody_start = match html[table_start..].find("<tbody>") {
+        Some(pos) => table_start + pos,
+        None => return html.to_string(),
+    };
+    let tbody_content_start = tbody_start + "<tbody>".len();
+    let tbody_end = match html[tbody_content_start..].find("</tbody>") {
+        Some(pos) => tbody_content_start + pos,
+        None => return html.to_string(),
+    };
+    let table_end = match html[tbody_end..].find("</table>") {
+        Some(pos) => tbody_end + pos + "</table>".len(),
+        None => return html.to_string(),
+    };
+
+    let tbody_content = &html[tbody_content_start..tbody_end];
+
+    // Extract all <tr ...>...</tr> elements
+    let tr_re = Regex::new(r"(?s)<tr ([^>]*)>(.*?)</tr>").unwrap();
+    let td_re = Regex::new(r"(?s)<td ([^>]*)>(.*?)</td>").unwrap();
+
+    let mut lhs_rows = String::new();
+    let mut rhs_rows = String::new();
+    let mut row_idx: usize = 0;
+
+    for tr_cap in tr_re.captures_iter(tbody_content) {
+        let tr_attrs = &tr_cap[1];
+        let tr_inner = &tr_cap[2];
+
+        // Collect all <td> cells
+        let cells: Vec<(&str, &str)> = td_re.captures_iter(tr_inner)
+            .map(|c| (c.get(1).unwrap().as_str(), c.get(2).unwrap().as_str()))
+            .collect();
+
+        if cells.len() == 1 {
+            // Chunk separator row: single cell with colspan="6"
+            // Create two rows, each with colspan="3"
+            let (attrs, content) = cells[0];
+            let new_attrs = attrs.replace("colspan=\"6\"", "colspan=\"3\"");
+            let lhs_tr = format!(
+                "<tr {} data-row-idx=\"{}\"><td {}>{}</td></tr>",
+                tr_attrs, row_idx, new_attrs, content
+            );
+            let rhs_tr = format!(
+                "<tr {} data-row-idx=\"{}\"><td {}>{}</td></tr>",
+                tr_attrs, row_idx, new_attrs, content
+            );
+            lhs_rows.push_str(&lhs_tr);
+            rhs_rows.push_str(&rhs_tr);
+        } else if cells.len() == 6 {
+            // Normal 6-cell row: split into first 3 (lhs) and last 3 (rhs).
+            // For added-only rows, the lhs placeholder is zero-height.
+            // For removed-only rows, the rhs placeholder is zero-height.
+            // Placeholders still exist so height-sync can align rows when
+            // the other side's fold is expanded.
+            let is_add_only = tr_attrs.contains("line-added");
+            let is_remove_only = tr_attrs.contains("line-removed");
+            let lhs_cells: String = cells[..3].iter()
+                .map(|(attrs, content)| format!("<td {}>{}</td>", attrs, content))
+                .collect();
+            let rhs_cells: String = cells[3..].iter()
+                .map(|(attrs, content)| format!("<td {}>{}</td>", attrs, content))
+                .collect();
+            let lhs_attrs = if is_add_only {
+                tr_attrs.replacen("class=\"", "class=\"placeholder ", 1)
+            } else {
+                tr_attrs.to_string()
+            };
+            let rhs_attrs = if is_remove_only {
+                tr_attrs.replacen("class=\"", "class=\"placeholder ", 1)
+            } else {
+                tr_attrs.to_string()
+            };
+            lhs_rows.push_str(&format!(
+                "<tr {} data-row-idx=\"{}\">{}</tr>",
+                lhs_attrs, row_idx, lhs_cells
+            ));
+            rhs_rows.push_str(&format!(
+                "<tr {} data-row-idx=\"{}\">{}</tr>",
+                rhs_attrs, row_idx, rhs_cells
+            ));
+        } else if cells.len() == 3 {
+            // Already a 3-cell row (e.g., fold summary). Put it in both tables.
+            let cell_html: String = cells.iter()
+                .map(|(attrs, content)| format!("<td {}>{}</td>", attrs, content))
+                .collect();
+            lhs_rows.push_str(&format!(
+                "<tr {} data-row-idx=\"{}\">{}</tr>",
+                tr_attrs, row_idx, cell_html
+            ));
+            rhs_rows.push_str(&format!(
+                "<tr {} data-row-idx=\"{}\">{}</tr>",
+                tr_attrs, row_idx, cell_html
+            ));
+        } else {
+            // Unexpected cell count: pass through to both sides
+            lhs_rows.push_str(&format!(
+                "<tr {} data-row-idx=\"{}\">{}</tr>",
+                tr_attrs, row_idx, tr_inner
+            ));
+            rhs_rows.push_str(&format!(
+                "<tr {} data-row-idx=\"{}\">{}</tr>",
+                tr_attrs, row_idx, tr_inner
+            ));
+        }
+
+        row_idx += 1;
+    }
+
+    let colgroup = "<colgroup><col class=\"ln-col\"><col class=\"sign-col\"><col class=\"code-col\"></colgroup>";
+
+    let two_tables = format!(
+        "<div class=\"diff-sides\">\
+         <div class=\"diff-side diff-side-old\">\
+         <table class=\"diff-table diff-table-lhs\">{}<tbody>{}</tbody></table>\
+         </div>\
+         <div class=\"diff-side diff-side-new\">\
+         <table class=\"diff-table diff-table-rhs\">{}<tbody>{}</tbody></table>\
+         </div>\
+         </div>",
+        colgroup, lhs_rows, colgroup, rhs_rows
+    );
+
+    // Replace the original table with the two-table flex container
+    let mut result = String::with_capacity(html.len() + two_tables.len());
+    result.push_str(&html[..table_start]);
+    result.push_str(&two_tables);
+    result.push_str(&html[table_end..]);
+    result
+}
+
 fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter, hl: &mut Highlighter, collapse: CollapseMode) -> String {
     let lang = arborium::detect_language(file_path);
     let old_hl = syntax_highlight_lines(&difft.old_lines, hl, lang);
@@ -2642,6 +2920,10 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         html = strip_re.replace_all(&html, "${1}").to_string();
     }
 
+    if !single {
+        html = split_into_two_tables(&html);
+    }
+
     html
 }
 
@@ -2803,6 +3085,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
     let mut in_folds_block = false;
     let mut folds_body = String::new();
     let mut last_block_base_line: usize = 0; // base new-line (0-based) for relative→absolute
+    let mut last_block_base_line_old: usize = 0; // base old-line (0-based) for old-side folds
     let mut last_block_file = String::new(); // file path for syntax-highlighting folds
     let mut referenced: std::collections::HashSet<(String, usize)> = std::collections::HashSet::new();
 
@@ -2883,19 +3166,25 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                 enriched_md.push_str(line);
                 enriched_md.push('\n');
 
-                // Parse folds and inject into most recent diff block
-                let fold_re = Regex::new(r"^(\d+)(?:-(\d+))?:\s*(.*)$").unwrap();
-                let mut folds: Vec<(u64, u64, String)> = Vec::new();
+                // Parse folds and inject into most recent diff block.
+                // Each fold can optionally specify a side: "old 1-5: ..." or "new 1-5: ...".
+                // Default (no prefix) is "new" for backward compatibility.
+                // Side determines which line numbers to use and which column to render in.
+                let fold_re = Regex::new(r"^(?:(old|new)\s+)?(\d+)(?:-(\d+))?:\s*(.*)$").unwrap();
+                // side: false = new (rhs), true = old (lhs)
+                let mut folds: Vec<(u64, u64, String, bool)> = Vec::new();
                 for fold_line in folds_body.lines() {
                     let trimmed = fold_line.trim();
                     if trimmed.is_empty() { continue; }
                     if let Some(caps) = fold_re.captures(trimmed) {
-                        let rel_start: usize = caps[1].parse().unwrap_or(0);
-                        let rel_end: usize = caps.get(2).map_or(rel_start, |m| m.as_str().parse().unwrap_or(rel_start));
-                        let text = caps[3].to_string();
-                        let abs_start = (last_block_base_line + rel_start) as u64;
-                        let abs_end = (last_block_base_line + rel_end) as u64;
-                        folds.push((abs_start, abs_end, text));
+                        let is_old = caps.get(1).map_or(false, |m| m.as_str() == "old");
+                        let rel_start: usize = caps[2].parse().unwrap_or(0);
+                        let rel_end: usize = caps.get(3).map_or(rel_start, |m| m.as_str().parse().unwrap_or(rel_start));
+                        let text = caps[4].to_string();
+                        let base = if is_old { last_block_base_line_old } else { last_block_base_line };
+                        let abs_start = (base + rel_start) as u64;
+                        let abs_end = (base + rel_end) as u64;
+                        folds.push((abs_start, abs_end, text, is_old));
                     } else if !folds.is_empty() {
                         // Continuation line: append to previous fold's text
                         let last = folds.last_mut().unwrap();
@@ -2908,20 +3197,27 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                     if let Some(last_block) = diff_blocks.last_mut() {
                         let is_single = last_block.contains("diff-single");
 
-                        for (fold_idx, (start, end, text)) in folds.iter().enumerate() {
+                        for (fold_idx, (start, end, text, is_old)) in folds.iter().enumerate() {
                             let escaped_text = html_escape(text);
                             let fold_id = fold_idx.to_string();
 
                             // Mark matching rows with fold-line class, count how many.
-                            // Search patterns: "ln ln-rhs", "ln ln-lhs" (diff blocks),
-                            // and plain "ln" (src blocks).
+                            // Search pattern depends on which side the fold targets:
+                            //   old  → "ln ln-lhs" only
+                            //   new  → "ln ln-rhs" first, then "ln ln-lhs", then plain "ln"
                             let mut fold_count: usize = 0;
                             for ln in *start..=*end {
-                                let needles = [
-                                    format!("class=\"ln ln-rhs\">{}</td>", ln),
-                                    format!("class=\"ln ln-lhs\">{}</td>", ln),
-                                    format!("class=\"ln\">{}</td>", ln),
-                                ];
+                                let needles: Vec<String> = if *is_old {
+                                    vec![
+                                        format!("class=\"ln ln-lhs\">{}</td>", ln),
+                                        format!("class=\"ln\">{}</td>", ln),
+                                    ]
+                                } else {
+                                    vec![
+                                        format!("class=\"ln ln-rhs\">{}</td>", ln),
+                                        format!("class=\"ln\">{}</td>", ln),
+                                    ]
+                                };
                                 for needle in &needles {
                                     if let Some(td_pos) = last_block.find(needle.as_str()) {
                                         if let Some(tr_pos) = last_block[..td_pos].rfind("<tr") {
@@ -2949,20 +3245,28 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                             }
 
                             if fold_count == 0 {
+                                let side_label = if *is_old { "old" } else { "new" };
                                 eprintln!(
-                                    "Warning: fold {}-{} matched 0 rows in the diff block \
+                                    "Warning: fold {} {}-{} matched 0 rows in the diff block \
                                      (line numbers are relative, 1-based from the first \
-                                     new-file line in the chunk)",
-                                    start, end
+                                     {}-file line in the chunk)",
+                                    side_label, start, end, side_label
                                 );
                                 continue;
                             }
 
                             // Extract indentation from the first non-empty folded row's code cell.
-                            // In side-by-side diffs each row has two code cells (old + new);
-                            // check all code cells in the row before moving to the next one.
+                            // For side-specific folds, look at the targeted side's code cell;
+                            // otherwise check all code cells in the row.
                             let mut indent = String::new();
                             let fold_marker = format!("data-fold-id=\"{}\"", fold_id);
+                            let code_class = if *is_old {
+                                "class=\"code-lhs\""
+                            } else if !is_single {
+                                "class=\"code-rhs\""
+                            } else {
+                                "class=\"code"
+                            };
                             let mut search_from = 0usize;
                             'outer: while let Some(marker_pos) = last_block[search_from..].find(&fold_marker) {
                                 let abs_marker = search_from + marker_pos;
@@ -2971,7 +3275,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                                     .map_or(last_block.len(), |p| abs_marker + p);
                                 let mut code_search = abs_marker;
                                 while code_search < row_end {
-                                    if let Some(code_pos) = last_block[code_search..row_end].find("class=\"code") {
+                                    if let Some(code_pos) = last_block[code_search..row_end].find(code_class) {
                                         let abs_code_pos = code_search + code_pos;
                                         if let Some(gt_pos) = last_block[abs_code_pos..].find('>') {
                                             let content_start = abs_code_pos + gt_pos + 1;
@@ -2997,7 +3301,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                                                 break 'outer;
                                             }
                                             // Empty cell; try the next code cell in this row
-                                            code_search = abs_code_pos + "class=\"code".len();
+                                            code_search = abs_code_pos + code_class.len();
                                         } else {
                                             break;
                                         }
@@ -3009,9 +3313,9 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                             }
 
                             // Build summary row with multi-line support.
-                            // Arrow + line count in the gutter, pseudocode in the code cell.
+                            // For side-by-side diffs with a side-specific fold, the summary
+                            // appears on just that side's columns; the other side is empty.
                             let line_label = if fold_count == 1 { "line" } else { "lines" };
-                            let code_colspan = if is_single { 1 } else { 4 };
 
                             // Render fold text: syntax-highlight as the same language.
                             // Single-line folds get the extracted indent prefix.
@@ -3054,12 +3358,26 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                                 fold_content.push_str(hl_line);
                             }
 
+                            // Determine fold color class based on context:
+                            // add-only block or new-side fold → fold-add (green)
+                            // remove-only block or old-side fold → fold-del (red)
+                            // src block or other → default (yellow)
+                            let fold_color = if last_block.contains("diff-add-only") {
+                                " fold-add"
+                            } else if last_block.contains("diff-remove-only") {
+                                " fold-del"
+                            } else if last_block.contains("diff-sides") {
+                                if *is_old { " fold-del" } else { " fold-add" }
+                            } else {
+                                "" // src blocks keep yellow
+                            };
+
                             let summary = format!(
-                                "<tr class=\"fold-summary\" data-fold-id=\"{}\">\
+                                "<tr class=\"fold-summary{}\" data-fold-id=\"{}\">\
                                  <td class=\"ln fold-count\">{} {}</td>\
                                  <td class=\"sign\"><span class=\"fold-arrow\">\u{25B6}</span></td>\
-                                 <td class=\"fold-text\" colspan=\"{}\">{}</td></tr>",
-                                fold_id, fold_count, line_label, code_colspan, fold_content
+                                 <td class=\"fold-text\">{}</td></tr>",
+                                fold_color, fold_id, fold_count, line_label, fold_content
                             );
 
                             // Insert fold summary row before the first fold-line of this group
@@ -3068,6 +3386,50 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                                     let before = last_block[..tr_pos].to_string();
                                     let after = last_block[tr_pos..].to_string();
                                     *last_block = format!("{}{}{}", before, summary, after);
+                                }
+                            }
+
+                            // In two-table layout, insert a placeholder fold-summary
+                            // in the OTHER table so height-sync can align when expanded.
+                            let is_two_table = last_block.contains("diff-sides");
+                            if is_two_table {
+                                let placeholder = format!(
+                                    "<tr class=\"fold-summary placeholder\" data-fold-id=\"{}\">\
+                                     <td class=\"ln\"></td><td class=\"sign\"></td><td class=\"code\"></td></tr>",
+                                    fold_id
+                                );
+                                let other_table = if *is_old { "diff-table-rhs" } else { "diff-table-lhs" };
+                                if let Some(table_pos) = last_block.find(other_table) {
+                                    // Find the data-row-idx of the first fold-line row
+                                    // (skip fold-summary which doesn't have row-idx).
+                                    // Fold-line rows have both "fold-line" in class and the fold_marker.
+                                    let idx_re = Regex::new(r#"data-row-idx="(\d+)""#).unwrap();
+                                    let mut first_fold_idx: Option<usize> = None;
+                                    let mut search = 0;
+                                    while let Some(pos) = last_block[search..].find(&fold_marker) {
+                                        let abs = search + pos;
+                                        if let Some(tr_start) = last_block[..abs].rfind("<tr") {
+                                            let tr_tag = &last_block[tr_start..abs + fold_marker.len()];
+                                            if tr_tag.contains("fold-line") {
+                                                first_fold_idx = idx_re.captures(tr_tag)
+                                                    .and_then(|c| c[1].parse::<usize>().ok());
+                                                break;
+                                            }
+                                        }
+                                        search = abs + fold_marker.len();
+                                    }
+                                    if let Some(target_idx) = first_fold_idx {
+                                        let target_needle = format!("data-row-idx=\"{}\"", target_idx);
+                                        // Find this row-idx in the other table
+                                        if let Some(other_row_pos) = last_block[table_pos..].find(&target_needle) {
+                                            let abs_pos = table_pos + other_row_pos;
+                                            if let Some(tr_start) = last_block[..abs_pos].rfind("<tr") {
+                                                let before = last_block[..tr_start].to_string();
+                                                let after = last_block[tr_start..].to_string();
+                                                *last_block = format!("{}{}{}", before, placeholder, after);
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3151,18 +3513,23 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                         processed_md
                             .push_str(&format!("<!-- DIFF_PLACEHOLDER_{} -->\n", placeholder_id));
 
-                        // Track base new-line for relative note line numbers
+                        // Track base line numbers for relative fold addressing
                         let mut base = usize::MAX;
+                        let mut old_base = usize::MAX;
                         for &ci in &indices {
                             if let Some(chunk) = difft.chunks.get(ci) {
                                 for entry in chunk {
                                     if let Some(rhs) = &entry.rhs {
                                         base = base.min(rhs.line_number as usize);
                                     }
+                                    if let Some(lhs) = &entry.lhs {
+                                        old_base = old_base.min(lhs.line_number as usize);
+                                    }
                                 }
                             }
                         }
                         last_block_base_line = if base == usize::MAX { 0 } else { base };
+                        last_block_base_line_old = if old_base == usize::MAX { 0 } else { old_base };
                         last_block_file = file.clone();
 
                         // Write enriched markdown: opening fence + text diff + closing fence
@@ -3247,6 +3614,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                         // Track base line for relative fold/note line numbers.
                         // For src blocks, relative line 1 = the first displayed line.
                         last_block_base_line = start.saturating_sub(1);
+                        last_block_base_line_old = start.saturating_sub(1);
                         last_block_file = file.clone();
 
                         // Enrich markdown with source lines
@@ -3581,47 +3949,178 @@ mod tests {
     }
 
     /// Extract all (class, old_ln, new_ln) tuples from rendered HTML table rows.
+    /// Supports three layouts:
+    ///   - Two-table mode (diff-table-lhs + diff-table-rhs): 3-cell rows paired by data-row-idx
+    ///   - Single-column mode (diff-single): 1 ln cell mapped to the active side
+    ///   - Legacy 6-column mode: first 2 ln cells are old/new
     fn extract_rows(html: &str) -> Vec<(String, Option<u64>, Option<u64>)> {
-        let row_re = Regex::new(r#"<tr class="([^"]+)">"#).unwrap();
-        let td_re = Regex::new(r#"<td class="ln[^"]*"[^>]*>(\d*)</td>"#).unwrap();
+        let is_two_table = html.contains("diff-table-lhs") && html.contains("diff-table-rhs");
         let is_single = html.contains("diff-single");
         let single_is_add = html.contains("diff-add-only");
 
-        let mut rows = Vec::new();
-        for row_cap in row_re.captures_iter(html) {
-            // Normalize variant classes for test comparisons
-            let class = row_cap[1].to_string()
-                .replace("line-paired-full", "line-paired")
-                .replace("line-added-partial", "line-added")
-                .replace("line-removed-partial", "line-removed");
-            let start = row_cap.get(0).unwrap().end();
-            // Find the closing </tr> after this point
-            let rest = &html[start..];
-            let end = rest.find("</tr>").unwrap_or(rest.len());
-            let row_html = &rest[..end];
+        if is_two_table {
+            // Two-table mode: parse each table separately, pair rows by data-row-idx
+            let row_re = Regex::new(r#"<tr ([^>]*class="([^"]+)"[^>]*)>"#).unwrap();
+            let td_re = Regex::new(r#"<td class="ln[^"]*"[^>]*>(\d*)</td>"#).unwrap();
+            let idx_re = Regex::new(r#"data-row-idx="(\d+)""#).unwrap();
 
-            let lns: Vec<Option<u64>> = td_re.captures_iter(row_html)
-                .map(|c| {
-                    let s = &c[1];
-                    if s.is_empty() { None } else { s.parse().ok() }
-                })
-                .collect();
+            // Find LHS table content
+            let lhs_start = html.find("diff-table-lhs").unwrap_or(0);
+            let lhs_end = html[lhs_start..].find("</table>").map(|p| lhs_start + p).unwrap_or(html.len());
+            let lhs_html = &html[lhs_start..lhs_end];
 
-            if is_single && lns.len() == 1 {
-                // Single-column: the one ln cell maps to the active side
-                let ln = lns[0];
-                if single_is_add {
-                    rows.push((class, None, ln));
-                } else {
-                    rows.push((class, ln, None));
+            // Find RHS table content
+            let rhs_start = html.find("diff-table-rhs").unwrap_or(0);
+            let rhs_end = html[rhs_start..].find("</table>").map(|p| rhs_start + p).unwrap_or(html.len());
+            let rhs_html = &html[rhs_start..rhs_end];
+
+            // Parse LHS rows into a map: row_idx -> (class, ln)
+            let mut lhs_map: std::collections::HashMap<usize, (String, Option<u64>)> = std::collections::HashMap::new();
+            let mut lhs_order: Vec<usize> = Vec::new();
+            for row_cap in row_re.captures_iter(lhs_html) {
+                let attrs = &row_cap[1];
+                let class = row_cap[2].to_string()
+                    .replace("placeholder ", "")
+                    .replace("line-paired-full", "line-paired")
+                    .replace("line-added-partial", "line-added")
+                    .replace("line-removed-partial", "line-removed");
+                if let Some(idx_cap) = idx_re.captures(attrs) {
+                    let idx: usize = idx_cap[1].parse().unwrap_or(0);
+                    let match_end = row_cap.get(0).unwrap().end();
+                    let rest = &lhs_html[match_end..];
+                    let end = rest.find("</tr>").unwrap_or(rest.len());
+                    let row_html = &rest[..end];
+                    let lns: Vec<Option<u64>> = td_re.captures_iter(row_html)
+                        .map(|c| {
+                            let s = &c[1];
+                            if s.is_empty() { None } else { s.parse().ok() }
+                        })
+                        .collect();
+                    let old_ln = lns.first().copied().flatten();
+                    lhs_map.insert(idx, (class, old_ln));
+                    lhs_order.push(idx);
                 }
-            } else {
-                let old_ln = lns.first().copied().flatten();
-                let new_ln = lns.get(1).copied().flatten();
+            }
+
+            // Parse RHS rows
+            let mut rhs_map: std::collections::HashMap<usize, Option<u64>> = std::collections::HashMap::new();
+            for row_cap in row_re.captures_iter(rhs_html) {
+                let attrs = &row_cap[1];
+                if let Some(idx_cap) = idx_re.captures(attrs) {
+                    let idx: usize = idx_cap[1].parse().unwrap_or(0);
+                    let abs_start = row_cap.get(0).unwrap().end();
+                    let rest = &rhs_html[abs_start..];
+                    let end = rest.find("</tr>").unwrap_or(rest.len());
+                    let row_html = &rest[..end];
+                    let lns: Vec<Option<u64>> = td_re.captures_iter(row_html)
+                        .map(|c| {
+                            let s = &c[1];
+                            if s.is_empty() { None } else { s.parse().ok() }
+                        })
+                        .collect();
+                    let new_ln = lns.first().copied().flatten();
+                    rhs_map.insert(idx, new_ln);
+                }
+            }
+
+            // Parse RHS rows with class info for added-only rows
+            let mut rhs_class_map: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
+            let mut rhs_order: Vec<usize> = Vec::new();
+            for row_cap in row_re.captures_iter(rhs_html) {
+                let attrs = &row_cap[1];
+                let class = row_cap[2].to_string()
+                    .replace("placeholder ", "")
+                    .replace("line-paired-full", "line-paired")
+                    .replace("line-added-partial", "line-added")
+                    .replace("line-removed-partial", "line-removed");
+                if let Some(idx_cap) = idx_re.captures(attrs) {
+                    let idx: usize = idx_cap[1].parse().unwrap_or(0);
+                    rhs_class_map.insert(idx, class);
+                    rhs_order.push(idx);
+                }
+            }
+
+            // Merge LHS and RHS indices in order, deduplicating
+            let mut all_indices: Vec<usize> = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            let mut li = 0;
+            let mut ri = 0;
+            loop {
+                let l = lhs_order.get(li).copied();
+                let r = rhs_order.get(ri).copied();
+                match (l, r) {
+                    (Some(lv), Some(rv)) => {
+                        if lv <= rv {
+                            if seen.insert(lv) { all_indices.push(lv); }
+                            li += 1;
+                            if lv == rv { ri += 1; }
+                        } else {
+                            if seen.insert(rv) { all_indices.push(rv); }
+                            ri += 1;
+                        }
+                    }
+                    (Some(lv), None) => {
+                        if seen.insert(lv) { all_indices.push(lv); }
+                        li += 1;
+                    }
+                    (None, Some(rv)) => {
+                        if seen.insert(rv) { all_indices.push(rv); }
+                        ri += 1;
+                    }
+                    (None, None) => break,
+                }
+            }
+
+            // Combine by row_idx
+            let mut rows = Vec::new();
+            for idx in &all_indices {
+                let (class, old_ln) = lhs_map.get(idx)
+                    .map(|(c, l)| (c.clone(), *l))
+                    .unwrap_or_else(|| {
+                        (rhs_class_map.get(idx).cloned().unwrap_or_default(), None)
+                    });
+                let new_ln = rhs_map.get(idx).copied().flatten();
                 rows.push((class, old_ln, new_ln));
             }
+            rows
+        } else {
+            // Original single-table mode (single-column or legacy 6-column)
+            let row_re = Regex::new(r#"<tr class="([^"]+)">"#).unwrap();
+            let td_re = Regex::new(r#"<td class="ln[^"]*"[^>]*>(\d*)</td>"#).unwrap();
+
+            let mut rows = Vec::new();
+            for row_cap in row_re.captures_iter(html) {
+                let class = row_cap[1].to_string()
+                    .replace("line-paired-full", "line-paired")
+                    .replace("line-added-partial", "line-added")
+                    .replace("line-removed-partial", "line-removed");
+                let start = row_cap.get(0).unwrap().end();
+                let rest = &html[start..];
+                let end = rest.find("</tr>").unwrap_or(rest.len());
+                let row_html = &rest[..end];
+
+                let lns: Vec<Option<u64>> = td_re.captures_iter(row_html)
+                    .map(|c| {
+                        let s = &c[1];
+                        if s.is_empty() { None } else { s.parse().ok() }
+                    })
+                    .collect();
+
+                if is_single && lns.len() == 1 {
+                    let ln = lns[0];
+                    if single_is_add {
+                        rows.push((class, None, ln));
+                    } else {
+                        rows.push((class, ln, None));
+                    }
+                } else {
+                    let old_ln = lns.first().copied().flatten();
+                    let new_ln = lns.get(1).copied().flatten();
+                    rows.push((class, old_ln, new_ln));
+                }
+            }
+            rows
         }
-        rows
     }
 
     #[test]
@@ -3742,17 +4241,16 @@ mod tests {
         let html = test_render_chunks(&difft, &[0], "test.ts", None);
 
         assert!(html.contains("line-paired"), "HTML should contain line-paired row");
-        let paired_row_re = Regex::new(r#"(?s)<tr class="line-paired">.*?</tr>"#).unwrap();
+        // In two-table mode, paired rows are split across LHS and RHS tables.
+        // LHS rows contain hl-del, RHS rows contain hl-add.
+        let paired_row_re = Regex::new(r#"(?s)<tr [^>]*class="line-paired"[^>]*>.*?</tr>"#).unwrap();
         let matched: Vec<_> = paired_row_re.find_iter(&html).collect();
         assert!(!matched.is_empty(), "should have at least one paired row");
 
-        for m in &matched {
-            let row_html = m.as_str();
-            assert!(row_html.contains("hl-del"),
-                "paired row should contain hl-del highlight: {}", row_html);
-            assert!(row_html.contains("hl-add"),
-                "paired row should contain hl-add highlight: {}", row_html);
-        }
+        let has_hl_del = matched.iter().any(|m| m.as_str().contains("hl-del"));
+        let has_hl_add = matched.iter().any(|m| m.as_str().contains("hl-add"));
+        assert!(has_hl_del, "paired rows should contain hl-del highlight in LHS table");
+        assert!(has_hl_add, "paired rows should contain hl-add highlight in RHS table");
     }
 
     #[test]

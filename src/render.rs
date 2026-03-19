@@ -2240,7 +2240,7 @@ enum DiffLayout {
     RemoveOnly,
 }
 
-fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize]) -> DiffLayout {
+fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize], line_filter: LineFilter) -> DiffLayout {
     // File-level status: new files are always add-only, deleted files remove-only.
     // Difft's structural matching can pair entries even for new/deleted files,
     // but the file status from git is the ground truth.
@@ -2251,11 +2251,22 @@ fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize]) -> DiffLayou
     }
 
     // For modified/renamed files, check entries in the selected chunks.
+    // When a line filter is active, only consider entries within the filtered
+    // range so that splitting a mixed chunk with lines= can produce
+    // single-column blocks for the add-only or remove-only portions.
     let mut has_lhs = false;
     let mut has_rhs = false;
     for &idx in chunk_indices {
         let Some(chunk) = difft.chunks.get(idx) else { continue };
         for entry in chunk {
+            // Apply line filter: use rhs line number, fall back to lhs
+            if let Some((start, end)) = line_filter {
+                let ln = entry.rhs.as_ref().map(|r| r.line_number as usize)
+                    .or_else(|| entry.lhs.as_ref().map(|l| l.line_number as usize));
+                if let Some(ln) = ln {
+                    if ln < start || ln > end { continue; }
+                }
+            }
             if entry.lhs.is_some() { has_lhs = true; }
             if entry.rhs.is_some() { has_rhs = true; }
             if has_lhs && has_rhs { return DiffLayout::SideBySide; }
@@ -2412,7 +2423,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     let old_hl = syntax_highlight_lines(&difft.old_lines, hl, lang);
     let new_hl = syntax_highlight_lines(&difft.new_lines, hl, lang);
 
-    let layout = detect_diff_layout(difft, chunk_indices);
+    let layout = detect_diff_layout(difft, chunk_indices, line_filter);
     let single = layout != DiffLayout::SideBySide;
 
     let collapsed = collapse != CollapseMode::None;

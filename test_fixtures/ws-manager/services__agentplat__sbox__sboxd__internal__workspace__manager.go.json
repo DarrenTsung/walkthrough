@@ -1,0 +1,6882 @@
+{
+  "chunks": [
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "\"context\"",
+              "end": 10,
+              "highlight": "string",
+              "start": 1
+            }
+          ],
+          "line_number": 4
+        }
+      }
+    ],
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// WorkspaceState represents the lifecycle state of a workspace.",
+              "end": 64,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 24
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "type",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "WorkspaceState",
+              "end": 19,
+              "highlight": "type",
+              "start": 5
+            },
+            {
+              "content": "int",
+              "end": 23,
+              "highlight": "type",
+              "start": 20
+            }
+          ],
+          "line_number": 25
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "const",
+              "end": 5,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "(",
+              "end": 7,
+              "highlight": "delimiter",
+              "start": 6
+            }
+          ],
+          "line_number": 27
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// StateCreating means bootstrap is in progress. Operations block until Ready.",
+              "end": 79,
+              "highlight": "comment",
+              "start": 1
+            }
+          ],
+          "line_number": 28
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "StateCreating",
+              "end": 14,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "WorkspaceState",
+              "end": 29,
+              "highlight": "type",
+              "start": 15
+            },
+            {
+              "content": "=",
+              "end": 31,
+              "highlight": "keyword",
+              "start": 30
+            },
+            {
+              "content": "iota",
+              "end": 36,
+              "highlight": "keyword",
+              "start": 32
+            }
+          ],
+          "line_number": 29
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// StateReady means bootstrap completed. All operations proceed normally.",
+              "end": 74,
+              "highlight": "comment",
+              "start": 1
+            }
+          ],
+          "line_number": 30
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "StateReady",
+              "end": 11,
+              "highlight": "normal",
+              "start": 1
+            }
+          ],
+          "line_number": 31
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": ")",
+              "end": 1,
+              "highlight": "delimiter",
+              "start": 0
+            }
+          ],
+          "line_number": 32
+        }
+      }
+    ],
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Lifecycle state",
+              "end": 19,
+              "highlight": "comment",
+              "start": 1
+            }
+          ],
+          "line_number": 72
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "State",
+              "end": 6,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "WorkspaceState",
+              "end": 28,
+              "highlight": "type",
+              "start": 14
+            }
+          ],
+          "line_number": 73
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "StateErr",
+              "end": 9,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "error",
+              "end": 19,
+              "highlight": "type",
+              "start": 14
+            },
+            {
+              "content": "// non-nil when bootstrap failed (workspace will be removed from map)",
+              "end": 97,
+              "highlight": "comment",
+              "start": 28
+            }
+          ],
+          "line_number": 74
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ready",
+              "end": 6,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "chan",
+              "end": 18,
+              "highlight": "keyword",
+              "start": 14
+            },
+            {
+              "content": "struct",
+              "end": 25,
+              "highlight": "keyword",
+              "start": 19
+            },
+            {
+              "content": "{",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            },
+            {
+              "content": "}",
+              "end": 27,
+              "highlight": "delimiter",
+              "start": 26
+            },
+            {
+              "content": "// closed when State transitions out of Creating",
+              "end": 76,
+              "highlight": "comment",
+              "start": 28
+            }
+          ],
+          "line_number": 75
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "bootstrapped",
+              "end": 13,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "bool",
+              "end": 18,
+              "highlight": "type",
+              "start": 14
+            },
+            {
+              "content": "// true after successful bootstrap via FinishBootstrap",
+              "end": 82,
+              "highlight": "comment",
+              "start": 28
+            }
+          ],
+          "line_number": 76
+        }
+      }
+    ],
+    [
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "defaultWorkspacePath",
+              "end": 21,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "string",
+              "end": 28,
+              "highlight": "type",
+              "start": 22
+            }
+          ],
+          "line_number": 88
+        }
+      }
+    ],
+    [
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "defaultWorkspacePath",
+              "end": 22,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 23,
+              "highlight": "normal",
+              "start": 22
+            },
+            {
+              "content": "proto",
+              "end": 29,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": ".",
+              "end": 30,
+              "highlight": "normal",
+              "start": 29
+            },
+            {
+              "content": "DefaultWorkspacePath",
+              "end": 50,
+              "highlight": "normal",
+              "start": 30
+            },
+            {
+              "content": ",",
+              "end": 51,
+              "highlight": "normal",
+              "start": 50
+            }
+          ],
+          "line_number": 104
+        }
+      }
+    ],
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "mu",
+              "end": 5,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": ".",
+              "end": 6,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "RLock",
+              "end": 11,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "(",
+              "end": 12,
+              "highlight": "delimiter",
+              "start": 11
+            },
+            {
+              "content": ")",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            }
+          ],
+          "line_number": 128
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "defer",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "m",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": ".",
+              "end": 9,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "mu",
+              "end": 11,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "RUnlock",
+              "end": 19,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 20,
+              "highlight": "delimiter",
+              "start": 19
+            },
+            {
+              "content": ")",
+              "end": 21,
+              "highlight": "delimiter",
+              "start": 20
+            }
+          ],
+          "line_number": 129
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 3,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "ws",
+              "end": 6,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ",",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "ok",
+              "end": 10,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ":=",
+              "end": 13,
+              "highlight": "keyword",
+              "start": 11
+            },
+            {
+              "content": "m",
+              "end": 15,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": ".",
+              "end": 16,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": "workspaces",
+              "end": 26,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": "[",
+              "end": 27,
+              "highlight": "delimiter",
+              "start": 26
+            },
+            {
+              "content": "proto",
+              "end": 32,
+              "highlight": "normal",
+              "start": 27
+            },
+            {
+              "content": ".",
+              "end": 33,
+              "highlight": "normal",
+              "start": 32
+            },
+            {
+              "content": "DefaultWorkspaceID",
+              "end": 51,
+              "highlight": "normal",
+              "start": 33
+            },
+            {
+              "content": "]",
+              "end": 52,
+              "highlight": "delimiter",
+              "start": 51
+            },
+            {
+              "content": ";",
+              "end": 53,
+              "highlight": "normal",
+              "start": 52
+            },
+            {
+              "content": "ok",
+              "end": 56,
+              "highlight": "normal",
+              "start": 54
+            },
+            {
+              "content": "{",
+              "end": 58,
+              "highlight": "delimiter",
+              "start": 57
+            }
+          ],
+          "line_number": 130
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ws",
+              "end": 11,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "RootPath",
+              "end": 20,
+              "highlight": "normal",
+              "start": 12
+            }
+          ],
+          "line_number": 131
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 132
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "proto",
+              "end": 13,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ".",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "DefaultWorkspacePath",
+              "end": 34,
+              "highlight": "normal",
+              "start": 14
+            }
+          ],
+          "line_number": 133
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 1,
+              "highlight": "delimiter",
+              "start": 0
+            }
+          ],
+          "line_number": 134
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// GetWorkspace returns the workspace for the given ID, or nil if not found.",
+              "end": 76,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 136
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "func",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "(",
+              "end": 6,
+              "highlight": "delimiter",
+              "start": 5
+            },
+            {
+              "content": "m",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "*",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "WorkspaceManager",
+              "end": 25,
+              "highlight": "type",
+              "start": 9
+            },
+            {
+              "content": ")",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            },
+            {
+              "content": "GetWorkspace",
+              "end": 39,
+              "highlight": "normal",
+              "start": 27
+            },
+            {
+              "content": "(",
+              "end": 40,
+              "highlight": "delimiter",
+              "start": 39
+            },
+            {
+              "content": "wsID",
+              "end": 44,
+              "highlight": "normal",
+              "start": 40
+            },
+            {
+              "content": "proto",
+              "end": 50,
+              "highlight": "normal",
+              "start": 45
+            },
+            {
+              "content": ".",
+              "end": 51,
+              "highlight": "normal",
+              "start": 50
+            },
+            {
+              "content": "WorkspaceID",
+              "end": 62,
+              "highlight": "type",
+              "start": 51
+            },
+            {
+              "content": ")",
+              "end": 63,
+              "highlight": "delimiter",
+              "start": 62
+            },
+            {
+              "content": "*",
+              "end": 65,
+              "highlight": "keyword",
+              "start": 64
+            },
+            {
+              "content": "Workspace",
+              "end": 74,
+              "highlight": "type",
+              "start": 65
+            }
+          ],
+          "line_number": 137
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "mu",
+              "end": 5,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": ".",
+              "end": 6,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "RLock",
+              "end": 11,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "(",
+              "end": 12,
+              "highlight": "delimiter",
+              "start": 11
+            },
+            {
+              "content": ")",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            }
+          ],
+          "line_number": 138
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "defer",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "m",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": ".",
+              "end": 9,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "mu",
+              "end": 11,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "RUnlock",
+              "end": 19,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 20,
+              "highlight": "delimiter",
+              "start": 19
+            },
+            {
+              "content": ")",
+              "end": 21,
+              "highlight": "delimiter",
+              "start": 20
+            }
+          ],
+          "line_number": 139
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// WaitForReady blocks until the workspace reaches Ready state or the context",
+              "end": 77,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 143
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// is cancelled. Returns nil if the workspace is ready, context error on",
+              "end": 72,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 144
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// timeout/cancellation, or ErrWorkspaceNotFound if the workspace doesn't exist",
+              "end": 79,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 145
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// or was removed after a failed bootstrap.",
+              "end": 43,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 146
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "func",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "(",
+              "end": 6,
+              "highlight": "delimiter",
+              "start": 5
+            },
+            {
+              "content": "m",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "*",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "WorkspaceManager",
+              "end": 25,
+              "highlight": "type",
+              "start": 9
+            },
+            {
+              "content": ")",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            },
+            {
+              "content": "WaitForReady",
+              "end": 39,
+              "highlight": "normal",
+              "start": 27
+            },
+            {
+              "content": "(",
+              "end": 40,
+              "highlight": "delimiter",
+              "start": 39
+            },
+            {
+              "content": "ctx",
+              "end": 43,
+              "highlight": "normal",
+              "start": 40
+            },
+            {
+              "content": "context",
+              "end": 51,
+              "highlight": "normal",
+              "start": 44
+            },
+            {
+              "content": ".",
+              "end": 52,
+              "highlight": "normal",
+              "start": 51
+            },
+            {
+              "content": "Context",
+              "end": 59,
+              "highlight": "type",
+              "start": 52
+            },
+            {
+              "content": ",",
+              "end": 60,
+              "highlight": "normal",
+              "start": 59
+            },
+            {
+              "content": "wsID",
+              "end": 65,
+              "highlight": "normal",
+              "start": 61
+            },
+            {
+              "content": "proto",
+              "end": 71,
+              "highlight": "normal",
+              "start": 66
+            },
+            {
+              "content": ".",
+              "end": 72,
+              "highlight": "normal",
+              "start": 71
+            },
+            {
+              "content": "WorkspaceID",
+              "end": 83,
+              "highlight": "type",
+              "start": 72
+            },
+            {
+              "content": ")",
+              "end": 84,
+              "highlight": "delimiter",
+              "start": 83
+            },
+            {
+              "content": "error",
+              "end": 90,
+              "highlight": "type",
+              "start": 85
+            },
+            {
+              "content": "{",
+              "end": 92,
+              "highlight": "delimiter",
+              "start": 91
+            }
+          ],
+          "line_number": 147
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "mu",
+              "end": 5,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": ".",
+              "end": 6,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "RLock",
+              "end": 11,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "(",
+              "end": 12,
+              "highlight": "delimiter",
+              "start": 11
+            },
+            {
+              "content": ")",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            }
+          ],
+          "line_number": 148
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 3,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ",",
+              "end": 4,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": "ok",
+              "end": 7,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": ":=",
+              "end": 10,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "m",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": ".",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "workspaces",
+              "end": 23,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "[",
+              "end": 24,
+              "highlight": "delimiter",
+              "start": 23
+            },
+            {
+              "content": "wsID",
+              "end": 28,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": "]",
+              "end": 29,
+              "highlight": "delimiter",
+              "start": 28
+            }
+          ],
+          "line_number": 149
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 3,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "!",
+              "end": 5,
+              "highlight": "keyword",
+              "start": 4
+            },
+            {
+              "content": "ok",
+              "end": 7,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "{",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            }
+          ],
+          "line_number": 150
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 4,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": "mu",
+              "end": 6,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ".",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "RUnlock",
+              "end": 14,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "(",
+              "end": 15,
+              "highlight": "delimiter",
+              "start": 14
+            },
+            {
+              "content": ")",
+              "end": 16,
+              "highlight": "delimiter",
+              "start": 15
+            }
+          ],
+          "line_number": 151
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ErrWorkspaceNotFound",
+              "end": 29,
+              "highlight": "normal",
+              "start": 9
+            }
+          ],
+          "line_number": 152
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 153
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ready",
+              "end": 6,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ":=",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 7
+            },
+            {
+              "content": "ws",
+              "end": 12,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": ".",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "ready",
+              "end": 18,
+              "highlight": "normal",
+              "start": 13
+            }
+          ],
+          "line_number": 154
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "mu",
+              "end": 5,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": ".",
+              "end": 6,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "RUnlock",
+              "end": 13,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "(",
+              "end": 14,
+              "highlight": "delimiter",
+              "start": 13
+            },
+            {
+              "content": ")",
+              "end": 15,
+              "highlight": "delimiter",
+              "start": 14
+            }
+          ],
+          "line_number": 155
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "select",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "{",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            }
+          ],
+          "line_number": 157
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "case",
+              "end": 5,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "<-",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 6
+            },
+            {
+              "content": "ready",
+              "end": 13,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ":",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            }
+          ],
+          "line_number": 158
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Re-check: workspace may have been removed after failed bootstrap.",
+              "end": 70,
+              "highlight": "comment",
+              "start": 2
+            }
+          ],
+          "line_number": 159
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 4,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": "mu",
+              "end": 6,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ".",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "RLock",
+              "end": 12,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "(",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            },
+            {
+              "content": ")",
+              "end": 14,
+              "highlight": "delimiter",
+              "start": 13
+            }
+          ],
+          "line_number": 160
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 4,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ",",
+              "end": 5,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": "ok",
+              "end": 8,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "=",
+              "end": 10,
+              "highlight": "keyword",
+              "start": 9
+            },
+            {
+              "content": "m",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": ".",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "workspaces",
+              "end": 23,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "[",
+              "end": 24,
+              "highlight": "delimiter",
+              "start": 23
+            },
+            {
+              "content": "wsID",
+              "end": 28,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": "]",
+              "end": 29,
+              "highlight": "delimiter",
+              "start": 28
+            }
+          ],
+          "line_number": 161
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 4,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": "mu",
+              "end": 6,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ".",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "RUnlock",
+              "end": 14,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "(",
+              "end": 15,
+              "highlight": "delimiter",
+              "start": 14
+            },
+            {
+              "content": ")",
+              "end": 16,
+              "highlight": "delimiter",
+              "start": 15
+            }
+          ],
+          "line_number": 162
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "!",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 5
+            },
+            {
+              "content": "ok",
+              "end": 8,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "{",
+              "end": 10,
+              "highlight": "delimiter",
+              "start": 9
+            }
+          ],
+          "line_number": 163
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 3
+            },
+            {
+              "content": "ErrWorkspaceNotFound",
+              "end": 30,
+              "highlight": "normal",
+              "start": 10
+            }
+          ],
+          "line_number": 164
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 3,
+              "highlight": "delimiter",
+              "start": 2
+            }
+          ],
+          "line_number": 165
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ws",
+              "end": 7,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": ".",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "State",
+              "end": 13,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "==",
+              "end": 16,
+              "highlight": "keyword",
+              "start": 14
+            },
+            {
+              "content": "StateReady",
+              "end": 27,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "{",
+              "end": 29,
+              "highlight": "delimiter",
+              "start": 28
+            }
+          ],
+          "line_number": 166
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 3
+            },
+            {
+              "content": "nil",
+              "end": 13,
+              "highlight": "keyword",
+              "start": 10
+            }
+          ],
+          "line_number": 167
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 3,
+              "highlight": "delimiter",
+              "start": 2
+            }
+          ],
+          "line_number": 168
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ErrWorkspaceNotFound",
+              "end": 29,
+              "highlight": "normal",
+              "start": 9
+            }
+          ],
+          "line_number": 169
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "case",
+              "end": 5,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "<-",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 6
+            },
+            {
+              "content": "ctx",
+              "end": 11,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ".",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "Done",
+              "end": 16,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 17,
+              "highlight": "delimiter",
+              "start": 16
+            },
+            {
+              "content": ")",
+              "end": 18,
+              "highlight": "delimiter",
+              "start": 17
+            },
+            {
+              "content": ":",
+              "end": 19,
+              "highlight": "normal",
+              "start": 18
+            }
+          ],
+          "line_number": 170
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ctx",
+              "end": 12,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "Err",
+              "end": 16,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "(",
+              "end": 17,
+              "highlight": "delimiter",
+              "start": 16
+            },
+            {
+              "content": ")",
+              "end": 18,
+              "highlight": "delimiter",
+              "start": 17
+            }
+          ],
+          "line_number": 171
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 172
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 1,
+              "highlight": "delimiter",
+              "start": 0
+            }
+          ],
+          "line_number": 173
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// ErrWorkspaceNotFound is returned when a workspace does not exist or was",
+              "end": 74,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 175
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// removed after a failed bootstrap.",
+              "end": 36,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 176
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "var",
+              "end": 3,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "ErrWorkspaceNotFound",
+              "end": 24,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": "=",
+              "end": 26,
+              "highlight": "keyword",
+              "start": 25
+            },
+            {
+              "content": "fmt",
+              "end": 30,
+              "highlight": "normal",
+              "start": 27
+            },
+            {
+              "content": ".",
+              "end": 31,
+              "highlight": "normal",
+              "start": 30
+            },
+            {
+              "content": "Errorf",
+              "end": 37,
+              "highlight": "normal",
+              "start": 31
+            },
+            {
+              "content": "(",
+              "end": 38,
+              "highlight": "delimiter",
+              "start": 37
+            },
+            {
+              "content": "\"workspace not found\"",
+              "end": 59,
+              "highlight": "string",
+              "start": 38
+            },
+            {
+              "content": ")",
+              "end": 60,
+              "highlight": "delimiter",
+              "start": 59
+            }
+          ],
+          "line_number": 177
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// CreateWorkspaceForBootstrap creates a workspace in Creating state.",
+              "end": 69,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 179
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Returns (metadata, true, nil) when the workspace needs bootstrap.",
+              "end": 68,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 180
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Returns (metadata, false, nil) when the workspace is already bootstrapped.",
+              "end": 77,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 181
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "//",
+              "end": 2,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 182
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// After bootstrap completes, the caller must call FinishBootstrap to transition",
+              "end": 80,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 183
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// the workspace to Ready (on success) or remove it (on failure).",
+              "end": 65,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 184
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "func",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "(",
+              "end": 6,
+              "highlight": "delimiter",
+              "start": 5
+            },
+            {
+              "content": "m",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "*",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "WorkspaceManager",
+              "end": 25,
+              "highlight": "type",
+              "start": 9
+            },
+            {
+              "content": ")",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            },
+            {
+              "content": "CreateWorkspaceForBootstrap",
+              "end": 54,
+              "highlight": "normal",
+              "start": 27
+            },
+            {
+              "content": "(",
+              "end": 55,
+              "highlight": "delimiter",
+              "start": 54
+            },
+            {
+              "content": "wsID",
+              "end": 59,
+              "highlight": "normal",
+              "start": 55
+            },
+            {
+              "content": "proto",
+              "end": 65,
+              "highlight": "normal",
+              "start": 60
+            },
+            {
+              "content": ".",
+              "end": 66,
+              "highlight": "normal",
+              "start": 65
+            },
+            {
+              "content": "WorkspaceID",
+              "end": 77,
+              "highlight": "type",
+              "start": 66
+            },
+            {
+              "content": ",",
+              "end": 78,
+              "highlight": "normal",
+              "start": 77
+            },
+            {
+              "content": "rootPath",
+              "end": 87,
+              "highlight": "normal",
+              "start": 79
+            },
+            {
+              "content": "string",
+              "end": 94,
+              "highlight": "type",
+              "start": 88
+            },
+            {
+              "content": ")",
+              "end": 95,
+              "highlight": "delimiter",
+              "start": 94
+            },
+            {
+              "content": "(",
+              "end": 97,
+              "highlight": "delimiter",
+              "start": 96
+            },
+            {
+              "content": "*",
+              "end": 98,
+              "highlight": "keyword",
+              "start": 97
+            },
+            {
+              "content": "proto",
+              "end": 103,
+              "highlight": "normal",
+              "start": 98
+            },
+            {
+              "content": ".",
+              "end": 104,
+              "highlight": "normal",
+              "start": 103
+            },
+            {
+              "content": "WorkspaceMetadata",
+              "end": 121,
+              "highlight": "type",
+              "start": 104
+            },
+            {
+              "content": ",",
+              "end": 122,
+              "highlight": "normal",
+              "start": 121
+            },
+            {
+              "content": "bool",
+              "end": 127,
+              "highlight": "type",
+              "start": 123
+            },
+            {
+              "content": ",",
+              "end": 128,
+              "highlight": "normal",
+              "start": 127
+            },
+            {
+              "content": "error",
+              "end": 134,
+              "highlight": "type",
+              "start": 129
+            },
+            {
+              "content": ")",
+              "end": 135,
+              "highlight": "delimiter",
+              "start": 134
+            },
+            {
+              "content": "{",
+              "end": 137,
+              "highlight": "delimiter",
+              "start": 136
+            }
+          ],
+          "line_number": 185
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "mu",
+              "end": 5,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": ".",
+              "end": 6,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "Lock",
+              "end": 10,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "(",
+              "end": 11,
+              "highlight": "delimiter",
+              "start": 10
+            },
+            {
+              "content": ")",
+              "end": 12,
+              "highlight": "delimiter",
+              "start": 11
+            }
+          ],
+          "line_number": 186
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "defer",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "m",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": ".",
+              "end": 9,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "mu",
+              "end": 11,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "Unlock",
+              "end": 18,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 19,
+              "highlight": "delimiter",
+              "start": 18
+            },
+            {
+              "content": ")",
+              "end": 20,
+              "highlight": "delimiter",
+              "start": 19
+            }
+          ],
+          "line_number": 187
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 3,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "ws",
+              "end": 6,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ",",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "exists",
+              "end": 14,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ":=",
+              "end": 17,
+              "highlight": "keyword",
+              "start": 15
+            },
+            {
+              "content": "m",
+              "end": 19,
+              "highlight": "normal",
+              "start": 18
+            },
+            {
+              "content": ".",
+              "end": 20,
+              "highlight": "normal",
+              "start": 19
+            },
+            {
+              "content": "workspaces",
+              "end": 30,
+              "highlight": "normal",
+              "start": 20
+            },
+            {
+              "content": "[",
+              "end": 31,
+              "highlight": "delimiter",
+              "start": 30
+            },
+            {
+              "content": "wsID",
+              "end": 35,
+              "highlight": "normal",
+              "start": 31
+            },
+            {
+              "content": "]",
+              "end": 36,
+              "highlight": "delimiter",
+              "start": 35
+            },
+            {
+              "content": ";",
+              "end": 37,
+              "highlight": "normal",
+              "start": 36
+            },
+            {
+              "content": "exists",
+              "end": 44,
+              "highlight": "normal",
+              "start": 38
+            },
+            {
+              "content": "{",
+              "end": 46,
+              "highlight": "delimiter",
+              "start": 45
+            }
+          ],
+          "line_number": 189
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ws",
+              "end": 7,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": ".",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "State",
+              "end": 13,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "==",
+              "end": 16,
+              "highlight": "keyword",
+              "start": 14
+            },
+            {
+              "content": "StateReady",
+              "end": 27,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "&&",
+              "end": 30,
+              "highlight": "keyword",
+              "start": 28
+            },
+            {
+              "content": "ws",
+              "end": 33,
+              "highlight": "normal",
+              "start": 31
+            },
+            {
+              "content": ".",
+              "end": 34,
+              "highlight": "normal",
+              "start": 33
+            },
+            {
+              "content": "bootstrapped",
+              "end": 46,
+              "highlight": "normal",
+              "start": 34
+            },
+            {
+              "content": "{",
+              "end": 48,
+              "highlight": "delimiter",
+              "start": 47
+            }
+          ],
+          "line_number": 190
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 3
+            },
+            {
+              "content": "ws",
+              "end": 12,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": ".",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "Metadata",
+              "end": 21,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": ",",
+              "end": 22,
+              "highlight": "normal",
+              "start": 21
+            },
+            {
+              "content": "false",
+              "end": 28,
+              "highlight": "keyword",
+              "start": 23
+            },
+            {
+              "content": ",",
+              "end": 29,
+              "highlight": "normal",
+              "start": 28
+            },
+            {
+              "content": "nil",
+              "end": 33,
+              "highlight": "keyword",
+              "start": 30
+            }
+          ],
+          "line_number": 191
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 3,
+              "highlight": "delimiter",
+              "start": 2
+            }
+          ],
+          "line_number": 192
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ws",
+              "end": 7,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": ".",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "State",
+              "end": 13,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "==",
+              "end": 16,
+              "highlight": "keyword",
+              "start": 14
+            },
+            {
+              "content": "StateCreating",
+              "end": 30,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "{",
+              "end": 32,
+              "highlight": "delimiter",
+              "start": 31
+            }
+          ],
+          "line_number": 193
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Still creating — caller should WaitForReady.",
+              "end": 52,
+              "highlight": "comment",
+              "start": 3
+            }
+          ],
+          "line_number": 194
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 3
+            },
+            {
+              "content": "nil",
+              "end": 13,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": ",",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "false",
+              "end": 20,
+              "highlight": "keyword",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 21,
+              "highlight": "normal",
+              "start": 20
+            },
+            {
+              "content": "fmt",
+              "end": 25,
+              "highlight": "normal",
+              "start": 22
+            },
+            {
+              "content": ".",
+              "end": 26,
+              "highlight": "normal",
+              "start": 25
+            },
+            {
+              "content": "Errorf",
+              "end": 32,
+              "highlight": "normal",
+              "start": 26
+            },
+            {
+              "content": "(",
+              "end": 33,
+              "highlight": "delimiter",
+              "start": 32
+            },
+            {
+              "content": "\"workspace %s is already being created\"",
+              "end": 72,
+              "highlight": "string",
+              "start": 33
+            },
+            {
+              "content": ",",
+              "end": 73,
+              "highlight": "normal",
+              "start": 72
+            },
+            {
+              "content": "wsID",
+              "end": 78,
+              "highlight": "normal",
+              "start": 74
+            },
+            {
+              "content": ")",
+              "end": 79,
+              "highlight": "delimiter",
+              "start": 78
+            }
+          ],
+          "line_number": 195
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 3,
+              "highlight": "delimiter",
+              "start": 2
+            }
+          ],
+          "line_number": 196
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Ready but not bootstrapped (created by NewServer at startup).",
+              "end": 66,
+              "highlight": "comment",
+              "start": 2
+            }
+          ],
+          "line_number": 197
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Transition back to Creating so bootstrap can run.",
+              "end": 54,
+              "highlight": "comment",
+              "start": 2
+            }
+          ],
+          "line_number": 198
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 4,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 5,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": "State",
+              "end": 10,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "=",
+              "end": 12,
+              "highlight": "keyword",
+              "start": 11
+            },
+            {
+              "content": "StateCreating",
+              "end": 26,
+              "highlight": "normal",
+              "start": 13
+            }
+          ],
+          "line_number": 199
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 4,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 5,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": "ready",
+              "end": 10,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "=",
+              "end": 12,
+              "highlight": "keyword",
+              "start": 11
+            },
+            {
+              "content": "make",
+              "end": 17,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "(",
+              "end": 18,
+              "highlight": "delimiter",
+              "start": 17
+            },
+            {
+              "content": "chan",
+              "end": 22,
+              "highlight": "keyword",
+              "start": 18
+            },
+            {
+              "content": "struct",
+              "end": 29,
+              "highlight": "keyword",
+              "start": 23
+            },
+            {
+              "content": "{",
+              "end": 30,
+              "highlight": "delimiter",
+              "start": 29
+            },
+            {
+              "content": "}",
+              "end": 31,
+              "highlight": "delimiter",
+              "start": 30
+            },
+            {
+              "content": ")",
+              "end": 32,
+              "highlight": "delimiter",
+              "start": 31
+            }
+          ],
+          "line_number": 200
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "ws",
+              "end": 11,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "Metadata",
+              "end": 20,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": ",",
+              "end": 21,
+              "highlight": "normal",
+              "start": 20
+            },
+            {
+              "content": "true",
+              "end": 26,
+              "highlight": "keyword",
+              "start": 22
+            },
+            {
+              "content": ",",
+              "end": 27,
+              "highlight": "normal",
+              "start": 26
+            },
+            {
+              "content": "nil",
+              "end": 31,
+              "highlight": "keyword",
+              "start": 28
+            }
+          ],
+          "line_number": 202
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 203
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 3,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "err",
+              "end": 7,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": ":=",
+              "end": 10,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "os",
+              "end": 13,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": ".",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "MkdirAll",
+              "end": 22,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": "(",
+              "end": 23,
+              "highlight": "delimiter",
+              "start": 22
+            },
+            {
+              "content": "rootPath",
+              "end": 31,
+              "highlight": "normal",
+              "start": 23
+            },
+            {
+              "content": ",",
+              "end": 32,
+              "highlight": "normal",
+              "start": 31
+            },
+            {
+              "content": "0755",
+              "end": 37,
+              "highlight": "normal",
+              "start": 33
+            },
+            {
+              "content": ")",
+              "end": 38,
+              "highlight": "delimiter",
+              "start": 37
+            },
+            {
+              "content": ";",
+              "end": 39,
+              "highlight": "normal",
+              "start": 38
+            },
+            {
+              "content": "err",
+              "end": 43,
+              "highlight": "normal",
+              "start": 40
+            },
+            {
+              "content": "!=",
+              "end": 46,
+              "highlight": "keyword",
+              "start": 44
+            },
+            {
+              "content": "nil",
+              "end": 50,
+              "highlight": "keyword",
+              "start": 47
+            },
+            {
+              "content": "{",
+              "end": 52,
+              "highlight": "delimiter",
+              "start": 51
+            }
+          ],
+          "line_number": 205
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 2
+            },
+            {
+              "content": "nil",
+              "end": 12,
+              "highlight": "keyword",
+              "start": 9
+            },
+            {
+              "content": ",",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "false",
+              "end": 19,
+              "highlight": "keyword",
+              "start": 14
+            },
+            {
+              "content": ",",
+              "end": 20,
+              "highlight": "normal",
+              "start": 19
+            },
+            {
+              "content": "fmt",
+              "end": 24,
+              "highlight": "normal",
+              "start": 21
+            },
+            {
+              "content": ".",
+              "end": 25,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": "Errorf",
+              "end": 31,
+              "highlight": "normal",
+              "start": 25
+            },
+            {
+              "content": "(",
+              "end": 32,
+              "highlight": "delimiter",
+              "start": 31
+            },
+            {
+              "content": "\"create workspace directory %s: %w\"",
+              "end": 67,
+              "highlight": "string",
+              "start": 32
+            },
+            {
+              "content": ",",
+              "end": 68,
+              "highlight": "normal",
+              "start": 67
+            },
+            {
+              "content": "rootPath",
+              "end": 77,
+              "highlight": "normal",
+              "start": 69
+            },
+            {
+              "content": ",",
+              "end": 78,
+              "highlight": "normal",
+              "start": 77
+            },
+            {
+              "content": "err",
+              "end": 82,
+              "highlight": "normal",
+              "start": 79
+            },
+            {
+              "content": ")",
+              "end": 83,
+              "highlight": "delimiter",
+              "start": 82
+            }
+          ],
+          "line_number": 206
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 207
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "now",
+              "end": 4,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ":=",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 5
+            },
+            {
+              "content": "time",
+              "end": 12,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ".",
+              "end": 13,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "Now",
+              "end": 16,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "(",
+              "end": 17,
+              "highlight": "delimiter",
+              "start": 16
+            },
+            {
+              "content": ")",
+              "end": 18,
+              "highlight": "delimiter",
+              "start": 17
+            },
+            {
+              "content": ".",
+              "end": 19,
+              "highlight": "normal",
+              "start": 18
+            },
+            {
+              "content": "UnixMilli",
+              "end": 28,
+              "highlight": "normal",
+              "start": 19
+            },
+            {
+              "content": "(",
+              "end": 29,
+              "highlight": "delimiter",
+              "start": 28
+            },
+            {
+              "content": ")",
+              "end": 30,
+              "highlight": "delimiter",
+              "start": 29
+            }
+          ],
+          "line_number": 209
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "metadata",
+              "end": 9,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ":=",
+              "end": 12,
+              "highlight": "keyword",
+              "start": 10
+            },
+            {
+              "content": "&",
+              "end": 14,
+              "highlight": "keyword",
+              "start": 13
+            },
+            {
+              "content": "proto",
+              "end": 19,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": ".",
+              "end": 20,
+              "highlight": "normal",
+              "start": 19
+            },
+            {
+              "content": "WorkspaceMetadata",
+              "end": 37,
+              "highlight": "type",
+              "start": 20
+            },
+            {
+              "content": "{",
+              "end": 38,
+              "highlight": "delimiter",
+              "start": 37
+            }
+          ],
+          "line_number": 210
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "WorkspaceID",
+              "end": 13,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "wsID",
+              "end": 19,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 20,
+              "highlight": "normal",
+              "start": 19
+            }
+          ],
+          "line_number": 211
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "RootPath",
+              "end": 10,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 11,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "rootPath",
+              "end": 23,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 24,
+              "highlight": "normal",
+              "start": 23
+            }
+          ],
+          "line_number": 212
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "CreatedAtMs",
+              "end": 13,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "now",
+              "end": 18,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 19,
+              "highlight": "normal",
+              "start": 18
+            }
+          ],
+          "line_number": 213
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "UpdatedAtMs",
+              "end": 13,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "now",
+              "end": 18,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 19,
+              "highlight": "normal",
+              "start": 18
+            }
+          ],
+          "line_number": 214
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 215
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 3,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ":=",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 4
+            },
+            {
+              "content": "&",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 7
+            },
+            {
+              "content": "Workspace",
+              "end": 17,
+              "highlight": "type",
+              "start": 8
+            },
+            {
+              "content": "{",
+              "end": 18,
+              "highlight": "delimiter",
+              "start": 17
+            }
+          ],
+          "line_number": 217
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "WorkspaceID",
+              "end": 13,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 14,
+              "highlight": "normal",
+              "start": 13
+            },
+            {
+              "content": "wsID",
+              "end": 19,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 20,
+              "highlight": "normal",
+              "start": 19
+            }
+          ],
+          "line_number": 218
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "RootPath",
+              "end": 10,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 11,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "rootPath",
+              "end": 23,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 24,
+              "highlight": "normal",
+              "start": 23
+            }
+          ],
+          "line_number": 219
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "Metadata",
+              "end": 10,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 11,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "metadata",
+              "end": 23,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 24,
+              "highlight": "normal",
+              "start": 23
+            }
+          ],
+          "line_number": 220
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "Repos",
+              "end": 7,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "make",
+              "end": 19,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": "(",
+              "end": 20,
+              "highlight": "delimiter",
+              "start": 19
+            },
+            {
+              "content": "map",
+              "end": 23,
+              "highlight": "keyword",
+              "start": 20
+            },
+            {
+              "content": "[",
+              "end": 24,
+              "highlight": "delimiter",
+              "start": 23
+            },
+            {
+              "content": "proto",
+              "end": 29,
+              "highlight": "normal",
+              "start": 24
+            },
+            {
+              "content": ".",
+              "end": 30,
+              "highlight": "normal",
+              "start": 29
+            },
+            {
+              "content": "RepoID",
+              "end": 36,
+              "highlight": "type",
+              "start": 30
+            },
+            {
+              "content": "]",
+              "end": 37,
+              "highlight": "delimiter",
+              "start": 36
+            },
+            {
+              "content": "*",
+              "end": 38,
+              "highlight": "keyword",
+              "start": 37
+            },
+            {
+              "content": "ManagedRepo",
+              "end": 49,
+              "highlight": "type",
+              "start": 38
+            },
+            {
+              "content": ")",
+              "end": 50,
+              "highlight": "delimiter",
+              "start": 49
+            },
+            {
+              "content": ",",
+              "end": 51,
+              "highlight": "normal",
+              "start": 50
+            }
+          ],
+          "line_number": 221
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "State",
+              "end": 7,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "StateCreating",
+              "end": 28,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 29,
+              "highlight": "normal",
+              "start": 28
+            }
+          ],
+          "line_number": 222
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ready",
+              "end": 7,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "make",
+              "end": 19,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": "(",
+              "end": 20,
+              "highlight": "delimiter",
+              "start": 19
+            },
+            {
+              "content": "chan",
+              "end": 24,
+              "highlight": "keyword",
+              "start": 20
+            },
+            {
+              "content": "struct",
+              "end": 31,
+              "highlight": "keyword",
+              "start": 25
+            },
+            {
+              "content": "{",
+              "end": 32,
+              "highlight": "delimiter",
+              "start": 31
+            },
+            {
+              "content": "}",
+              "end": 33,
+              "highlight": "delimiter",
+              "start": 32
+            },
+            {
+              "content": ")",
+              "end": 34,
+              "highlight": "delimiter",
+              "start": 33
+            },
+            {
+              "content": ",",
+              "end": 35,
+              "highlight": "normal",
+              "start": 34
+            }
+          ],
+          "line_number": 223
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 224
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "workspaces",
+              "end": 13,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": "[",
+              "end": 14,
+              "highlight": "delimiter",
+              "start": 13
+            },
+            {
+              "content": "wsID",
+              "end": 18,
+              "highlight": "normal",
+              "start": 14
+            },
+            {
+              "content": "]",
+              "end": 19,
+              "highlight": "delimiter",
+              "start": 18
+            },
+            {
+              "content": "=",
+              "end": 21,
+              "highlight": "keyword",
+              "start": 20
+            },
+            {
+              "content": "ws",
+              "end": 24,
+              "highlight": "normal",
+              "start": 22
+            }
+          ],
+          "line_number": 225
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "metadata",
+              "end": 16,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": ",",
+              "end": 17,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": "true",
+              "end": 22,
+              "highlight": "keyword",
+              "start": 18
+            },
+            {
+              "content": ",",
+              "end": 23,
+              "highlight": "normal",
+              "start": 22
+            },
+            {
+              "content": "nil",
+              "end": 27,
+              "highlight": "keyword",
+              "start": 24
+            }
+          ],
+          "line_number": 227
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 1,
+              "highlight": "delimiter",
+              "start": 0
+            }
+          ],
+          "line_number": 228
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// FinishBootstrap completes the bootstrap lifecycle for a workspace.",
+              "end": 69,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 230
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// On success (bootstrapErr == nil), transitions to Ready.",
+              "end": 58,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 231
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "// On failure, removes the workspace so it can be retried.",
+              "end": 58,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 232
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "func",
+              "end": 4,
+              "highlight": "keyword",
+              "start": 0
+            },
+            {
+              "content": "(",
+              "end": 6,
+              "highlight": "delimiter",
+              "start": 5
+            },
+            {
+              "content": "m",
+              "end": 7,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "*",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 8
+            },
+            {
+              "content": "WorkspaceManager",
+              "end": 25,
+              "highlight": "type",
+              "start": 9
+            },
+            {
+              "content": ")",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            },
+            {
+              "content": "FinishBootstrap",
+              "end": 42,
+              "highlight": "normal",
+              "start": 27
+            },
+            {
+              "content": "(",
+              "end": 43,
+              "highlight": "delimiter",
+              "start": 42
+            },
+            {
+              "content": "wsID",
+              "end": 47,
+              "highlight": "normal",
+              "start": 43
+            },
+            {
+              "content": "proto",
+              "end": 53,
+              "highlight": "normal",
+              "start": 48
+            },
+            {
+              "content": ".",
+              "end": 54,
+              "highlight": "normal",
+              "start": 53
+            },
+            {
+              "content": "WorkspaceID",
+              "end": 65,
+              "highlight": "type",
+              "start": 54
+            },
+            {
+              "content": ",",
+              "end": 66,
+              "highlight": "normal",
+              "start": 65
+            },
+            {
+              "content": "bootstrapErr",
+              "end": 79,
+              "highlight": "normal",
+              "start": 67
+            },
+            {
+              "content": "error",
+              "end": 85,
+              "highlight": "type",
+              "start": 80
+            },
+            {
+              "content": ")",
+              "end": 86,
+              "highlight": "delimiter",
+              "start": 85
+            },
+            {
+              "content": "{",
+              "end": 88,
+              "highlight": "delimiter",
+              "start": 87
+            }
+          ],
+          "line_number": 233
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "mu",
+              "end": 5,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": ".",
+              "end": 6,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "Lock",
+              "end": 10,
+              "highlight": "normal",
+              "start": 6
+            },
+            {
+              "content": "(",
+              "end": 11,
+              "highlight": "delimiter",
+              "start": 10
+            },
+            {
+              "content": ")",
+              "end": 12,
+              "highlight": "delimiter",
+              "start": 11
+            }
+          ],
+          "line_number": 234
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "defer",
+              "end": 6,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "m",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": ".",
+              "end": 9,
+              "highlight": "normal",
+              "start": 8
+            },
+            {
+              "content": "mu",
+              "end": 11,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 12,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": "Unlock",
+              "end": 18,
+              "highlight": "normal",
+              "start": 12
+            },
+            {
+              "content": "(",
+              "end": 19,
+              "highlight": "delimiter",
+              "start": 18
+            },
+            {
+              "content": ")",
+              "end": 20,
+              "highlight": "delimiter",
+              "start": 19
+            }
+          ],
+          "line_number": 235
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 3,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ",",
+              "end": 4,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": "exists",
+              "end": 11,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": ":=",
+              "end": 14,
+              "highlight": "keyword",
+              "start": 12
+            },
+            {
+              "content": "m",
+              "end": 16,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ".",
+              "end": 17,
+              "highlight": "normal",
+              "start": 16
+            },
+            {
+              "content": "workspaces",
+              "end": 27,
+              "highlight": "normal",
+              "start": 17
+            },
+            {
+              "content": "[",
+              "end": 28,
+              "highlight": "delimiter",
+              "start": 27
+            },
+            {
+              "content": "wsID",
+              "end": 32,
+              "highlight": "normal",
+              "start": 28
+            },
+            {
+              "content": "]",
+              "end": 33,
+              "highlight": "delimiter",
+              "start": 32
+            }
+          ],
+          "line_number": 237
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 3,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "!",
+              "end": 5,
+              "highlight": "keyword",
+              "start": 4
+            },
+            {
+              "content": "exists",
+              "end": 11,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "{",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            }
+          ],
+          "line_number": 238
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "return",
+              "end": 8,
+              "highlight": "keyword",
+              "start": 2
+            }
+          ],
+          "line_number": 239
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 240
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "if",
+              "end": 3,
+              "highlight": "keyword",
+              "start": 1
+            },
+            {
+              "content": "bootstrapErr",
+              "end": 16,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": "!=",
+              "end": 19,
+              "highlight": "keyword",
+              "start": 17
+            },
+            {
+              "content": "nil",
+              "end": 23,
+              "highlight": "keyword",
+              "start": 20
+            },
+            {
+              "content": "{",
+              "end": 25,
+              "highlight": "delimiter",
+              "start": 24
+            }
+          ],
+          "line_number": 242
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "delete",
+              "end": 8,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "(",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            },
+            {
+              "content": "m",
+              "end": 10,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": ".",
+              "end": 11,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "workspaces",
+              "end": 21,
+              "highlight": "normal",
+              "start": 11
+            },
+            {
+              "content": ",",
+              "end": 22,
+              "highlight": "normal",
+              "start": 21
+            },
+            {
+              "content": "wsID",
+              "end": 27,
+              "highlight": "normal",
+              "start": 23
+            },
+            {
+              "content": ")",
+              "end": 28,
+              "highlight": "delimiter",
+              "start": 27
+            }
+          ],
+          "line_number": 243
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            },
+            {
+              "content": "else",
+              "end": 7,
+              "highlight": "keyword",
+              "start": 3
+            },
+            {
+              "content": "{",
+              "end": 9,
+              "highlight": "delimiter",
+              "start": 8
+            }
+          ],
+          "line_number": 244
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 4,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 5,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": "State",
+              "end": 10,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "=",
+              "end": 12,
+              "highlight": "keyword",
+              "start": 11
+            },
+            {
+              "content": "StateReady",
+              "end": 23,
+              "highlight": "normal",
+              "start": 13
+            }
+          ],
+          "line_number": 245
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ws",
+              "end": 4,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ".",
+              "end": 5,
+              "highlight": "normal",
+              "start": 4
+            },
+            {
+              "content": "bootstrapped",
+              "end": 17,
+              "highlight": "normal",
+              "start": 5
+            },
+            {
+              "content": "=",
+              "end": 19,
+              "highlight": "keyword",
+              "start": 18
+            },
+            {
+              "content": "true",
+              "end": 24,
+              "highlight": "keyword",
+              "start": 20
+            }
+          ],
+          "line_number": 246
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 2,
+              "highlight": "delimiter",
+              "start": 1
+            }
+          ],
+          "line_number": 247
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "close",
+              "end": 6,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "(",
+              "end": 7,
+              "highlight": "delimiter",
+              "start": 6
+            },
+            {
+              "content": "ws",
+              "end": 9,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": ".",
+              "end": 10,
+              "highlight": "normal",
+              "start": 9
+            },
+            {
+              "content": "ready",
+              "end": 15,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": ")",
+              "end": 16,
+              "highlight": "delimiter",
+              "start": 15
+            }
+          ],
+          "line_number": 248
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "}",
+              "end": 1,
+              "highlight": "delimiter",
+              "start": 0
+            }
+          ],
+          "line_number": 249
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "/",
+              "end": 1,
+              "highlight": "comment",
+              "start": 0
+            },
+            {
+              "content": "/",
+              "end": 2,
+              "highlight": "comment",
+              "start": 1
+            },
+            {
+              "content": " ",
+              "end": 3,
+              "highlight": "comment",
+              "start": 2
+            },
+            {
+              "content": "DefaultWorkspacePath",
+              "end": 23,
+              "highlight": "comment",
+              "start": 3
+            },
+            {
+              "content": " ",
+              "end": 24,
+              "highlight": "comment",
+              "start": 23
+            },
+            {
+              "content": "returns",
+              "end": 31,
+              "highlight": "comment",
+              "start": 24
+            },
+            {
+              "content": " ",
+              "end": 32,
+              "highlight": "comment",
+              "start": 31
+            },
+            {
+              "content": "the",
+              "end": 35,
+              "highlight": "comment",
+              "start": 32
+            },
+            {
+              "content": " ",
+              "end": 36,
+              "highlight": "comment",
+              "start": 35
+            },
+            {
+              "content": "default",
+              "end": 43,
+              "highlight": "comment",
+              "start": 36
+            },
+            {
+              "content": " ",
+              "end": 44,
+              "highlight": "comment",
+              "start": 43
+            },
+            {
+              "content": "workspace",
+              "end": 53,
+              "highlight": "comment",
+              "start": 44
+            },
+            {
+              "content": "root",
+              "end": 58,
+              "highlight": "comment",
+              "start": 54
+            },
+            {
+              "content": "path",
+              "end": 63,
+              "highlight": "comment",
+              "start": 59
+            },
+            {
+              "content": ".",
+              "end": 64,
+              "highlight": "comment",
+              "start": 63
+            }
+          ],
+          "line_number": 110
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "/",
+              "end": 1,
+              "highlight": "comment",
+              "start": 0
+            },
+            {
+              "content": "/",
+              "end": 2,
+              "highlight": "comment",
+              "start": 1
+            },
+            {
+              "content": " ",
+              "end": 3,
+              "highlight": "comment",
+              "start": 2
+            },
+            {
+              "content": "DefaultWorkspacePath",
+              "end": 23,
+              "highlight": "comment",
+              "start": 3
+            },
+            {
+              "content": " ",
+              "end": 24,
+              "highlight": "comment",
+              "start": 23
+            },
+            {
+              "content": "returns",
+              "end": 31,
+              "highlight": "comment",
+              "start": 24
+            },
+            {
+              "content": " ",
+              "end": 32,
+              "highlight": "comment",
+              "start": 31
+            },
+            {
+              "content": "the",
+              "end": 35,
+              "highlight": "comment",
+              "start": 32
+            },
+            {
+              "content": " ",
+              "end": 36,
+              "highlight": "comment",
+              "start": 35
+            },
+            {
+              "content": "root",
+              "end": 40,
+              "highlight": "comment",
+              "start": 36
+            },
+            {
+              "content": "path",
+              "end": 45,
+              "highlight": "comment",
+              "start": 41
+            },
+            {
+              "content": "of",
+              "end": 48,
+              "highlight": "comment",
+              "start": 46
+            },
+            {
+              "content": "the",
+              "end": 52,
+              "highlight": "comment",
+              "start": 49
+            },
+            {
+              "content": "default",
+              "end": 60,
+              "highlight": "comment",
+              "start": 53
+            },
+            {
+              "content": " ",
+              "end": 61,
+              "highlight": "comment",
+              "start": 60
+            },
+            {
+              "content": "workspace",
+              "end": 70,
+              "highlight": "comment",
+              "start": 61
+            },
+            {
+              "content": ".",
+              "end": 71,
+              "highlight": "comment",
+              "start": 70
+            }
+          ],
+          "line_number": 125
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "// This is set internally when CreateWorkspace is called.",
+              "end": 57,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 111
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "// Returns proto.DefaultWorkspacePath if the default workspace hasn't been created yet.",
+              "end": 87,
+              "highlight": "comment",
+              "start": 0
+            }
+          ],
+          "line_number": 126
+        }
+      },
+      {
+        "lhs": {
+          "changes": [],
+          "line_number": 112
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "{",
+              "end": 58,
+              "highlight": "delimiter",
+              "start": 57
+            }
+          ],
+          "line_number": 127
+        }
+      },
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "defaultWorkspacePath",
+              "end": 30,
+              "highlight": "normal",
+              "start": 10
+            }
+          ],
+          "line_number": 113
+        },
+        "rhs": {
+          "changes": [
+            {
+              "content": "workspaces",
+              "end": 20,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "[",
+              "end": 21,
+              "highlight": "delimiter",
+              "start": 20
+            },
+            {
+              "content": "wsID",
+              "end": 25,
+              "highlight": "normal",
+              "start": 21
+            },
+            {
+              "content": "]",
+              "end": 26,
+              "highlight": "delimiter",
+              "start": 25
+            }
+          ],
+          "line_number": 140
+        }
+      }
+    ],
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ready",
+              "end": 6,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ":=",
+              "end": 9,
+              "highlight": "keyword",
+              "start": 7
+            },
+            {
+              "content": "make",
+              "end": 14,
+              "highlight": "normal",
+              "start": 10
+            },
+            {
+              "content": "(",
+              "end": 15,
+              "highlight": "delimiter",
+              "start": 14
+            },
+            {
+              "content": "chan",
+              "end": 19,
+              "highlight": "keyword",
+              "start": 15
+            },
+            {
+              "content": "struct",
+              "end": 26,
+              "highlight": "keyword",
+              "start": 20
+            },
+            {
+              "content": "{",
+              "end": 27,
+              "highlight": "delimiter",
+              "start": 26
+            },
+            {
+              "content": "}",
+              "end": 28,
+              "highlight": "delimiter",
+              "start": 27
+            },
+            {
+              "content": ")",
+              "end": 29,
+              "highlight": "delimiter",
+              "start": 28
+            }
+          ],
+          "line_number": 276
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "close",
+              "end": 6,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": "(",
+              "end": 7,
+              "highlight": "delimiter",
+              "start": 6
+            },
+            {
+              "content": "ready",
+              "end": 12,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": ")",
+              "end": 13,
+              "highlight": "delimiter",
+              "start": 12
+            }
+          ],
+          "line_number": 277
+        }
+      }
+    ],
+    [
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "State",
+              "end": 7,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "StateReady",
+              "end": 25,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 26,
+              "highlight": "normal",
+              "start": 25
+            }
+          ],
+          "line_number": 284
+        }
+      },
+      {
+        "rhs": {
+          "changes": [
+            {
+              "content": "ready",
+              "end": 7,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": ":",
+              "end": 8,
+              "highlight": "normal",
+              "start": 7
+            },
+            {
+              "content": "ready",
+              "end": 20,
+              "highlight": "normal",
+              "start": 15
+            },
+            {
+              "content": ",",
+              "end": 21,
+              "highlight": "normal",
+              "start": 20
+            }
+          ],
+          "line_number": 285
+        }
+      }
+    ],
+    [
+      {
+        "lhs": {
+          "changes": [
+            {
+              "content": "m",
+              "end": 2,
+              "highlight": "normal",
+              "start": 1
+            },
+            {
+              "content": ".",
+              "end": 3,
+              "highlight": "normal",
+              "start": 2
+            },
+            {
+              "content": "defaultWorkspacePath",
+              "end": 23,
+              "highlight": "normal",
+              "start": 3
+            },
+            {
+              "content": "=",
+              "end": 25,
+              "highlight": "keyword",
+              "start": 24
+            },
+            {
+              "content": "rootPath",
+              "end": 34,
+              "highlight": "normal",
+              "start": 26
+            }
+          ],
+          "line_number": 162
+        }
+      }
+    ]
+  ],
+  "hunks": [
+    {
+      "new_count": 1,
+      "new_start": 5,
+      "old_count": 0,
+      "old_start": 4
+    },
+    {
+      "new_count": 10,
+      "new_start": 25,
+      "old_count": 0,
+      "old_start": 23
+    },
+    {
+      "new_count": 6,
+      "new_start": 72,
+      "old_count": 0,
+      "old_start": 60
+    },
+    {
+      "new_count": 5,
+      "new_start": 103,
+      "old_count": 6,
+      "old_start": 86
+    },
+    {
+      "new_count": 4,
+      "new_start": 119,
+      "old_count": 5,
+      "old_start": 103
+    },
+    {
+      "new_count": 2,
+      "new_start": 126,
+      "old_count": 2,
+      "old_start": 111
+    },
+    {
+      "new_count": 121,
+      "new_start": 129,
+      "old_count": 1,
+      "old_start": 114
+    },
+    {
+      "new_count": 3,
+      "new_start": 277,
+      "old_count": 0,
+      "old_start": 141
+    },
+    {
+      "new_count": 2,
+      "new_start": 285,
+      "old_count": 0,
+      "old_start": 146
+    },
+    {
+      "new_count": 0,
+      "new_start": 302,
+      "old_count": 1,
+      "old_start": 163
+    }
+  ],
+  "language": "Go",
+  "new_lines": [
+    "package workspace",
+    "",
+    "import (",
+    "\t\"bytes\"",
+    "\t\"context\"",
+    "\t\"fmt\"",
+    "\t\"log/slog\"",
+    "\t\"maps\"",
+    "\t\"math/rand\"",
+    "\t\"os\"",
+    "\t\"path/filepath\"",
+    "\t\"regexp\"",
+    "\t\"strings\"",
+    "\t\"sync\"",
+    "\t\"time\"",
+    "",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/config\"",
+    "",
+    "\t\"figma.com/services/agentplat/gitclient\"",
+    "\t\"figma.com/services/agentplat/proto\"",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/metrics\"",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/pathutil\"",
+    ")",
+    "",
+    "// WorkspaceState represents the lifecycle state of a workspace.",
+    "type WorkspaceState int",
+    "",
+    "const (",
+    "\t// StateCreating means bootstrap is in progress. Operations block until Ready.",
+    "\tStateCreating WorkspaceState = iota",
+    "\t// StateReady means bootstrap completed. All operations proceed normally.",
+    "\tStateReady",
+    ")",
+    "",
+    "const (",
+    "\tcloneMaxRetries     = 3",
+    "\tcloneInitialBackoff = 1 * time.Second",
+    "\tcloneMaxBackoff     = 30 * time.Second",
+    ")",
+    "",
+    "func cloneBackoff(attempt int) time.Duration {",
+    "\tbackoff := cloneInitialBackoff * time.Duration(1<<uint(attempt))",
+    "\tif backoff > cloneMaxBackoff {",
+    "\t\tbackoff = cloneMaxBackoff",
+    "\t}",
+    "\tjitter := time.Duration(rand.Int63n(int64(backoff) / 2))",
+    "\treturn backoff/2 + jitter",
+    "}",
+    "",
+    "// credentialURLPattern matches URLs with embedded credentials (e.g., https://user:pass@host/...).",
+    "var credentialURLPattern = regexp.MustCompile(`(https?://)([^@/]+@)([^\\s'\\\"]+)`)",
+    "",
+    "// redactCredentials replaces credentials in URLs within an error string.",
+    "// \"https://user:token@host/path\" becomes \"https://REDACTED@host/path\".",
+    "func redactCredentials(s string) string {",
+    "\treturn credentialURLPattern.ReplaceAllString(s, \"${1}REDACTED@${3}\")",
+    "}",
+    "",
+    "// pathInfo maps an absolute path to its workspace and repo.",
+    "type pathInfo struct {",
+    "\tWorkspaceID proto.WorkspaceID",
+    "\tRepoID      proto.RepoID",
+    "}",
+    "",
+    "// Workspace represents a workspace containing multiple repositories.",
+    "type Workspace struct {",
+    "\tWorkspaceID proto.WorkspaceID",
+    "\tRootPath    string // Base path for workspace (e.g., /workspaces/default)",
+    "\tMetadata    *proto.WorkspaceMetadata",
+    "\tRepos       map[proto.RepoID]*ManagedRepo // repoId -> ManagedRepo",
+    "\tEnv         map[string]string             // per-workspace env defaults (from workspace/create)",
+    "",
+    "\t// Lifecycle state",
+    "\tState        WorkspaceState",
+    "\tStateErr     error         // non-nil when bootstrap failed (workspace will be removed from map)",
+    "\tready        chan struct{} // closed when State transitions out of Creating",
+    "\tbootstrapped bool          // true after successful bootstrap via FinishBootstrap",
+    "}",
+    "",
+    "// ManagedRepo represents a git repository within a workspace.",
+    "type ManagedRepo struct {",
+    "\tRepoID       proto.RepoID",
+    "\tRelativePath string // Relative to workspace root",
+    "\tAbsolutePath string // Computed: RootPath + RelativePath",
+    "\tGitRemoteURL string",
+    "\tGitBranch    string",
+    "\tCredentials  *proto.GitCredentials",
+    "\tAuthorName   string",
+    "\tAuthorEmail  string",
+    "\t// Autosave config",
+    "\tAutosaveEnabled    bool",
+    "\tAutosaveDebounceMs int",
+    "\t// State",
+    "\tinitialized  bool",
+    "\tcurrentSHA   string",
+    "\tlastSyncedAt time.Time",
+    "\tinitError    string",
+    "}",
+    "",
+    "// WorkspaceManager manages git-backed directories for sboxd.",
+    "// It handles initialization (cloning), saving (commit+push), and credential updates.",
+    "type WorkspaceManager struct {",
+    "\tmu         sync.RWMutex",
+    "\tworkspaces map[proto.WorkspaceID]*Workspace // workspaceId -> Workspace",
+    "\tpathIndex  map[string]pathInfo              // absolute path -> {workspaceId, repoId}",
+    "\tlogger     *slog.Logger",
+    "\tmetrics    *metrics.Reporter",
+    "}",
+    "",
+    "// NewWorkspaceManager creates a new workspace manager.",
+    "func NewWorkspaceManager(logger *slog.Logger, m *metrics.Reporter) *WorkspaceManager {",
+    "\tif logger == nil {",
+    "\t\tlogger = slog.Default()",
+    "\t}",
+    "\tif m == nil {",
+    "\t\tm = metrics.NoOpReporter()",
+    "\t}",
+    "\treturn &WorkspaceManager{",
+    "\t\tworkspaces: make(map[proto.WorkspaceID]*Workspace),",
+    "\t\tpathIndex:  make(map[string]pathInfo),",
+    "\t\tlogger:     logger,",
+    "\t\tmetrics:    m,",
+    "\t}",
+    "}",
+    "",
+    "// DefaultWorkspacePath returns the root path of the default workspace.",
+    "// Returns proto.DefaultWorkspacePath if the default workspace hasn't been created yet.",
+    "func (m *WorkspaceManager) DefaultWorkspacePath() string {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "\tif ws, ok := m.workspaces[proto.DefaultWorkspaceID]; ok {",
+    "\t\treturn ws.RootPath",
+    "\t}",
+    "\treturn proto.DefaultWorkspacePath",
+    "}",
+    "",
+    "// GetWorkspace returns the workspace for the given ID, or nil if not found.",
+    "func (m *WorkspaceManager) GetWorkspace(wsID proto.WorkspaceID) *Workspace {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "\treturn m.workspaces[wsID]",
+    "}",
+    "",
+    "// WaitForReady blocks until the workspace reaches Ready state or the context",
+    "// is cancelled. Returns nil if the workspace is ready, context error on",
+    "// timeout/cancellation, or ErrWorkspaceNotFound if the workspace doesn't exist",
+    "// or was removed after a failed bootstrap.",
+    "func (m *WorkspaceManager) WaitForReady(ctx context.Context, wsID proto.WorkspaceID) error {",
+    "\tm.mu.RLock()",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\tm.mu.RUnlock()",
+    "\t\treturn ErrWorkspaceNotFound",
+    "\t}",
+    "\tready := ws.ready",
+    "\tm.mu.RUnlock()",
+    "",
+    "\tselect {",
+    "\tcase <-ready:",
+    "\t\t// Re-check: workspace may have been removed after failed bootstrap.",
+    "\t\tm.mu.RLock()",
+    "\t\tws, ok = m.workspaces[wsID]",
+    "\t\tm.mu.RUnlock()",
+    "\t\tif !ok {",
+    "\t\t\treturn ErrWorkspaceNotFound",
+    "\t\t}",
+    "\t\tif ws.State == StateReady {",
+    "\t\t\treturn nil",
+    "\t\t}",
+    "\t\treturn ErrWorkspaceNotFound",
+    "\tcase <-ctx.Done():",
+    "\t\treturn ctx.Err()",
+    "\t}",
+    "}",
+    "",
+    "// ErrWorkspaceNotFound is returned when a workspace does not exist or was",
+    "// removed after a failed bootstrap.",
+    "var ErrWorkspaceNotFound = fmt.Errorf(\"workspace not found\")",
+    "",
+    "// CreateWorkspaceForBootstrap creates a workspace in Creating state.",
+    "// Returns (metadata, true, nil) when the workspace needs bootstrap.",
+    "// Returns (metadata, false, nil) when the workspace is already bootstrapped.",
+    "//",
+    "// After bootstrap completes, the caller must call FinishBootstrap to transition",
+    "// the workspace to Ready (on success) or remove it (on failure).",
+    "func (m *WorkspaceManager) CreateWorkspaceForBootstrap(wsID proto.WorkspaceID, rootPath string) (*proto.WorkspaceMetadata, bool, error) {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tif ws, exists := m.workspaces[wsID]; exists {",
+    "\t\tif ws.State == StateReady && ws.bootstrapped {",
+    "\t\t\treturn ws.Metadata, false, nil",
+    "\t\t}",
+    "\t\tif ws.State == StateCreating {",
+    "\t\t\t// Still creating — caller should WaitForReady.",
+    "\t\t\treturn nil, false, fmt.Errorf(\"workspace %s is already being created\", wsID)",
+    "\t\t}",
+    "\t\t// Ready but not bootstrapped (created by NewServer at startup).",
+    "\t\t// Transition back to Creating so bootstrap can run.",
+    "\t\tws.State = StateCreating",
+    "\t\tws.ready = make(chan struct{})",
+    "",
+    "\t\treturn ws.Metadata, true, nil",
+    "\t}",
+    "",
+    "\tif err := os.MkdirAll(rootPath, 0755); err != nil {",
+    "\t\treturn nil, false, fmt.Errorf(\"create workspace directory %s: %w\", rootPath, err)",
+    "\t}",
+    "",
+    "\tnow := time.Now().UnixMilli()",
+    "\tmetadata := &proto.WorkspaceMetadata{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tRootPath:    rootPath,",
+    "\t\tCreatedAtMs: now,",
+    "\t\tUpdatedAtMs: now,",
+    "\t}",
+    "",
+    "\tws := &Workspace{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tRootPath:    rootPath,",
+    "\t\tMetadata:    metadata,",
+    "\t\tRepos:       make(map[proto.RepoID]*ManagedRepo),",
+    "\t\tState:       StateCreating,",
+    "\t\tready:       make(chan struct{}),",
+    "\t}",
+    "\tm.workspaces[wsID] = ws",
+    "",
+    "\treturn metadata, true, nil",
+    "}",
+    "",
+    "// FinishBootstrap completes the bootstrap lifecycle for a workspace.",
+    "// On success (bootstrapErr == nil), transitions to Ready.",
+    "// On failure, removes the workspace so it can be retried.",
+    "func (m *WorkspaceManager) FinishBootstrap(wsID proto.WorkspaceID, bootstrapErr error) {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, exists := m.workspaces[wsID]",
+    "\tif !exists {",
+    "\t\treturn",
+    "\t}",
+    "",
+    "\tif bootstrapErr != nil {",
+    "\t\tdelete(m.workspaces, wsID)",
+    "\t} else {",
+    "\t\tws.State = StateReady",
+    "\t\tws.bootstrapped = true",
+    "\t}",
+    "\tclose(ws.ready)",
+    "}",
+    "",
+    "// CreateWorkspace creates a workspace with the given ID and root path.",
+    "// It creates the directory on disk via os.MkdirAll, then registers it in the",
+    "// workspace manager. Returns an error if the directory cannot be created (fail-fast).",
+    "// If the workspace already exists, it returns the existing metadata.",
+    "// The optional env map stores per-workspace env defaults for prompt sessions.",
+    "func (m *WorkspaceManager) CreateWorkspace(wsID proto.WorkspaceID, rootPath string, env ...map[string]string) (proto.WorkspaceID, *proto.WorkspaceMetadata, error) {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tif ws, exists := m.workspaces[wsID]; exists {",
+    "\t\treturn wsID, ws.Metadata, nil",
+    "\t}",
+    "",
+    "\tif err := os.MkdirAll(rootPath, 0755); err != nil {",
+    "\t\treturn \"\", nil, fmt.Errorf(\"create workspace directory %s: %w\", rootPath, err)",
+    "\t}",
+    "",
+    "\tnow := time.Now().UnixMilli()",
+    "\tmetadata := &proto.WorkspaceMetadata{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tRootPath:    rootPath,",
+    "\t\tCreatedAtMs: now,",
+    "\t\tUpdatedAtMs: now,",
+    "\t}",
+    "",
+    "\tready := make(chan struct{})",
+    "\tclose(ready)",
+    "",
+    "\tws := &Workspace{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tRootPath:    rootPath,",
+    "\t\tMetadata:    metadata,",
+    "\t\tRepos:       make(map[proto.RepoID]*ManagedRepo),",
+    "\t\tState:       StateReady,",
+    "\t\tready:       ready,",
+    "\t}",
+    "\tif len(env) > 0 && env[0] != nil {",
+    "\t\tfiltered := make(map[string]string, len(env[0]))",
+    "\t\tfor k, v := range env[0] {",
+    "\t\t\tif config.IsAllowedEnvKey(k) {",
+    "\t\t\t\tfiltered[k] = v",
+    "\t\t\t} else {",
+    "\t\t\t\tm.logger.Warn(\"CreateWorkspace: dropping disallowed env var\", slog.String(\"key\", k))",
+    "\t\t\t}",
+    "\t\t}",
+    "\t\tif len(filtered) > 0 {",
+    "\t\t\tws.Env = filtered",
+    "\t\t}",
+    "\t}",
+    "",
+    "\tm.workspaces[wsID] = ws",
+    "",
+    "\treturn wsID, metadata, nil",
+    "}",
+    "",
+    "// GetWorkspaceEnv returns a copy of the per-workspace env defaults.",
+    "func (m *WorkspaceManager) GetWorkspaceEnv(wsID proto.WorkspaceID) map[string]string {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok || ws.Env == nil {",
+    "\t\treturn nil",
+    "\t}",
+    "\treturn maps.Clone(ws.Env)",
+    "}",
+    "",
+    "// SetupWorkspaceRepos configures repositories within a workspace.",
+    "// If initialize is true, it will clone/initialize repositories immediately.",
+    "func (m *WorkspaceManager) SetupWorkspaceRepos(wsID proto.WorkspaceID, repos []*proto.Repository, initialize bool) []*proto.RepositoryStatus {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn []*proto.RepositoryStatus{{",
+    "\t\t\tError: fmt.Sprintf(\"workspace not found: %s\", wsID),",
+    "\t\t}}",
+    "\t}",
+    "",
+    "\tstatuses := make([]*proto.RepositoryStatus, 0, len(repos))",
+    "",
+    "\tfor _, repo := range repos {",
+    "\t\trepoID := repo.RepoID",
+    "\t\tif repoID.IsZero() {",
+    "\t\t\trepoID = proto.NewRepoID()",
+    "\t\t}",
+    "",
+    "\t\tabsPath := filepath.Join(ws.RootPath, repo.Path)",
+    "",
+    "\t\tmr := &ManagedRepo{",
+    "\t\t\tRepoID:       repoID,",
+    "\t\t\tRelativePath: repo.Path,",
+    "\t\t\tAbsolutePath: absPath,",
+    "\t\t\tGitRemoteURL: repo.GitRemoteURL,",
+    "\t\t\tGitBranch:    repo.GitBranch,",
+    "\t\t\tAuthorName:   repo.AuthorName,",
+    "\t\t\tAuthorEmail:  repo.AuthorEmail,",
+    "\t\t}",
+    "",
+    "\t\tif mr.GitBranch == \"\" {",
+    "\t\t\tmr.GitBranch = \"main\"",
+    "\t\t}",
+    "",
+    "\t\tif repo.Credentials != nil {",
+    "\t\t\tmr.Credentials = &proto.GitCredentials{",
+    "\t\t\t\tUsername: repo.Credentials.Username,",
+    "\t\t\t\tPassword: repo.Credentials.Password,",
+    "\t\t\t}",
+    "\t\t}",
+    "",
+    "\t\t// Autosave config",
+    "\t\tif repo.AutosaveEnabled != nil {",
+    "\t\t\tmr.AutosaveEnabled = *repo.AutosaveEnabled",
+    "\t\t} else {",
+    "\t\t\tmr.AutosaveEnabled = true // Default enabled",
+    "\t\t}",
+    "\t\tmr.AutosaveDebounceMs = repo.AutosaveDebounceMs",
+    "",
+    "\t\tws.Repos[repoID] = mr",
+    "",
+    "\t\t// Update path index",
+    "\t\tm.pathIndex[absPath] = pathInfo{",
+    "\t\t\tWorkspaceID: wsID,",
+    "\t\t\tRepoID:      repoID,",
+    "\t\t}",
+    "",
+    "\t\tif initialize {",
+    "\t\t\tstatus := m.initializeRepo(ws, mr)",
+    "\t\t\tstatuses = append(statuses, status)",
+    "\t\t} else {",
+    "\t\t\tstatuses = append(statuses, &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      repoID,",
+    "\t\t\t\tPath:        repo.Path,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t})",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Update workspace metadata",
+    "\tws.Metadata.UpdatedAtMs = time.Now().UnixMilli()",
+    "",
+    "\treturn statuses",
+    "}",
+    "",
+    "// GetWorkspaceStatus returns the status of a workspace and optionally specific repos.",
+    "func (m *WorkspaceManager) GetWorkspaceStatus(wsID proto.WorkspaceID, repoIDs []proto.RepoID) *proto.WorkspaceStatus {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn nil",
+    "\t}",
+    "",
+    "\tstatus := &proto.WorkspaceStatus{",
+    "\t\tWorkspaceID:  wsID,",
+    "\t\tMetadata:     ws.Metadata,",
+    "\t\tRepositories: make([]*proto.RepositoryStatus, 0),",
+    "\t}",
+    "",
+    "\tif len(repoIDs) == 0 {",
+    "\t\t// Return all repos",
+    "\t\tfor _, mr := range ws.Repos {",
+    "\t\t\tstatus.Repositories = append(status.Repositories, m.getRepoStatus(mr))",
+    "\t\t}",
+    "\t} else {",
+    "\t\tfor _, repoID := range repoIDs {",
+    "\t\t\tif mr, ok := ws.Repos[repoID]; ok {",
+    "\t\t\t\tstatus.Repositories = append(status.Repositories, m.getRepoStatus(mr))",
+    "\t\t\t} else {",
+    "\t\t\t\tstatus.Repositories = append(status.Repositories, &proto.RepositoryStatus{",
+    "\t\t\t\t\tRepoID: repoID,",
+    "\t\t\t\t\tError:  \"repository not found\",",
+    "\t\t\t\t})",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn status",
+    "}",
+    "",
+    "// DeleteWorkspace removes a workspace and all its repositories.",
+    "func (m *WorkspaceManager) DeleteWorkspace(wsID proto.WorkspaceID) error {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn fmt.Errorf(\"workspace not found: %s\", wsID)",
+    "\t}",
+    "",
+    "\t// Remove path index entries",
+    "\tfor _, mr := range ws.Repos {",
+    "\t\tdelete(m.pathIndex, mr.AbsolutePath)",
+    "\t}",
+    "",
+    "\tdelete(m.workspaces, wsID)",
+    "\treturn nil",
+    "}",
+    "",
+    "// SaveWorkspaceRepos commits and pushes changes in specified repos (or all if empty).",
+    "func (m *WorkspaceManager) SaveWorkspaceRepos(wsID proto.WorkspaceID, repoIDs []proto.RepoID, message string, push bool) []*proto.RepoSaveResult {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn []*proto.RepoSaveResult{{",
+    "\t\t\tError: fmt.Sprintf(\"workspace not found: %s\", wsID),",
+    "\t\t}}",
+    "\t}",
+    "",
+    "\tvar results []*proto.RepoSaveResult",
+    "",
+    "\tif len(repoIDs) == 0 {",
+    "\t\t// Save all repos",
+    "\t\tfor _, mr := range ws.Repos {",
+    "\t\t\tresult := m.saveRepo(ws, mr, message, push)",
+    "\t\t\tresults = append(results, result)",
+    "\t\t}",
+    "\t} else {",
+    "\t\tfor _, repoID := range repoIDs {",
+    "\t\t\tif mr, ok := ws.Repos[repoID]; ok {",
+    "\t\t\t\tresult := m.saveRepo(ws, mr, message, push)",
+    "\t\t\t\tresults = append(results, result)",
+    "\t\t\t} else {",
+    "\t\t\t\tresults = append(results, &proto.RepoSaveResult{",
+    "\t\t\t\t\tRepoID:  repoID,",
+    "\t\t\t\t\tSuccess: false,",
+    "\t\t\t\t\tError:   \"repository not found\",",
+    "\t\t\t\t})",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn results",
+    "}",
+    "",
+    "// UpdateRepoCredentials updates git credentials for a specific repository.",
+    "func (m *WorkspaceManager) UpdateRepoCredentials(wsID proto.WorkspaceID, repoID proto.RepoID, creds *proto.GitCredentials) error {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn fmt.Errorf(\"workspace not found: %s\", wsID)",
+    "\t}",
+    "",
+    "\tmr, ok := ws.Repos[repoID]",
+    "\tif !ok {",
+    "\t\treturn fmt.Errorf(\"repository not found: %s\", repoID)",
+    "\t}",
+    "",
+    "\tmr.Credentials = &proto.GitCredentials{",
+    "\t\tUsername: creds.Username,",
+    "\t\tPassword: creds.Password,",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "// ListWorkspaces returns status of all workspaces.",
+    "func (m *WorkspaceManager) ListWorkspaces() []*proto.WorkspaceStatus {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tvar statuses []*proto.WorkspaceStatus",
+    "\tfor wsID := range m.workspaces {",
+    "\t\t// Use unlocked version since we already hold the lock",
+    "\t\tws := m.workspaces[wsID]",
+    "\t\tstatus := &proto.WorkspaceStatus{",
+    "\t\t\tWorkspaceID:  wsID,",
+    "\t\t\tMetadata:     ws.Metadata,",
+    "\t\t\tRepositories: make([]*proto.RepositoryStatus, 0),",
+    "\t\t}",
+    "\t\tfor _, mr := range ws.Repos {",
+    "\t\t\tstatus.Repositories = append(status.Repositories, m.getRepoStatus(mr))",
+    "\t\t}",
+    "\t\tstatuses = append(statuses, status)",
+    "\t}",
+    "\treturn statuses",
+    "}",
+    "",
+    "// GetWorkspaceForPath returns the workspace and repo IDs for a given absolute path.",
+    "func (m *WorkspaceManager) GetWorkspaceForPath(absPath string) (wsID proto.WorkspaceID, repoID proto.RepoID, ok bool) {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tcleanPath := filepath.Clean(absPath)",
+    "",
+    "\t// First try exact match",
+    "\tif info, found := m.pathIndex[cleanPath]; found {",
+    "\t\treturn info.WorkspaceID, info.RepoID, true",
+    "\t}",
+    "",
+    "\t// Then check if path is under a repo",
+    "\tfor repoPath, info := range m.pathIndex {",
+    "\t\tif strings.HasPrefix(cleanPath, repoPath+string(filepath.Separator)) || cleanPath == repoPath {",
+    "\t\t\treturn info.WorkspaceID, info.RepoID, true",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn \"\", \"\", false",
+    "}",
+    "",
+    "// GetRepoConfig returns the repo configuration for autosave decisions.",
+    "func (m *WorkspaceManager) GetRepoConfig(wsID proto.WorkspaceID, repoID proto.RepoID) (autosaveEnabled bool, debounceMs int, ok bool) {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, found := m.workspaces[wsID]",
+    "\tif !found {",
+    "\t\treturn false, 0, false",
+    "\t}",
+    "",
+    "\tmr, found := ws.Repos[repoID]",
+    "\tif !found {",
+    "\t\treturn false, 0, false",
+    "\t}",
+    "",
+    "\treturn mr.AutosaveEnabled, mr.AutosaveDebounceMs, true",
+    "}",
+    "",
+    "// ResolvePath resolves a relative path within a workspace to an absolute path.",
+    "func (m *WorkspaceManager) ResolvePath(wsID proto.WorkspaceID, path string) (string, error) {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn \"\", fmt.Errorf(\"workspace not found: %s\", wsID)",
+    "\t}",
+    "",
+    "\treturn pathutil.ResolvePath(path, ws.RootPath)",
+    "}",
+    "",
+    "// =============================================================================",
+    "// Internal Helpers",
+    "// =============================================================================",
+    "",
+    "func (m *WorkspaceManager) initializeRepo(ws *Workspace, mr *ManagedRepo) *proto.RepositoryStatus {",
+    "\tstart := time.Now()",
+    "\tvar initType string",
+    "",
+    "\t// Repos without a git remote URL are empty repos — just create the",
+    "\t// directory. Template files (if any) are written by the caller after",
+    "\t// SetupWorkspaceRepos returns.",
+    "\tif mr.GitRemoteURL == \"\" {",
+    "\t\tinitType = \"empty\"",
+    "\t\tif err := os.MkdirAll(mr.AbsolutePath, 0755); err != nil {",
+    "\t\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultError, time.Since(start))",
+    "\t\t\tmr.initError = err.Error()",
+    "\t\t\treturn &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      mr.RepoID,",
+    "\t\t\t\tPath:        mr.RelativePath,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t\tError:       err.Error(),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t\tmr.initialized = true",
+    "\t\tmr.lastSyncedAt = time.Now()",
+    "\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultSuccess, time.Since(start))",
+    "\t\tm.logger.Info(\"repo initialized\",",
+    "\t\t\tslog.String(\"path\", mr.RelativePath),",
+    "\t\t\tslog.String(\"init_type\", initType),",
+    "\t\t\tslog.Bool(\"initialized\", true))",
+    "\t\treturn m.getRepoStatus(mr)",
+    "\t}",
+    "",
+    "\t// Check if directory exists",
+    "\tif _, err := os.Stat(mr.AbsolutePath); os.IsNotExist(err) {",
+    "\t\tinitType = \"clone_new\"",
+    "\t\t// Clone the repository",
+    "\t\tif err := m.cloneRepo(ws, mr); err != nil {",
+    "\t\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultError, time.Since(start))",
+    "\t\t\tmr.initError = err.Error()",
+    "\t\t\treturn &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      mr.RepoID,",
+    "\t\t\t\tPath:        mr.RelativePath,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t\tError:       err.Error(),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t} else {",
+    "\t\tinitType = \"reconnect\"",
+    "\t\t// Directory exists, configure remote",
+    "\t\tif err := m.configureRemote(mr); err != nil {",
+    "\t\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultError, time.Since(start))",
+    "\t\t\tmr.initError = err.Error()",
+    "\t\t\treturn &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      mr.RepoID,",
+    "\t\t\t\tPath:        mr.RelativePath,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t\tError:       err.Error(),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Get current commit",
+    "\tsha, err := m.getCurrentCommit(mr)",
+    "\tif err == nil {",
+    "\t\tmr.currentSHA = sha",
+    "\t} else if initType == \"clone_new\" {",
+    "\t\t// Cloned but repo has no commits yet",
+    "\t\tinitType = \"clone_empty_repo\"",
+    "\t}",
+    "",
+    "\tmr.initialized = true",
+    "\tmr.lastSyncedAt = time.Now()",
+    "",
+    "\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultSuccess, time.Since(start))",
+    "\tm.logger.Info(\"repo initialized\",",
+    "\t\tslog.String(\"path\", mr.RelativePath),",
+    "\t\tslog.String(\"init_type\", initType),",
+    "\t\tslog.String(\"commit\", mr.currentSHA),",
+    "\t\tslog.Bool(\"initialized\", true))",
+    "",
+    "\treturn m.getRepoStatus(mr)",
+    "}",
+    "",
+    "func (m *WorkspaceManager) getRepoStatus(mr *ManagedRepo) *proto.RepositoryStatus {",
+    "\thasChanges, err := m.hasChanges(mr)",
+    "\tif err != nil {",
+    "\t\tslog.Warn(\"getRepoStatus: failed to check for changes\", slog.String(\"repo\", mr.RelativePath), slog.Any(\"error\", err))",
+    "\t}",
+    "",
+    "\treturn &proto.RepositoryStatus{",
+    "\t\tRepoID:         mr.RepoID,",
+    "\t\tPath:           mr.RelativePath,",
+    "\t\tInitialized:    mr.initialized,",
+    "\t\tHasChanges:     hasChanges,",
+    "\t\tCurrentCommit:  mr.currentSHA,",
+    "\t\tCurrentBranch:  mr.GitBranch,",
+    "\t\tError:          mr.initError,",
+    "\t\tLastSyncedAtMs: mr.lastSyncedAt.UnixMilli(),",
+    "\t}",
+    "}",
+    "",
+    "func (m *WorkspaceManager) saveRepo(ws *Workspace, mr *ManagedRepo, message string, push bool) *proto.RepoSaveResult {",
+    "\tif !mr.initialized {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   \"repository not initialized\",",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Check for changes",
+    "\thasChanges, err := m.hasChanges(mr)",
+    "\tif err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"checking for changes: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "\tif !hasChanges {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:     mr.RepoID,",
+    "\t\t\tPath:       mr.RelativePath,",
+    "\t\t\tSuccess:    true,",
+    "\t\t\tCommitSHA:  mr.currentSHA,",
+    "\t\t\tHadChanges: false,",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Stage all changes",
+    "\tif err := m.gitAdd(mr, \".\"); err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"git add failed: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Commit",
+    "\tif message == \"\" {",
+    "\t\tmessage = fmt.Sprintf(\"Auto-save at %s\", time.Now().Format(time.RFC3339))",
+    "\t}",
+    "",
+    "\tif err := m.gitCommit(mr, message); err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"git commit failed: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Get new commit SHA",
+    "\tsha, err := m.getCurrentCommit(mr)",
+    "\tif err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"failed to get commit SHA: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "\tmr.currentSHA = sha",
+    "",
+    "\t// Push if requested",
+    "\tif push {",
+    "\t\tif err := m.gitPush(mr); err != nil {",
+    "\t\t\treturn &proto.RepoSaveResult{",
+    "\t\t\t\tRepoID:     mr.RepoID,",
+    "\t\t\t\tPath:       mr.RelativePath,",
+    "\t\t\t\tSuccess:    false,",
+    "\t\t\t\tCommitSHA:  sha,",
+    "\t\t\t\tHadChanges: true,",
+    "\t\t\t\tError:      fmt.Sprintf(\"git push failed: %v\", err),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\tmr.lastSyncedAt = time.Now()",
+    "",
+    "\treturn &proto.RepoSaveResult{",
+    "\t\tRepoID:     mr.RepoID,",
+    "\t\tPath:       mr.RelativePath,",
+    "\t\tSuccess:    true,",
+    "\t\tCommitSHA:  sha,",
+    "\t\tHadChanges: true,",
+    "\t}",
+    "}",
+    "",
+    "func (m *WorkspaceManager) cloneRepo(ws *Workspace, mr *ManagedRepo) error {",
+    "\tparentDir := filepath.Dir(mr.AbsolutePath)",
+    "\tif err := os.MkdirAll(parentDir, 0755); err != nil {",
+    "\t\treturn fmt.Errorf(\"failed to create parent directory: %w\", err)",
+    "\t}",
+    "",
+    "\tfor attempt := 0; attempt <= cloneMaxRetries; attempt++ {",
+    "\t\t_, stderr, err := m.runGit(",
+    "\t\t\t[]string{\"clone\", \"--single-branch\", \"--branch\", mr.GitBranch, mr.GitRemoteURL, mr.AbsolutePath},",
+    "\t\t\tparentDir,",
+    "\t\t)",
+    "\t\tif err == nil {",
+    "\t\t\tbreak",
+    "\t\t}",
+    "",
+    "\t\tge := classifyGitError(stderr)",
+    "",
+    "\t\tif ge.Class == \"empty_repo\" {",
+    "\t\t\tos.RemoveAll(mr.AbsolutePath)",
+    "",
+    "\t\t\t_, stderr, err = m.runGit([]string{\"clone\", mr.GitRemoteURL, mr.AbsolutePath}, parentDir)",
+    "\t\t\tif err != nil {",
+    "\t\t\t\tm.logger.Error(\"git clone fallback failed\",",
+    "\t\t\t\t\t\"cmd\", \"clone\",",
+    "\t\t\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\t\t\"error\", err,",
+    "\t\t\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t\t\t)",
+    "\t\t\t\treturn fmt.Errorf(\"clone failed: %s\", redactCredentials(stderr))",
+    "\t\t\t}",
+    "",
+    "\t\t\t_, stderr, err = m.runGit([]string{\"checkout\", \"-b\", mr.GitBranch}, mr.AbsolutePath)",
+    "\t\t\tif err != nil {",
+    "\t\t\t\tif !strings.Contains(stderr, \"already exists\") {",
+    "\t\t\t\t\tm.logger.Error(\"git checkout branch failed\",",
+    "\t\t\t\t\t\t\"cmd\", \"checkout\",",
+    "\t\t\t\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\t\t\t\"error\", err,",
+    "\t\t\t\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t\t\t\t)",
+    "\t\t\t\t\treturn fmt.Errorf(\"checkout branch failed: %s\", redactCredentials(stderr))",
+    "\t\t\t\t}",
+    "\t\t\t}",
+    "\t\t\tbreak",
+    "\t\t}",
+    "",
+    "\t\tif ge.Retryable && attempt < cloneMaxRetries {",
+    "\t\t\tos.RemoveAll(mr.AbsolutePath)",
+    "\t\t\tslog.Warn(\"retrying git clone\",",
+    "\t\t\t\tslog.String(\"error_class\", ge.Class),",
+    "\t\t\t\tslog.Int(\"attempt\", attempt),",
+    "\t\t\t\tslog.String(\"repo_path\", mr.AbsolutePath),",
+    "\t\t\t)",
+    "\t\t\ttime.Sleep(cloneBackoff(attempt))",
+    "\t\t\tcontinue",
+    "\t\t}",
+    "",
+    "\t\tm.logger.Error(\"git clone failed\",",
+    "\t\t\t\"cmd\", \"clone\",",
+    "\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"error_class\", ge.Class,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"clone failed: %s\", redactCredentials(stderr))",
+    "\t}",
+    "",
+    "\tif err := m.configureUser(mr); err != nil {",
+    "\t\treturn err",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) configureRemote(mr *ManagedRepo) error {",
+    "\t// Check if this is a git repo",
+    "\t_, stderr, err := m.runGit([]string{\"rev-parse\", \"--git-dir\"}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git rev-parse failed\",",
+    "\t\t\t\"cmd\", \"rev-parse\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"not a git repository\")",
+    "\t}",
+    "",
+    "\t// Update remote URL (auth is handled via /etc/gitconfig extraHeader)",
+    "\t_, _, err = m.runGit([]string{\"remote\", \"set-url\", \"origin\", mr.GitRemoteURL}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\t// Try to add remote if it doesn't exist",
+    "\t\t_, stderr, err = m.runGit([]string{\"remote\", \"add\", \"origin\", mr.GitRemoteURL}, mr.AbsolutePath)",
+    "\t\tif err != nil {",
+    "\t\t\tm.logger.Error(\"git remote add failed\",",
+    "\t\t\t\t\"cmd\", \"remote add\",",
+    "\t\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\t\"error\", err,",
+    "\t\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t\t)",
+    "\t\t\treturn fmt.Errorf(\"failed to configure remote: %w\", err)",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Configure user",
+    "\tif err := m.configureUser(mr); err != nil {",
+    "\t\treturn err",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) configureUser(mr *ManagedRepo) error {",
+    "\tauthorName := mr.AuthorName",
+    "\tif authorName == \"\" {",
+    "\t\tauthorName = \"sboxd\"",
+    "\t}",
+    "\tauthorEmail := mr.AuthorEmail",
+    "\tif authorEmail == \"\" {",
+    "\t\tauthorEmail = \"sbox@figma.com\"",
+    "\t}",
+    "",
+    "\t_, stderr, err := m.runGit([]string{\"config\", \"user.name\", authorName}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git config user.name failed\",",
+    "\t\t\t\"cmd\", \"config user.name\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"failed to configure user.name: %w\", err)",
+    "\t}",
+    "",
+    "\t_, stderr, err = m.runGit([]string{\"config\", \"user.email\", authorEmail}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git config user.email failed\",",
+    "\t\t\t\"cmd\", \"config user.email\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"failed to configure user.email: %w\", err)",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) getCurrentCommit(mr *ManagedRepo) (string, error) {",
+    "\tstdout, _, err := m.runGit([]string{\"rev-parse\", \"HEAD\"}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\treturn \"\", err",
+    "\t}",
+    "\treturn strings.TrimSpace(stdout), nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) hasChanges(mr *ManagedRepo) (bool, error) {",
+    "\tstdout, _, err := m.runGit([]string{\"status\", \"--porcelain\"}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tslog.Warn(\"git status failed\", slog.String(\"repo\", mr.RelativePath), slog.Any(\"error\", err))",
+    "\t\treturn false, fmt.Errorf(\"git status: %w\", err)",
+    "\t}",
+    "\treturn len(strings.TrimSpace(stdout)) > 0, nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) gitAdd(mr *ManagedRepo, path string) error {",
+    "\t_, stderr, err := m.runGit([]string{\"add\", path}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git add failed\",",
+    "\t\t\t\"cmd\", \"add\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn err",
+    "\t}",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) gitCommit(mr *ManagedRepo, message string) error {",
+    "\t_, stderr, err := m.runGit([]string{\"commit\", \"-m\", message}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git commit failed\",",
+    "\t\t\t\"cmd\", \"commit\",",
+    "\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"%s\", redactCredentials(stderr))",
+    "\t}",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) gitPush(mr *ManagedRepo) error {",
+    "\t_, stderr, err := m.runGit([]string{\"push\", \"--no-thin\", \"origin\", \"HEAD:\" + mr.GitBranch}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git push failed\",",
+    "\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"%s\", redactCredentials(stderr))",
+    "\t}",
+    "\treturn nil",
+    "}",
+    "",
+    "// runGit builds a git command, executes it, records a duration metric, and",
+    "// returns stdout, stderr, and any error.",
+    "func (m *WorkspaceManager) runGit(args []string, cwd string) (stdout, stderr string, err error) {",
+    "\tcmd := gitclient.Command(cwd, args...)",
+    "",
+    "\tvar outBuf, errBuf bytes.Buffer",
+    "\tcmd.Stdout = &outBuf",
+    "\tcmd.Stderr = &errBuf",
+    "",
+    "\tstart := time.Now()",
+    "\terr = cmd.Run()",
+    "",
+    "\tvar errorClass string",
+    "\tif err != nil {",
+    "\t\tge := classifyGitError(errBuf.String())",
+    "\t\terrorClass = ge.Class",
+    "\t}",
+    "\tm.metrics.RecordWorkspaceGitCmd(args[0], err, errorClass, time.Since(start))",
+    "",
+    "\treturn outBuf.String(), errBuf.String(), err",
+    "}"
+  ],
+  "old_lines": [
+    "package workspace",
+    "",
+    "import (",
+    "\t\"bytes\"",
+    "\t\"fmt\"",
+    "\t\"log/slog\"",
+    "\t\"maps\"",
+    "\t\"math/rand\"",
+    "\t\"os\"",
+    "\t\"path/filepath\"",
+    "\t\"regexp\"",
+    "\t\"strings\"",
+    "\t\"sync\"",
+    "\t\"time\"",
+    "",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/config\"",
+    "",
+    "\t\"figma.com/services/agentplat/gitclient\"",
+    "\t\"figma.com/services/agentplat/proto\"",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/metrics\"",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/pathutil\"",
+    ")",
+    "",
+    "const (",
+    "\tcloneMaxRetries     = 3",
+    "\tcloneInitialBackoff = 1 * time.Second",
+    "\tcloneMaxBackoff     = 30 * time.Second",
+    ")",
+    "",
+    "func cloneBackoff(attempt int) time.Duration {",
+    "\tbackoff := cloneInitialBackoff * time.Duration(1<<uint(attempt))",
+    "\tif backoff > cloneMaxBackoff {",
+    "\t\tbackoff = cloneMaxBackoff",
+    "\t}",
+    "\tjitter := time.Duration(rand.Int63n(int64(backoff) / 2))",
+    "\treturn backoff/2 + jitter",
+    "}",
+    "",
+    "// credentialURLPattern matches URLs with embedded credentials (e.g., https://user:pass@host/...).",
+    "var credentialURLPattern = regexp.MustCompile(`(https?://)([^@/]+@)([^\\s'\\\"]+)`)",
+    "",
+    "// redactCredentials replaces credentials in URLs within an error string.",
+    "// \"https://user:token@host/path\" becomes \"https://REDACTED@host/path\".",
+    "func redactCredentials(s string) string {",
+    "\treturn credentialURLPattern.ReplaceAllString(s, \"${1}REDACTED@${3}\")",
+    "}",
+    "",
+    "// pathInfo maps an absolute path to its workspace and repo.",
+    "type pathInfo struct {",
+    "\tWorkspaceID proto.WorkspaceID",
+    "\tRepoID      proto.RepoID",
+    "}",
+    "",
+    "// Workspace represents a workspace containing multiple repositories.",
+    "type Workspace struct {",
+    "\tWorkspaceID proto.WorkspaceID",
+    "\tRootPath    string // Base path for workspace (e.g., /workspaces/default)",
+    "\tMetadata    *proto.WorkspaceMetadata",
+    "\tRepos       map[proto.RepoID]*ManagedRepo // repoId -> ManagedRepo",
+    "\tEnv         map[string]string             // per-workspace env defaults (from workspace/create)",
+    "}",
+    "",
+    "// ManagedRepo represents a git repository within a workspace.",
+    "type ManagedRepo struct {",
+    "\tRepoID       proto.RepoID",
+    "\tRelativePath string // Relative to workspace root",
+    "\tAbsolutePath string // Computed: RootPath + RelativePath",
+    "\tGitRemoteURL string",
+    "\tGitBranch    string",
+    "\tCredentials  *proto.GitCredentials",
+    "\tAuthorName   string",
+    "\tAuthorEmail  string",
+    "\t// Autosave config",
+    "\tAutosaveEnabled    bool",
+    "\tAutosaveDebounceMs int",
+    "\t// State",
+    "\tinitialized  bool",
+    "\tcurrentSHA   string",
+    "\tlastSyncedAt time.Time",
+    "\tinitError    string",
+    "}",
+    "",
+    "// WorkspaceManager manages git-backed directories for sboxd.",
+    "// It handles initialization (cloning), saving (commit+push), and credential updates.",
+    "type WorkspaceManager struct {",
+    "\tmu                   sync.RWMutex",
+    "\tworkspaces           map[proto.WorkspaceID]*Workspace // workspaceId -> Workspace",
+    "\tpathIndex            map[string]pathInfo              // absolute path -> {workspaceId, repoId}",
+    "\tdefaultWorkspacePath string",
+    "\tlogger               *slog.Logger",
+    "\tmetrics              *metrics.Reporter",
+    "}",
+    "",
+    "// NewWorkspaceManager creates a new workspace manager.",
+    "func NewWorkspaceManager(logger *slog.Logger, m *metrics.Reporter) *WorkspaceManager {",
+    "\tif logger == nil {",
+    "\t\tlogger = slog.Default()",
+    "\t}",
+    "\tif m == nil {",
+    "\t\tm = metrics.NoOpReporter()",
+    "\t}",
+    "\treturn &WorkspaceManager{",
+    "\t\tworkspaces:           make(map[proto.WorkspaceID]*Workspace),",
+    "\t\tpathIndex:            make(map[string]pathInfo),",
+    "\t\tdefaultWorkspacePath: proto.DefaultWorkspacePath,",
+    "\t\tlogger:               logger,",
+    "\t\tmetrics:              m,",
+    "\t}",
+    "}",
+    "",
+    "// DefaultWorkspacePath returns the default workspace root path.",
+    "// This is set internally when CreateWorkspace is called.",
+    "func (m *WorkspaceManager) DefaultWorkspacePath() string {",
+    "\treturn m.defaultWorkspacePath",
+    "}",
+    "",
+    "// CreateWorkspace creates a workspace with the given ID and root path.",
+    "// It creates the directory on disk via os.MkdirAll, then registers it in the",
+    "// workspace manager. Returns an error if the directory cannot be created (fail-fast).",
+    "// If the workspace already exists, it returns the existing metadata.",
+    "// The optional env map stores per-workspace env defaults for prompt sessions.",
+    "func (m *WorkspaceManager) CreateWorkspace(wsID proto.WorkspaceID, rootPath string, env ...map[string]string) (proto.WorkspaceID, *proto.WorkspaceMetadata, error) {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tif ws, exists := m.workspaces[wsID]; exists {",
+    "\t\treturn wsID, ws.Metadata, nil",
+    "\t}",
+    "",
+    "\tif err := os.MkdirAll(rootPath, 0755); err != nil {",
+    "\t\treturn \"\", nil, fmt.Errorf(\"create workspace directory %s: %w\", rootPath, err)",
+    "\t}",
+    "",
+    "\tnow := time.Now().UnixMilli()",
+    "\tmetadata := &proto.WorkspaceMetadata{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tRootPath:    rootPath,",
+    "\t\tCreatedAtMs: now,",
+    "\t\tUpdatedAtMs: now,",
+    "\t}",
+    "",
+    "\tws := &Workspace{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tRootPath:    rootPath,",
+    "\t\tMetadata:    metadata,",
+    "\t\tRepos:       make(map[proto.RepoID]*ManagedRepo),",
+    "\t}",
+    "\tif len(env) > 0 && env[0] != nil {",
+    "\t\tfiltered := make(map[string]string, len(env[0]))",
+    "\t\tfor k, v := range env[0] {",
+    "\t\t\tif config.IsAllowedEnvKey(k) {",
+    "\t\t\t\tfiltered[k] = v",
+    "\t\t\t} else {",
+    "\t\t\t\tm.logger.Warn(\"CreateWorkspace: dropping disallowed env var\", slog.String(\"key\", k))",
+    "\t\t\t}",
+    "\t\t}",
+    "\t\tif len(filtered) > 0 {",
+    "\t\t\tws.Env = filtered",
+    "\t\t}",
+    "\t}",
+    "",
+    "\tm.workspaces[wsID] = ws",
+    "\tm.defaultWorkspacePath = rootPath",
+    "",
+    "\treturn wsID, metadata, nil",
+    "}",
+    "",
+    "// GetWorkspaceEnv returns a copy of the per-workspace env defaults.",
+    "func (m *WorkspaceManager) GetWorkspaceEnv(wsID proto.WorkspaceID) map[string]string {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok || ws.Env == nil {",
+    "\t\treturn nil",
+    "\t}",
+    "\treturn maps.Clone(ws.Env)",
+    "}",
+    "",
+    "// SetupWorkspaceRepos configures repositories within a workspace.",
+    "// If initialize is true, it will clone/initialize repositories immediately.",
+    "func (m *WorkspaceManager) SetupWorkspaceRepos(wsID proto.WorkspaceID, repos []*proto.Repository, initialize bool) []*proto.RepositoryStatus {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn []*proto.RepositoryStatus{{",
+    "\t\t\tError: fmt.Sprintf(\"workspace not found: %s\", wsID),",
+    "\t\t}}",
+    "\t}",
+    "",
+    "\tstatuses := make([]*proto.RepositoryStatus, 0, len(repos))",
+    "",
+    "\tfor _, repo := range repos {",
+    "\t\trepoID := repo.RepoID",
+    "\t\tif repoID.IsZero() {",
+    "\t\t\trepoID = proto.NewRepoID()",
+    "\t\t}",
+    "",
+    "\t\tabsPath := filepath.Join(ws.RootPath, repo.Path)",
+    "",
+    "\t\tmr := &ManagedRepo{",
+    "\t\t\tRepoID:       repoID,",
+    "\t\t\tRelativePath: repo.Path,",
+    "\t\t\tAbsolutePath: absPath,",
+    "\t\t\tGitRemoteURL: repo.GitRemoteURL,",
+    "\t\t\tGitBranch:    repo.GitBranch,",
+    "\t\t\tAuthorName:   repo.AuthorName,",
+    "\t\t\tAuthorEmail:  repo.AuthorEmail,",
+    "\t\t}",
+    "",
+    "\t\tif mr.GitBranch == \"\" {",
+    "\t\t\tmr.GitBranch = \"main\"",
+    "\t\t}",
+    "",
+    "\t\tif repo.Credentials != nil {",
+    "\t\t\tmr.Credentials = &proto.GitCredentials{",
+    "\t\t\t\tUsername: repo.Credentials.Username,",
+    "\t\t\t\tPassword: repo.Credentials.Password,",
+    "\t\t\t}",
+    "\t\t}",
+    "",
+    "\t\t// Autosave config",
+    "\t\tif repo.AutosaveEnabled != nil {",
+    "\t\t\tmr.AutosaveEnabled = *repo.AutosaveEnabled",
+    "\t\t} else {",
+    "\t\t\tmr.AutosaveEnabled = true // Default enabled",
+    "\t\t}",
+    "\t\tmr.AutosaveDebounceMs = repo.AutosaveDebounceMs",
+    "",
+    "\t\tws.Repos[repoID] = mr",
+    "",
+    "\t\t// Update path index",
+    "\t\tm.pathIndex[absPath] = pathInfo{",
+    "\t\t\tWorkspaceID: wsID,",
+    "\t\t\tRepoID:      repoID,",
+    "\t\t}",
+    "",
+    "\t\tif initialize {",
+    "\t\t\tstatus := m.initializeRepo(ws, mr)",
+    "\t\t\tstatuses = append(statuses, status)",
+    "\t\t} else {",
+    "\t\t\tstatuses = append(statuses, &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      repoID,",
+    "\t\t\t\tPath:        repo.Path,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t})",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Update workspace metadata",
+    "\tws.Metadata.UpdatedAtMs = time.Now().UnixMilli()",
+    "",
+    "\treturn statuses",
+    "}",
+    "",
+    "// GetWorkspaceStatus returns the status of a workspace and optionally specific repos.",
+    "func (m *WorkspaceManager) GetWorkspaceStatus(wsID proto.WorkspaceID, repoIDs []proto.RepoID) *proto.WorkspaceStatus {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn nil",
+    "\t}",
+    "",
+    "\tstatus := &proto.WorkspaceStatus{",
+    "\t\tWorkspaceID:  wsID,",
+    "\t\tMetadata:     ws.Metadata,",
+    "\t\tRepositories: make([]*proto.RepositoryStatus, 0),",
+    "\t}",
+    "",
+    "\tif len(repoIDs) == 0 {",
+    "\t\t// Return all repos",
+    "\t\tfor _, mr := range ws.Repos {",
+    "\t\t\tstatus.Repositories = append(status.Repositories, m.getRepoStatus(mr))",
+    "\t\t}",
+    "\t} else {",
+    "\t\tfor _, repoID := range repoIDs {",
+    "\t\t\tif mr, ok := ws.Repos[repoID]; ok {",
+    "\t\t\t\tstatus.Repositories = append(status.Repositories, m.getRepoStatus(mr))",
+    "\t\t\t} else {",
+    "\t\t\t\tstatus.Repositories = append(status.Repositories, &proto.RepositoryStatus{",
+    "\t\t\t\t\tRepoID: repoID,",
+    "\t\t\t\t\tError:  \"repository not found\",",
+    "\t\t\t\t})",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn status",
+    "}",
+    "",
+    "// DeleteWorkspace removes a workspace and all its repositories.",
+    "func (m *WorkspaceManager) DeleteWorkspace(wsID proto.WorkspaceID) error {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn fmt.Errorf(\"workspace not found: %s\", wsID)",
+    "\t}",
+    "",
+    "\t// Remove path index entries",
+    "\tfor _, mr := range ws.Repos {",
+    "\t\tdelete(m.pathIndex, mr.AbsolutePath)",
+    "\t}",
+    "",
+    "\tdelete(m.workspaces, wsID)",
+    "\treturn nil",
+    "}",
+    "",
+    "// SaveWorkspaceRepos commits and pushes changes in specified repos (or all if empty).",
+    "func (m *WorkspaceManager) SaveWorkspaceRepos(wsID proto.WorkspaceID, repoIDs []proto.RepoID, message string, push bool) []*proto.RepoSaveResult {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn []*proto.RepoSaveResult{{",
+    "\t\t\tError: fmt.Sprintf(\"workspace not found: %s\", wsID),",
+    "\t\t}}",
+    "\t}",
+    "",
+    "\tvar results []*proto.RepoSaveResult",
+    "",
+    "\tif len(repoIDs) == 0 {",
+    "\t\t// Save all repos",
+    "\t\tfor _, mr := range ws.Repos {",
+    "\t\t\tresult := m.saveRepo(ws, mr, message, push)",
+    "\t\t\tresults = append(results, result)",
+    "\t\t}",
+    "\t} else {",
+    "\t\tfor _, repoID := range repoIDs {",
+    "\t\t\tif mr, ok := ws.Repos[repoID]; ok {",
+    "\t\t\t\tresult := m.saveRepo(ws, mr, message, push)",
+    "\t\t\t\tresults = append(results, result)",
+    "\t\t\t} else {",
+    "\t\t\t\tresults = append(results, &proto.RepoSaveResult{",
+    "\t\t\t\t\tRepoID:  repoID,",
+    "\t\t\t\t\tSuccess: false,",
+    "\t\t\t\t\tError:   \"repository not found\",",
+    "\t\t\t\t})",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn results",
+    "}",
+    "",
+    "// UpdateRepoCredentials updates git credentials for a specific repository.",
+    "func (m *WorkspaceManager) UpdateRepoCredentials(wsID proto.WorkspaceID, repoID proto.RepoID, creds *proto.GitCredentials) error {",
+    "\tm.mu.Lock()",
+    "\tdefer m.mu.Unlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn fmt.Errorf(\"workspace not found: %s\", wsID)",
+    "\t}",
+    "",
+    "\tmr, ok := ws.Repos[repoID]",
+    "\tif !ok {",
+    "\t\treturn fmt.Errorf(\"repository not found: %s\", repoID)",
+    "\t}",
+    "",
+    "\tmr.Credentials = &proto.GitCredentials{",
+    "\t\tUsername: creds.Username,",
+    "\t\tPassword: creds.Password,",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "// ListWorkspaces returns status of all workspaces.",
+    "func (m *WorkspaceManager) ListWorkspaces() []*proto.WorkspaceStatus {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tvar statuses []*proto.WorkspaceStatus",
+    "\tfor wsID := range m.workspaces {",
+    "\t\t// Use unlocked version since we already hold the lock",
+    "\t\tws := m.workspaces[wsID]",
+    "\t\tstatus := &proto.WorkspaceStatus{",
+    "\t\t\tWorkspaceID:  wsID,",
+    "\t\t\tMetadata:     ws.Metadata,",
+    "\t\t\tRepositories: make([]*proto.RepositoryStatus, 0),",
+    "\t\t}",
+    "\t\tfor _, mr := range ws.Repos {",
+    "\t\t\tstatus.Repositories = append(status.Repositories, m.getRepoStatus(mr))",
+    "\t\t}",
+    "\t\tstatuses = append(statuses, status)",
+    "\t}",
+    "\treturn statuses",
+    "}",
+    "",
+    "// GetWorkspaceForPath returns the workspace and repo IDs for a given absolute path.",
+    "func (m *WorkspaceManager) GetWorkspaceForPath(absPath string) (wsID proto.WorkspaceID, repoID proto.RepoID, ok bool) {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tcleanPath := filepath.Clean(absPath)",
+    "",
+    "\t// First try exact match",
+    "\tif info, found := m.pathIndex[cleanPath]; found {",
+    "\t\treturn info.WorkspaceID, info.RepoID, true",
+    "\t}",
+    "",
+    "\t// Then check if path is under a repo",
+    "\tfor repoPath, info := range m.pathIndex {",
+    "\t\tif strings.HasPrefix(cleanPath, repoPath+string(filepath.Separator)) || cleanPath == repoPath {",
+    "\t\t\treturn info.WorkspaceID, info.RepoID, true",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn \"\", \"\", false",
+    "}",
+    "",
+    "// GetRepoConfig returns the repo configuration for autosave decisions.",
+    "func (m *WorkspaceManager) GetRepoConfig(wsID proto.WorkspaceID, repoID proto.RepoID) (autosaveEnabled bool, debounceMs int, ok bool) {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, found := m.workspaces[wsID]",
+    "\tif !found {",
+    "\t\treturn false, 0, false",
+    "\t}",
+    "",
+    "\tmr, found := ws.Repos[repoID]",
+    "\tif !found {",
+    "\t\treturn false, 0, false",
+    "\t}",
+    "",
+    "\treturn mr.AutosaveEnabled, mr.AutosaveDebounceMs, true",
+    "}",
+    "",
+    "// ResolvePath resolves a relative path within a workspace to an absolute path.",
+    "func (m *WorkspaceManager) ResolvePath(wsID proto.WorkspaceID, path string) (string, error) {",
+    "\tm.mu.RLock()",
+    "\tdefer m.mu.RUnlock()",
+    "",
+    "\tws, ok := m.workspaces[wsID]",
+    "\tif !ok {",
+    "\t\treturn \"\", fmt.Errorf(\"workspace not found: %s\", wsID)",
+    "\t}",
+    "",
+    "\treturn pathutil.ResolvePath(path, ws.RootPath)",
+    "}",
+    "",
+    "// =============================================================================",
+    "// Internal Helpers",
+    "// =============================================================================",
+    "",
+    "func (m *WorkspaceManager) initializeRepo(ws *Workspace, mr *ManagedRepo) *proto.RepositoryStatus {",
+    "\tstart := time.Now()",
+    "\tvar initType string",
+    "",
+    "\t// Repos without a git remote URL are empty repos — just create the",
+    "\t// directory. Template files (if any) are written by the caller after",
+    "\t// SetupWorkspaceRepos returns.",
+    "\tif mr.GitRemoteURL == \"\" {",
+    "\t\tinitType = \"empty\"",
+    "\t\tif err := os.MkdirAll(mr.AbsolutePath, 0755); err != nil {",
+    "\t\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultError, time.Since(start))",
+    "\t\t\tmr.initError = err.Error()",
+    "\t\t\treturn &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      mr.RepoID,",
+    "\t\t\t\tPath:        mr.RelativePath,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t\tError:       err.Error(),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t\tmr.initialized = true",
+    "\t\tmr.lastSyncedAt = time.Now()",
+    "\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultSuccess, time.Since(start))",
+    "\t\tm.logger.Info(\"repo initialized\",",
+    "\t\t\tslog.String(\"path\", mr.RelativePath),",
+    "\t\t\tslog.String(\"init_type\", initType),",
+    "\t\t\tslog.Bool(\"initialized\", true))",
+    "\t\treturn m.getRepoStatus(mr)",
+    "\t}",
+    "",
+    "\t// Check if directory exists",
+    "\tif _, err := os.Stat(mr.AbsolutePath); os.IsNotExist(err) {",
+    "\t\tinitType = \"clone_new\"",
+    "\t\t// Clone the repository",
+    "\t\tif err := m.cloneRepo(ws, mr); err != nil {",
+    "\t\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultError, time.Since(start))",
+    "\t\t\tmr.initError = err.Error()",
+    "\t\t\treturn &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      mr.RepoID,",
+    "\t\t\t\tPath:        mr.RelativePath,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t\tError:       err.Error(),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t} else {",
+    "\t\tinitType = \"reconnect\"",
+    "\t\t// Directory exists, configure remote",
+    "\t\tif err := m.configureRemote(mr); err != nil {",
+    "\t\t\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultError, time.Since(start))",
+    "\t\t\tmr.initError = err.Error()",
+    "\t\t\treturn &proto.RepositoryStatus{",
+    "\t\t\t\tRepoID:      mr.RepoID,",
+    "\t\t\t\tPath:        mr.RelativePath,",
+    "\t\t\t\tInitialized: false,",
+    "\t\t\t\tError:       err.Error(),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Get current commit",
+    "\tsha, err := m.getCurrentCommit(mr)",
+    "\tif err == nil {",
+    "\t\tmr.currentSHA = sha",
+    "\t} else if initType == \"clone_new\" {",
+    "\t\t// Cloned but repo has no commits yet",
+    "\t\tinitType = \"clone_empty_repo\"",
+    "\t}",
+    "",
+    "\tmr.initialized = true",
+    "\tmr.lastSyncedAt = time.Now()",
+    "",
+    "\tm.metrics.RecordBootstrapRepo(initType, metrics.ResultSuccess, time.Since(start))",
+    "\tm.logger.Info(\"repo initialized\",",
+    "\t\tslog.String(\"path\", mr.RelativePath),",
+    "\t\tslog.String(\"init_type\", initType),",
+    "\t\tslog.String(\"commit\", mr.currentSHA),",
+    "\t\tslog.Bool(\"initialized\", true))",
+    "",
+    "\treturn m.getRepoStatus(mr)",
+    "}",
+    "",
+    "func (m *WorkspaceManager) getRepoStatus(mr *ManagedRepo) *proto.RepositoryStatus {",
+    "\thasChanges, err := m.hasChanges(mr)",
+    "\tif err != nil {",
+    "\t\tslog.Warn(\"getRepoStatus: failed to check for changes\", slog.String(\"repo\", mr.RelativePath), slog.Any(\"error\", err))",
+    "\t}",
+    "",
+    "\treturn &proto.RepositoryStatus{",
+    "\t\tRepoID:         mr.RepoID,",
+    "\t\tPath:           mr.RelativePath,",
+    "\t\tInitialized:    mr.initialized,",
+    "\t\tHasChanges:     hasChanges,",
+    "\t\tCurrentCommit:  mr.currentSHA,",
+    "\t\tCurrentBranch:  mr.GitBranch,",
+    "\t\tError:          mr.initError,",
+    "\t\tLastSyncedAtMs: mr.lastSyncedAt.UnixMilli(),",
+    "\t}",
+    "}",
+    "",
+    "func (m *WorkspaceManager) saveRepo(ws *Workspace, mr *ManagedRepo, message string, push bool) *proto.RepoSaveResult {",
+    "\tif !mr.initialized {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   \"repository not initialized\",",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Check for changes",
+    "\thasChanges, err := m.hasChanges(mr)",
+    "\tif err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"checking for changes: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "\tif !hasChanges {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:     mr.RepoID,",
+    "\t\t\tPath:       mr.RelativePath,",
+    "\t\t\tSuccess:    true,",
+    "\t\t\tCommitSHA:  mr.currentSHA,",
+    "\t\t\tHadChanges: false,",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Stage all changes",
+    "\tif err := m.gitAdd(mr, \".\"); err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"git add failed: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Commit",
+    "\tif message == \"\" {",
+    "\t\tmessage = fmt.Sprintf(\"Auto-save at %s\", time.Now().Format(time.RFC3339))",
+    "\t}",
+    "",
+    "\tif err := m.gitCommit(mr, message); err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"git commit failed: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Get new commit SHA",
+    "\tsha, err := m.getCurrentCommit(mr)",
+    "\tif err != nil {",
+    "\t\treturn &proto.RepoSaveResult{",
+    "\t\t\tRepoID:  mr.RepoID,",
+    "\t\t\tPath:    mr.RelativePath,",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   fmt.Sprintf(\"failed to get commit SHA: %v\", err),",
+    "\t\t}",
+    "\t}",
+    "\tmr.currentSHA = sha",
+    "",
+    "\t// Push if requested",
+    "\tif push {",
+    "\t\tif err := m.gitPush(mr); err != nil {",
+    "\t\t\treturn &proto.RepoSaveResult{",
+    "\t\t\t\tRepoID:     mr.RepoID,",
+    "\t\t\t\tPath:       mr.RelativePath,",
+    "\t\t\t\tSuccess:    false,",
+    "\t\t\t\tCommitSHA:  sha,",
+    "\t\t\t\tHadChanges: true,",
+    "\t\t\t\tError:      fmt.Sprintf(\"git push failed: %v\", err),",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "",
+    "\tmr.lastSyncedAt = time.Now()",
+    "",
+    "\treturn &proto.RepoSaveResult{",
+    "\t\tRepoID:     mr.RepoID,",
+    "\t\tPath:       mr.RelativePath,",
+    "\t\tSuccess:    true,",
+    "\t\tCommitSHA:  sha,",
+    "\t\tHadChanges: true,",
+    "\t}",
+    "}",
+    "",
+    "func (m *WorkspaceManager) cloneRepo(ws *Workspace, mr *ManagedRepo) error {",
+    "\tparentDir := filepath.Dir(mr.AbsolutePath)",
+    "\tif err := os.MkdirAll(parentDir, 0755); err != nil {",
+    "\t\treturn fmt.Errorf(\"failed to create parent directory: %w\", err)",
+    "\t}",
+    "",
+    "\tfor attempt := 0; attempt <= cloneMaxRetries; attempt++ {",
+    "\t\t_, stderr, err := m.runGit(",
+    "\t\t\t[]string{\"clone\", \"--single-branch\", \"--branch\", mr.GitBranch, mr.GitRemoteURL, mr.AbsolutePath},",
+    "\t\t\tparentDir,",
+    "\t\t)",
+    "\t\tif err == nil {",
+    "\t\t\tbreak",
+    "\t\t}",
+    "",
+    "\t\tge := classifyGitError(stderr)",
+    "",
+    "\t\tif ge.Class == \"empty_repo\" {",
+    "\t\t\tos.RemoveAll(mr.AbsolutePath)",
+    "",
+    "\t\t\t_, stderr, err = m.runGit([]string{\"clone\", mr.GitRemoteURL, mr.AbsolutePath}, parentDir)",
+    "\t\t\tif err != nil {",
+    "\t\t\t\tm.logger.Error(\"git clone fallback failed\",",
+    "\t\t\t\t\t\"cmd\", \"clone\",",
+    "\t\t\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\t\t\"error\", err,",
+    "\t\t\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t\t\t)",
+    "\t\t\t\treturn fmt.Errorf(\"clone failed: %s\", redactCredentials(stderr))",
+    "\t\t\t}",
+    "",
+    "\t\t\t_, stderr, err = m.runGit([]string{\"checkout\", \"-b\", mr.GitBranch}, mr.AbsolutePath)",
+    "\t\t\tif err != nil {",
+    "\t\t\t\tif !strings.Contains(stderr, \"already exists\") {",
+    "\t\t\t\t\tm.logger.Error(\"git checkout branch failed\",",
+    "\t\t\t\t\t\t\"cmd\", \"checkout\",",
+    "\t\t\t\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\t\t\t\"error\", err,",
+    "\t\t\t\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t\t\t\t)",
+    "\t\t\t\t\treturn fmt.Errorf(\"checkout branch failed: %s\", redactCredentials(stderr))",
+    "\t\t\t\t}",
+    "\t\t\t}",
+    "\t\t\tbreak",
+    "\t\t}",
+    "",
+    "\t\tif ge.Retryable && attempt < cloneMaxRetries {",
+    "\t\t\tos.RemoveAll(mr.AbsolutePath)",
+    "\t\t\tslog.Warn(\"retrying git clone\",",
+    "\t\t\t\tslog.String(\"error_class\", ge.Class),",
+    "\t\t\t\tslog.Int(\"attempt\", attempt),",
+    "\t\t\t\tslog.String(\"repo_path\", mr.AbsolutePath),",
+    "\t\t\t)",
+    "\t\t\ttime.Sleep(cloneBackoff(attempt))",
+    "\t\t\tcontinue",
+    "\t\t}",
+    "",
+    "\t\tm.logger.Error(\"git clone failed\",",
+    "\t\t\t\"cmd\", \"clone\",",
+    "\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"error_class\", ge.Class,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"clone failed: %s\", redactCredentials(stderr))",
+    "\t}",
+    "",
+    "\tif err := m.configureUser(mr); err != nil {",
+    "\t\treturn err",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) configureRemote(mr *ManagedRepo) error {",
+    "\t// Check if this is a git repo",
+    "\t_, stderr, err := m.runGit([]string{\"rev-parse\", \"--git-dir\"}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git rev-parse failed\",",
+    "\t\t\t\"cmd\", \"rev-parse\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"not a git repository\")",
+    "\t}",
+    "",
+    "\t// Update remote URL (auth is handled via /etc/gitconfig extraHeader)",
+    "\t_, _, err = m.runGit([]string{\"remote\", \"set-url\", \"origin\", mr.GitRemoteURL}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\t// Try to add remote if it doesn't exist",
+    "\t\t_, stderr, err = m.runGit([]string{\"remote\", \"add\", \"origin\", mr.GitRemoteURL}, mr.AbsolutePath)",
+    "\t\tif err != nil {",
+    "\t\t\tm.logger.Error(\"git remote add failed\",",
+    "\t\t\t\t\"cmd\", \"remote add\",",
+    "\t\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\t\"error\", err,",
+    "\t\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t\t)",
+    "\t\t\treturn fmt.Errorf(\"failed to configure remote: %w\", err)",
+    "\t\t}",
+    "\t}",
+    "",
+    "\t// Configure user",
+    "\tif err := m.configureUser(mr); err != nil {",
+    "\t\treturn err",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) configureUser(mr *ManagedRepo) error {",
+    "\tauthorName := mr.AuthorName",
+    "\tif authorName == \"\" {",
+    "\t\tauthorName = \"sboxd\"",
+    "\t}",
+    "\tauthorEmail := mr.AuthorEmail",
+    "\tif authorEmail == \"\" {",
+    "\t\tauthorEmail = \"sbox@figma.com\"",
+    "\t}",
+    "",
+    "\t_, stderr, err := m.runGit([]string{\"config\", \"user.name\", authorName}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git config user.name failed\",",
+    "\t\t\t\"cmd\", \"config user.name\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"failed to configure user.name: %w\", err)",
+    "\t}",
+    "",
+    "\t_, stderr, err = m.runGit([]string{\"config\", \"user.email\", authorEmail}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git config user.email failed\",",
+    "\t\t\t\"cmd\", \"config user.email\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"failed to configure user.email: %w\", err)",
+    "\t}",
+    "",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) getCurrentCommit(mr *ManagedRepo) (string, error) {",
+    "\tstdout, _, err := m.runGit([]string{\"rev-parse\", \"HEAD\"}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\treturn \"\", err",
+    "\t}",
+    "\treturn strings.TrimSpace(stdout), nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) hasChanges(mr *ManagedRepo) (bool, error) {",
+    "\tstdout, _, err := m.runGit([]string{\"status\", \"--porcelain\"}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tslog.Warn(\"git status failed\", slog.String(\"repo\", mr.RelativePath), slog.Any(\"error\", err))",
+    "\t\treturn false, fmt.Errorf(\"git status: %w\", err)",
+    "\t}",
+    "\treturn len(strings.TrimSpace(stdout)) > 0, nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) gitAdd(mr *ManagedRepo, path string) error {",
+    "\t_, stderr, err := m.runGit([]string{\"add\", path}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git add failed\",",
+    "\t\t\t\"cmd\", \"add\",",
+    "\t\t\t\"stderr\", stderr,",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn err",
+    "\t}",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) gitCommit(mr *ManagedRepo, message string) error {",
+    "\t_, stderr, err := m.runGit([]string{\"commit\", \"-m\", message}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git commit failed\",",
+    "\t\t\t\"cmd\", \"commit\",",
+    "\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\"error\", err,",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"%s\", redactCredentials(stderr))",
+    "\t}",
+    "\treturn nil",
+    "}",
+    "",
+    "func (m *WorkspaceManager) gitPush(mr *ManagedRepo) error {",
+    "\t_, stderr, err := m.runGit([]string{\"push\", \"--no-thin\", \"origin\", \"HEAD:\" + mr.GitBranch}, mr.AbsolutePath)",
+    "\tif err != nil {",
+    "\t\tm.logger.Error(\"git push failed\",",
+    "\t\t\t\"stderr\", redactCredentials(stderr),",
+    "\t\t\t\"repo_path\", mr.AbsolutePath,",
+    "\t\t)",
+    "\t\treturn fmt.Errorf(\"%s\", redactCredentials(stderr))",
+    "\t}",
+    "\treturn nil",
+    "}",
+    "",
+    "// runGit builds a git command, executes it, records a duration metric, and",
+    "// returns stdout, stderr, and any error.",
+    "func (m *WorkspaceManager) runGit(args []string, cwd string) (stdout, stderr string, err error) {",
+    "\tcmd := gitclient.Command(cwd, args...)",
+    "",
+    "\tvar outBuf, errBuf bytes.Buffer",
+    "\tcmd.Stdout = &outBuf",
+    "\tcmd.Stderr = &errBuf",
+    "",
+    "\tstart := time.Now()",
+    "\terr = cmd.Run()",
+    "",
+    "\tvar errorClass string",
+    "\tif err != nil {",
+    "\t\tge := classifyGitError(errBuf.String())",
+    "\t\terrorClass = ge.Class",
+    "\t}",
+    "\tm.metrics.RecordWorkspaceGitCmd(args[0], err, errorClass, time.Since(start))",
+    "",
+    "\treturn outBuf.String(), errBuf.String(), err",
+    "}"
+  ],
+  "path": "services/agentplat/sbox/sboxd/internal/workspace/manager.go",
+  "status": "changed"
+}

@@ -2557,13 +2557,21 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             GapPaired(usize, usize), // (old_0, new_0)
         }
 
-        // Sort entries by new-file position with *3 spacing to separate types.
-        // Difft removed-only entries use prev_rhs (structural position from the
-        // preceding entry in chunk order). Gap lines use anchor keys from the
-        // nearest preceding difft entry, offset by old-line distance.
         let rows = consolidate_chunk(chunk);
-        let mut items: Vec<(u64, RenderItem)> = Vec::new();
 
+        // Compute gap lines first so we can use gap-paired positions to
+        // assign correct sort keys for removed-only difft entries that
+        // have no preceding rhs entry.
+        let (gap_paired, gap_removed, gap_added) = hunk_gap_lines(
+            chunk, hunks, old_first, old_last, new_first, new_last,
+            &difft.old_lines, &difft.new_lines,
+        );
+
+        // Sort entries by new-file position with KEY_SPACE spacing.
+        // For removed-only entries with no preceding rhs, use gap-paired
+        // items to find the correct new-file position so the entry sorts
+        // correctly relative to gap-paired context lines.
+        let mut items: Vec<(u64, RenderItem)> = Vec::new();
         let mut prev_rhs: Option<u64> = None;
         let mut removed_seq: u64 = 0;
         for row in &rows {
@@ -2571,27 +2579,42 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 prev_rhs = Some(rhs.line_number);
                 removed_seq = 0;
                 rhs.line_number * KEY_SPACE
+            } else if let Some(p) = prev_rhs {
+                removed_seq += 1;
+                p * KEY_SPACE + removed_seq
+            } else if let Some(lhs) = row.lhs {
+                // No prev_rhs: find the gap-paired item just before this
+                // entry in old-line order, but only from the same hunk.
+                removed_seq += 1;
+                let old_1 = lhs.line_number + 1; // 1-based
+                // Find the hunk containing this old line
+                let containing_hunk = hunks.iter().find(|h|
+                    h.old_count > 0
+                        && old_1 >= h.old_start
+                        && old_1 < h.old_start + h.old_count
+                );
+                let old_0 = lhs.line_number as usize;
+                if let Some(h) = containing_hunk {
+                    let h_old_start = (h.old_start as usize).saturating_sub(1);
+                    let h_old_end = h_old_start + h.old_count as usize;
+                    if let Some(&(_, gn)) = gap_paired.iter()
+                        .filter(|&&(go, _)| go < old_0 && go >= h_old_start && go < h_old_end)
+                        .max_by_key(|&&(go, _)| go)
+                    {
+                        gn as u64 * KEY_SPACE + KEY_SPACE / 2 + removed_seq
+                    } else {
+                        removed_seq
+                    }
+                } else {
+                    removed_seq
+                }
             } else {
                 removed_seq += 1;
-                prev_rhs.map_or(removed_seq, |p| p * KEY_SPACE + removed_seq)
+                removed_seq
             };
-            items.push((key,RenderItem::DifftRow(row)));
+            items.push((key, RenderItem::DifftRow(row)));
         }
 
-        // Add hunk gap lines as individual removed/added items.
-        // Get gap lines from overlapping hunks
-        let (gap_paired, gap_removed, gap_added) = hunk_gap_lines(
-            chunk, hunks, old_first, old_last, new_first, new_last,
-            &difft.old_lines, &difft.new_lines,
-        );
-
-        // Gap removed lines use the same key as the difft removed entries
-        // they're adjacent to (prev_rhs * 3 + seq), continuing the sequence.
-        // This ensures they sort together with difft removed entries and the
-        // old-line tiebreaker handles ordering correctly.
-        //
-        // To find the right key: find the difft entry closest to the gap line
-        // in old-line order and use the same base key (adjusted by offset).
         for &(old_0, new_0) in &gap_paired {
             items.push((new_0 as u64 * KEY_SPACE, RenderItem::GapPaired(old_0, new_0)));
             old_first = old_first.min(old_0);
@@ -5539,5 +5562,40 @@ mod tests {
             "Line ordering errors when rendering chunks 0,1 together:\n{}",
             order_errors.join("\n"),
         );
+    }
+
+    /// When a chunk has a single removed line within a hunk that also has
+    /// whitespace-only changes on surrounding lines (e.g. Go alignment after
+    /// removing a struct field), the gap-paired context lines must still
+    /// appear in the rendered output.
+    #[test]
+    fn gap_paired_context_lines_not_dropped() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test_fixtures/ws-manager/services__agentplat__sbox__sboxd__internal__workspace__manager.go.json");
+        if !fixture_path.exists() {
+            eprintln!("Fixture not found, skipping");
+            return;
+        }
+        let json_str = fs::read_to_string(&fixture_path).unwrap();
+        let difft: DifftOutput = serde_json::from_str(&json_str).unwrap();
+        let file_path = difft.path.as_deref().unwrap_or("unknown");
+
+        let mut hl = Highlighter::new();
+        let html = render_chunks(&difft, &[3], file_path, None, &mut hl, CollapseMode::None);
+        let rows = extract_rows(&html);
+
+        let rendered_old_lines: Vec<u64> = rows.iter()
+            .filter_map(|(_, old, _)| *old)
+            .collect();
+
+        for expected in [86, 87, 88] {
+            assert!(
+                rendered_old_lines.contains(&expected),
+                "Old line {} (gap-paired context) missing from rendered chunk 3.\n\
+                 Rendered old lines: {:?}\n\
+                 Rows: {:?}",
+                expected, rendered_old_lines, rows,
+            );
+        }
     }
 }

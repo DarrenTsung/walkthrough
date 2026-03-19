@@ -1839,9 +1839,14 @@ fn hunk_gap_lines(
     }
 
     // Pair gap lines by content similarity. Match criteria (in priority order):
-    // 1. Exact trimmed equality (content is identical, just whitespace differs)
-    // 2. One line's trimmed content starts with the other's (structural match,
+    // 1. Exact trimmed equality (content is identical, just leading/trailing ws)
+    // 2. Whitespace-normalized equality (only internal whitespace differs, e.g.
+    //    Go alignment: `mu                   sync.RWMutex` == `mu         sync.RWMutex`)
+    // 3. One line's trimmed content starts with the other's (structural match,
     //    e.g. `cbOrOpts?:` matches `cbOrOpts?: Callback<...> | ...`)
+    let normalize_ws = |s: &str| -> String {
+        s.split_whitespace().collect::<Vec<_>>().join(" ")
+    };
     let mut paired = Vec::new();
     let mut used_added: std::collections::HashSet<usize> = std::collections::HashSet::new();
     let mut unmatched_removed = Vec::new();
@@ -1852,7 +1857,8 @@ fn hunk_gap_lines(
             unmatched_removed.push(old_0);
             continue;
         }
-        // First try exact match, then prefix match
+        let old_normalized = normalize_ws(old_content);
+        // First try exact trimmed match, then whitespace-normalized, then prefix
         let matched = raw_added.iter()
             .find(|&&new_0| {
                 !used_added.contains(&new_0) && {
@@ -1860,6 +1866,13 @@ fn hunk_gap_lines(
                     old_content == new_content
                 }
             })
+            .or_else(|| raw_added.iter()
+                .find(|&&new_0| {
+                    !used_added.contains(&new_0) && {
+                        let new_content = new_lines.get(new_0).map(|s| s.trim()).unwrap_or("");
+                        normalize_ws(new_content) == old_normalized
+                    }
+                }))
             .or_else(|| raw_added.iter()
                 .find(|&&new_0| {
                     !used_added.contains(&new_0) && {

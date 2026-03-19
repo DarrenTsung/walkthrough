@@ -2252,9 +2252,8 @@ fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
     // When a line filter is active, only consider entries within the filtered
     // range so that splitting a mixed chunk with lines= can produce
     // single-column blocks for the add-only or remove-only portions.
-    let mut lhs_only = 0usize;
-    let mut rhs_only = 0usize;
-    let mut both = 0usize;
+    let mut has_lhs = false;
+    let mut has_rhs = false;
     for &idx in chunk_indices {
         let Some(chunk) = difft.chunks.get(idx) else { continue };
         for entry in chunk {
@@ -2266,34 +2265,14 @@ fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
                     if ln < start || ln > end { continue; }
                 }
             }
-            match (entry.lhs.is_some(), entry.rhs.is_some()) {
-                (true, true) => both += 1,
-                (true, false) => lhs_only += 1,
-                (false, true) => rhs_only += 1,
-                (false, false) => {}
-            }
+            if entry.lhs.is_some() { has_lhs = true; }
+            if entry.rhs.is_some() { has_rhs = true; }
+            if has_lhs && has_rhs { return DiffLayout::SideBySide; }
         }
     }
-
-    let total = lhs_only + rhs_only + both;
-    if total == 0 { return DiffLayout::SideBySide; }
-
-    // Pure one-sided
-    if both == 0 {
-        if rhs_only > 0 && lhs_only == 0 { return DiffLayout::AddOnly; }
-        if lhs_only > 0 && rhs_only == 0 { return DiffLayout::RemoveOnly; }
-    }
-
-    // Predominantly one-sided: if paired entries are <=10% of the total and
-    // all one-sided entries are on the same side, use single-column. This
-    // handles chunks where difft pairs a few lines structurally but the
-    // change is overwhelmingly additions or removals.
-    if both * 10 <= total {
-        if rhs_only > 0 && lhs_only == 0 { return DiffLayout::AddOnly; }
-        if lhs_only > 0 && rhs_only == 0 { return DiffLayout::RemoveOnly; }
-    }
-
-    DiffLayout::SideBySide
+    if has_rhs && !has_lhs { DiffLayout::AddOnly }
+    else if has_lhs && !has_rhs { DiffLayout::RemoveOnly }
+    else { DiffLayout::SideBySide }
 }
 
 /// Split a 6-column side-by-side diff table into two 3-column tables in a flex container.

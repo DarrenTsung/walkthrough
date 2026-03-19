@@ -89,10 +89,8 @@ article {
     border: 1px solid var(--border);
     border-radius: 6px;
     max-height: 75vh;
-    overflow: auto;
-    scrollbar-width: none;
+    overflow: hidden;
 }
-.diff-block::-webkit-scrollbar { display: none; }
 
 h1 {
     font-size: 1.2em;

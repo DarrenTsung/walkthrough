@@ -3180,8 +3180,24 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                     let end: usize = caps[3].parse().unwrap_or(1);
                     let use_old = info.contains(" old");
 
-                    if let Some(difft) = data.get(&file) {
-                        let lines = if use_old { &difft.old_lines } else { &difft.new_lines };
+                    // Get lines from collected data, or fall back to filesystem
+                    let lines_from_data: Option<&Vec<String>> = data.get(&file)
+                        .map(|difft| if use_old { &difft.old_lines } else { &difft.new_lines });
+                    let lines_from_fs: Vec<String>;
+                    let lines: Option<&Vec<String>> = if let Some(l) = lines_from_data {
+                        Some(l)
+                    } else {
+                        // Try reading from filesystem (relative to cwd)
+                        match fs::read_to_string(&file) {
+                            Ok(content) => {
+                                lines_from_fs = content.lines().map(|s| s.to_string()).collect();
+                                Some(&lines_from_fs)
+                            }
+                            Err(_) => None,
+                        }
+                    };
+
+                    if let Some(lines) = lines {
                         let lang = arborium::detect_language(&file);
                         let hl_lines = syntax_highlight_lines(lines, &mut hl, lang);
 
@@ -3234,7 +3250,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                         enriched_md.push_str(&"`".repeat(backtick_count));
                         enriched_md.push('\n');
                     } else {
-                        eprintln!("Warning: no data for file '{}', passing through", file);
+                        eprintln!("Warning: no data for file '{}' and file not found on disk, passing through", file);
                         processed_md.push_str(line);
                         processed_md.push('\n');
                         enriched_md.push_str(line);

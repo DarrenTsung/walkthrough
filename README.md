@@ -159,3 +159,7 @@ cargo build
 cargo test
 cargo clippy
 ```
+
+## Acknowledgements
+
+Inspired by [Showboat](https://github.com/simonw/showboat) by Simon Willison.

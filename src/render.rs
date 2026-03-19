@@ -2936,8 +2936,8 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                                         let mut row_indent = String::new();
                                         let mut has_content = false;
                                         for ch in last_block[content_start..].chars() {
-                                            if ch == ' ' {
-                                                row_indent.push(' ');
+                                            if ch == ' ' || ch == '\t' {
+                                                row_indent.push(ch);
                                             } else if ch == '<' {
                                                 // Check if this is </td> (empty cell) or
                                                 // a <span> tag (syntax-highlighted content)

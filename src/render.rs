@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use pulldown_cmark::{Options, Parser};
@@ -2652,6 +2653,30 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
     data.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut out = String::new();
+
+    // Generate frontmatter with author and PR (empty values if unavailable,
+    // so the LLM sees the fields and knows to fill them in)
+    let pr_url = Command::new("gh")
+        .args(["pr", "view", "--json", "url", "--jq", ".url"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+
+    let author = Command::new("gh")
+        .args(["api", "user", "--jq", ".name"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+
+    out.push_str("---\n");
+    out.push_str(&format!("pr: {}\n", pr_url));
+    out.push_str(&format!("author: {}\n", author));
+    out.push_str("---\n\n");
+
     out.push_str("# TODO: title\n\nTODO: overview\n\n");
 
     for (file, difft) in &data {
@@ -2923,37 +2948,51 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                                 continue;
                             }
 
-                            // Extract indentation from the first non-empty folded row's code cell
+                            // Extract indentation from the first non-empty folded row's code cell.
+                            // In side-by-side diffs each row has two code cells (old + new);
+                            // check all code cells in the row before moving to the next one.
                             let mut indent = String::new();
                             let fold_marker = format!("data-fold-id=\"{}\"", fold_id);
                             let mut search_from = 0usize;
-                            while let Some(marker_pos) = last_block[search_from..].find(&fold_marker) {
+                            'outer: while let Some(marker_pos) = last_block[search_from..].find(&fold_marker) {
                                 let abs_marker = search_from + marker_pos;
-                                if let Some(code_pos) = last_block[abs_marker..].find("class=\"code") {
-                                    let abs_code_pos = abs_marker + code_pos;
-                                    if let Some(gt_pos) = last_block[abs_code_pos..].find('>') {
-                                        let content_start = abs_code_pos + gt_pos + 1;
-                                        let mut row_indent = String::new();
-                                        let mut has_content = false;
-                                        for ch in last_block[content_start..].chars() {
-                                            if ch == ' ' || ch == '\t' {
-                                                row_indent.push(ch);
-                                            } else if ch == '<' {
-                                                // Check if this is </td> (empty cell) or
-                                                // a <span> tag (syntax-highlighted content)
-                                                has_content = !last_block[content_start + row_indent.len()..].starts_with("</td>");
-                                                break;
-                                            } else if ch == '\n' {
-                                                break;
-                                            } else {
-                                                has_content = true;
-                                                break;
+                                // Find the end of this row so we check all code cells within it
+                                let row_end = last_block[abs_marker..].find("</tr>")
+                                    .map_or(last_block.len(), |p| abs_marker + p);
+                                let mut code_search = abs_marker;
+                                while code_search < row_end {
+                                    if let Some(code_pos) = last_block[code_search..row_end].find("class=\"code") {
+                                        let abs_code_pos = code_search + code_pos;
+                                        if let Some(gt_pos) = last_block[abs_code_pos..].find('>') {
+                                            let content_start = abs_code_pos + gt_pos + 1;
+                                            let mut row_indent = String::new();
+                                            let mut has_content = false;
+                                            for ch in last_block[content_start..].chars() {
+                                                if ch == ' ' || ch == '\t' {
+                                                    row_indent.push(ch);
+                                                } else if ch == '<' {
+                                                    // Check if this is </td> (empty cell) or
+                                                    // a <span> tag (syntax-highlighted content)
+                                                    has_content = !last_block[content_start + row_indent.len()..].starts_with("</td>");
+                                                    break;
+                                                } else if ch == '\n' {
+                                                    break;
+                                                } else {
+                                                    has_content = true;
+                                                    break;
+                                                }
                                             }
-                                        }
-                                        if has_content {
-                                            indent = row_indent;
+                                            if has_content {
+                                                indent = row_indent;
+                                                break 'outer;
+                                            }
+                                            // Empty cell; try the next code cell in this row
+                                            code_search = abs_code_pos + "class=\"code".len();
+                                        } else {
                                             break;
                                         }
+                                    } else {
+                                        break;
                                     }
                                 }
                                 search_from = abs_marker + fold_marker.len();
@@ -3410,7 +3449,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
     // Inject metadata subtitle inside the h1 (before </h1>)
     if !metadata.is_empty() {
         let mut subtitle_parts: Vec<String> = Vec::new();
-        if let Some(pr) = metadata.get("pr") {
+        if let Some(pr) = metadata.get("pr").filter(|v| !v.is_empty()) {
             // Auto-link PR numbers
             let pr_text = if pr.starts_with("http") {
                 // Extract PR number from URL (e.g. .../pull/711123)
@@ -3423,12 +3462,12 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
             };
             subtitle_parts.push(pr_text);
         }
-        if let Some(author) = metadata.get("author") {
+        if let Some(author) = metadata.get("author").filter(|v| !v.is_empty()) {
             subtitle_parts.push(html_escape(author));
         }
         // Include any other metadata keys
         for (key, value) in &metadata {
-            if key != "pr" && key != "author" {
+            if key != "pr" && key != "author" && !value.is_empty() {
                 subtitle_parts.push(format!("{}: {}", html_escape(key), html_escape(value)));
             }
         }

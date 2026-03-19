@@ -2101,6 +2101,16 @@ enum DiffLayout {
 }
 
 fn detect_diff_layout(difft: &DifftOutput, chunk_indices: &[usize]) -> DiffLayout {
+    // File-level status: new files are always add-only, deleted files remove-only.
+    // Difft's structural matching can pair entries even for new/deleted files,
+    // but the file status from git is the ground truth.
+    match difft.status.as_deref() {
+        Some("added") => return DiffLayout::AddOnly,
+        Some("deleted") => return DiffLayout::RemoveOnly,
+        _ => {}
+    }
+
+    // For modified/renamed files, check entries in the selected chunks.
     let mut has_lhs = false;
     let mut has_rhs = false;
     for &idx in chunk_indices {

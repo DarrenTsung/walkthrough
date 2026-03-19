@@ -373,6 +373,9 @@ article table:not(.diff-table) tr:nth-child(even) td {
     color: #1f2328;
     table-layout: fixed;
 }
+.diff-table-lhs, .diff-table-rhs {
+    table-layout: auto;
+}
 
 col.ln-col { width: 3.5em; }
 col.sign-col { width: 1.5em; }

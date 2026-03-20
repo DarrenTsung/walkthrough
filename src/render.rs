@@ -679,6 +679,49 @@ tr.fold-line.fold-expanded.fold-del td:first-child { border-left-color: #b03060;
     }
 }
 
+/* Task lists (custom checkboxes) */
+article li > input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1.15em;
+    height: 1.15em;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    vertical-align: -0.2em;
+    margin-right: 0.35em;
+    cursor: default;
+    position: relative;
+}
+article li > input[type="checkbox"]:checked {
+    background: #6e7781;
+    border-color: #6e7781;
+}
+article li > input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4.5px;
+    height: 8.5px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+article li:has(> input[type="checkbox"]) {
+    list-style: none;
+    margin-left: -1.35em;
+}
+@media (prefers-color-scheme: dark) {
+    article li > input[type="checkbox"] {
+        border-color: #555;
+    }
+    article li > input[type="checkbox"]:checked {
+        background: #8b949e;
+        border-color: #8b949e;
+    }
+}
+
 /* Mermaid diagrams */
 .mermaid-diagram {
     margin: 1rem 0;
@@ -3723,6 +3766,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
     // Second pass: convert markdown (with placeholders) to HTML
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_TASKLISTS);
     let parser = Parser::new_ext(&processed_md, options);
     let mut html_body = String::new();
     pulldown_cmark::html::push_html(&mut html_body, parser);

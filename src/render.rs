@@ -3239,12 +3239,14 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
     let mut data: Vec<(String, DifftOutput)> = Vec::new();
     for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
         let entry = entry?;
-        if entry.path().extension().map_or(false, |e| e == "json") {
-            let json_str = fs::read_to_string(entry.path())?;
+        let path = entry.path();
+        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if path.extension().map_or(false, |e| e == "json") && filename != ".meta.json" {
+            let json_str = fs::read_to_string(&path)?;
             let difft: DifftOutput = serde_json::from_str(&json_str)
-                .with_context(|| format!("Failed to parse {}", entry.path().display()))?;
-            if let Some(ref path) = difft.path {
-                data.push((path.clone(), difft));
+                .with_context(|| format!("Failed to parse {}", path.display()))?;
+            if let Some(ref p) = difft.path {
+                data.push((p.clone(), difft));
             }
         }
     }
@@ -3358,10 +3360,12 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
     if !no_diff_data {
         for entry in fs::read_dir(data_dir).context("Failed to read data directory")? {
             let entry = entry?;
-            if entry.path().extension().map_or(false, |e| e == "json") {
-                let json_str = fs::read_to_string(entry.path())?;
+            let path = entry.path();
+            let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if path.extension().map_or(false, |e| e == "json") && filename != ".meta.json" {
+                let json_str = fs::read_to_string(&path)?;
                 let difft: DifftOutput = serde_json::from_str(&json_str)
-                    .with_context(|| format!("Failed to parse {}", entry.path().display()))?;
+                    .with_context(|| format!("Failed to parse {}", path.display()))?;
                 if let Some(ref path) = difft.path {
                     data.insert(path.clone(), difft);
                 }

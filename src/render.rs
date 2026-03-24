@@ -2869,9 +2869,13 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         });
 
 
-        // If the chunk has gap-paired lines (both old and new sides), it
-        // needs side-by-side rendering even if the difft entries are one-sided.
-        let (single, layout) = if single && !gap_paired.is_empty() {
+        // If the chunk has gap-paired lines AND the difft entries have both
+        // sides, use side-by-side rendering. Don't override for purely
+        // one-sided chunks (all removed or all added) where gap-paired lines
+        // are just whitespace realignment from the removal/addition.
+        let has_difft_lhs = rows.iter().any(|r| r.lhs.is_some());
+        let has_difft_rhs = rows.iter().any(|r| r.rhs.is_some());
+        let (single, layout) = if single && !gap_paired.is_empty() && has_difft_lhs && has_difft_rhs {
             (false, DiffLayout::SideBySide)
         } else {
             (single, layout)
@@ -5593,10 +5597,11 @@ mod tests {
             let is_context = rendered.iter().any(|(c, o, n)| {
                 c == "line-context" && *o == Some(old_1) && *n == Some(new_1)
             });
-            // Also accept the old line appearing as context with any new pairing
-            // (positional context uses offset-based pairing, not content matching).
-            let is_context_any = rendered.iter().any(|(c, o, _)| {
-                c == "line-context" && *o == Some(old_1)
+            // Also accept either side appearing as context with any pairing
+            // (positional context uses offset-based pairing, not content matching;
+            // single-column mode only shows one side's line number).
+            let is_context_any = rendered.iter().any(|(c, o, n)| {
+                c == "line-context" && (*o == Some(old_1) || *n == Some(new_1))
             });
             // Gap-paired lines may be absent if they were dropped by the
             // ordering guard (they'd violate old-side order if included).

@@ -2850,6 +2850,14 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             true
         });
 
+        // If the chunk has gap-paired lines (both old and new sides), it
+        // needs side-by-side rendering even if the difft entries are one-sided.
+        let (single, layout) = if single && !gap_paired.is_empty() {
+            (false, DiffLayout::SideBySide)
+        } else {
+            (single, layout)
+        };
+
         // Collect ALL item line numbers before filtering, so gap lines and
         // filtered-out changed lines don't become context rows.
         let mut item_old_lines: std::collections::HashSet<usize> = std::collections::HashSet::new();
@@ -3008,6 +3016,40 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             let dominated_old = cur_old.map_or(false, |o| rendered_old.contains(&o));
             let dominated_new = cur_new.map_or(false, |n| rendered_new.contains(&n));
             if dominated_old || dominated_new { continue; }
+
+            // Fill intra-chunk gaps: unchanged lines between consecutive items
+            // that aren't in any hunk (e.g. a function signature between a
+            // comment change and a body change). Use the old side to detect
+            // gaps since removed-only items lack a new side.
+            if let (Some(po), Some(pn)) = (prev_old, prev_new) {
+                let co = cur_old.unwrap_or(usize::MAX);
+                if co > po + 1 && co != usize::MAX {
+                    let old_gap_start = po + 1;
+                    let new_gap_start = pn + 1;
+                    let old_gap_count = co - old_gap_start;
+                    for g in 0..old_gap_count {
+                        let o = old_gap_start + g;
+                        let n = new_gap_start + g;
+                        if n < difft.new_lines.len()
+                            && !rendered_old.contains(&o) && !rendered_new.contains(&n)
+                            && !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
+                        {
+                            rendered_old.insert(o);
+                            rendered_new.insert(n);
+                            if single {
+                                let (idx, hl_lines) = if layout == DiffLayout::AddOnly {
+                                    (n, &new_hl)
+                                } else {
+                                    (o, &old_hl)
+                                };
+                                html.push_str(&render_single_context_row(idx, hl_lines));
+                            } else {
+                                html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
+                            }
+                        }
+                    }
+                }
+            }
 
             // Record these lines as rendered.
             if let Some(o) = cur_old { rendered_old.insert(o); }
@@ -6217,6 +6259,46 @@ mod tests {
              to be included.\n\
              Rendered new lines: {:?}",
             rendered_new_lines,
+        );
+    }
+
+    /// When unchanged lines fall between two hunks within a single difft chunk
+    /// (intra-chunk gaps), they should appear as context lines in the rendered
+    /// output. Without this, function signatures between a comment change and
+    /// a body change disappear.
+    #[test]
+    fn intra_chunk_gap_lines_rendered_as_context() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test_fixtures/intra-chunk-gap/services__agentplat__sbox__sboxd__internal__workspace__manager.go.json");
+        if !fixture_path.exists() {
+            eprintln!("Fixture not found, skipping");
+            return;
+        }
+        let json_str = fs::read_to_string(&fixture_path).unwrap();
+        let difft: DifftOutput = serde_json::from_str(&json_str).unwrap();
+        let file_path = difft.path.as_deref().unwrap_or("unknown");
+
+        // Chunk 3 has entries at old=474/new=478 and old=476/new=None,
+        // with the function signature at new=479 (old=475) falling between
+        // hunks and not in any chunk entry or hunk.
+        let mut hl = Highlighter::new();
+        let html = render_chunks(&difft, &[3], file_path, None, &mut hl, CollapseMode::None);
+        let rows = extract_rows(&html);
+
+        let rendered_new_lines: Vec<u64> = rows.iter()
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+
+        // New line 479 (display 480) is the function signature
+        // "func (m *WorkspaceManager) DefaultWorkspacePath() string {"
+        // It must appear as a context line between the changed entries.
+        assert!(
+            rendered_new_lines.contains(&480),
+            "Intra-chunk gap line (func signature at display 480) should be \
+             rendered as context between chunk entries.\n\
+             Rendered new lines: {:?}\n\
+             Rows: {:?}",
+            rendered_new_lines, rows,
         );
     }
 }

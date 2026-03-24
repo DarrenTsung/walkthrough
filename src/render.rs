@@ -4252,8 +4252,18 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
             )
         };
 
-        if !all_covered {
-            eprintln!("{} uncovered chunks:", uncovered.len());
+        if all_covered {
+            eprintln!(
+                "All {} chunks across {} files{} are present",
+                total_chunks, file_count,
+                if diff_source.is_empty() { String::new() } else { format!(" in\n{}", diff_source) },
+            );
+        } else {
+            eprintln!(
+                "{} uncovered chunks (out of {} across {} files{})",
+                uncovered.len(), total_chunks, file_count,
+                if diff_source.is_empty() { String::new() } else { format!(" in\n{}", diff_source) },
+            );
             for (file, idx) in &uncovered {
                 eprintln!("  {} chunk {}", file, idx);
             }

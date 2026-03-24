@@ -850,6 +850,23 @@ article li:has(> input[type="checkbox"]) {
 "#;
 
 const JS: &str = r#"
+// Close duplicate tabs: when a walkthrough opens, tell other tabs with the
+// same filename to close. Uses BroadcastChannel (same-origin only, works
+// with file:// URLs in the same browser).
+(function() {
+    var filename = location.pathname.split('/').pop() || '';
+    if (filename && typeof BroadcastChannel !== 'undefined') {
+        var ch = new BroadcastChannel('walkthrough_dedup');
+        ch.postMessage({ type: 'opened', filename: filename, time: Date.now() });
+        ch.onmessage = function(e) {
+            if (e.data.type === 'opened' && e.data.filename === filename && e.data.time > 0) {
+                // A newer tab with the same filename opened; close this one.
+                window.close();
+            }
+        };
+    }
+})();
+
 (function() {
     var blocks = document.querySelectorAll('.diff-block');
     var pinnedY = null;

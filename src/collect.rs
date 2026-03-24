@@ -110,10 +110,6 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
         let _ = fs::write(&gitignore_path, "*\n");
     }
 
-    // Write metadata about this collection (diff source)
-    let meta = serde_json::json!({ "diff_args": diff_args });
-    let _ = fs::write(output_dir.join(".meta.json"), serde_json::to_string_pretty(&meta)?);
-
     // Clean any previous JSON files in the output dir
     if let Ok(entries) = fs::read_dir(output_dir) {
         for entry in entries.flatten() {
@@ -122,6 +118,36 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
             }
         }
     }
+
+    // Resolve commit SHAs for staleness detection. Parse the diff args to
+    // find a range like "A..B" or "HEAD~N..HEAD" and resolve to full SHAs.
+    let resolve_rev = |rev: &str| -> Option<String> {
+        Command::new("git")
+            .args(["rev-parse", rev])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    };
+    let head_sha = resolve_rev("HEAD");
+    let mut diff_shas: Option<(String, String)> = None;
+    for arg in diff_args {
+        if let Some((left, right)) = arg.split_once("..") {
+            if let (Some(l), Some(r)) = (resolve_rev(left), resolve_rev(right)) {
+                diff_shas = Some((l, r));
+            }
+            break;
+        }
+    }
+    let mut meta = serde_json::json!({ "diff_args": diff_args });
+    if let Some(sha) = &head_sha {
+        meta["head_sha"] = serde_json::json!(sha);
+    }
+    if let Some((left, right)) = &diff_shas {
+        meta["diff_left_sha"] = serde_json::json!(left);
+        meta["diff_right_sha"] = serde_json::json!(right);
+    }
+    let _ = fs::write(output_dir.join(".meta.json"), serde_json::to_string_pretty(&meta)?);
 
     // Get list of changed files with status
     let mut cmd = Command::new("git");

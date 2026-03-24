@@ -1621,25 +1621,16 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
                 });
             }
         } else if has_rhs {
-            let rhs_start = i;
-            while i < entries.len() && entries[i].rhs.is_some() && entries[i].lhs.is_none() {
-                i += 1;
-            }
-            let rhs_run = &entries[rhs_start..i];
-
-            let lhs_start = i;
-            while i < entries.len() && entries[i].lhs.is_some() && entries[i].rhs.is_none() {
-                i += 1;
-            }
-            let lhs_run = &entries[lhs_start..i];
-
-            let max_len = lhs_run.len().max(rhs_run.len());
-            for j in 0..max_len {
-                rows.push(DiffRow {
-                    lhs: lhs_run.get(j).and_then(|e| e.lhs.as_ref()),
-                    rhs: rhs_run.get(j).and_then(|e| e.rhs.as_ref()),
-                });
-            }
+            // Added-only entries: don't pair with following removed entries.
+            // The removed→added direction (has_lhs branch) pairs naturally
+            // because removed lines are replaced by added lines. But
+            // added→removed is the reverse and creates cross-ordered pairs
+            // when the two runs are semantically unrelated.
+            rows.push(DiffRow {
+                lhs: None,
+                rhs: entry.rhs.as_ref(),
+            });
+            i += 1;
         } else {
             i += 1;
         }
@@ -2741,7 +2732,11 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         let mut removed_seq: u64 = 0;
         for row in &rows {
             let key = if let Some(rhs) = row.rhs {
-                prev_rhs = Some(rhs.line_number);
+                // Only anchor prev_rhs from truly paired entries (both sides).
+                // Added-only entries shouldn't position subsequent removed entries.
+                if row.lhs.is_some() {
+                    prev_rhs = Some(rhs.line_number);
+                }
                 removed_seq = 0;
                 rhs.line_number * KEY_SPACE
             } else if let Some(p) = prev_rhs {
@@ -2828,7 +2823,11 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             })
         });
 
-        // Remove gap lines that violate old-side ordering.
+        // Enforce old-side monotonicity. When old and new sides have
+        // different ordering (refactored code), the new-side-based sort can
+        // scatter old-side line numbers. Stable-sort items so old-side line
+        // numbers are non-decreasing while preserving new-side order for
+        // items without old-side lines (added-only).
         let get_old = |item: &RenderItem| -> Option<u64> {
             match item {
                 RenderItem::DifftRow(r) => r.lhs.map(|s| s.line_number),
@@ -2836,6 +2835,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 RenderItem::GapAdded(_) => None,
             }
         };
+
+        // First pass: remove gap lines that violate old-side ordering.
         let mut max_old: Option<u64> = None;
         items.retain(|&(_, ref item)| {
             if let Some(o) = get_old(item) {
@@ -2849,6 +2850,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             }
             true
         });
+
 
         // If the chunk has gap-paired lines (both old and new sides), it
         // needs side-by-side rendering even if the difft entries are one-sided.
@@ -3023,14 +3025,31 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             // gaps since removed-only items lack a new side.
             if let (Some(po), Some(pn)) = (prev_old, prev_new) {
                 let co = cur_old.unwrap_or(usize::MAX);
-                if co > po + 1 && co != usize::MAX {
+                let cn = cur_new.unwrap_or(usize::MAX);
+                // Only fill when the old side has a forward gap and (if available)
+                // the new side also has a forward gap (no cross-ordering).
+                let new_ok = cn == usize::MAX || cn > pn + 1;
+                if co > po + 1 && co != usize::MAX && new_ok {
                     let old_gap_start = po + 1;
                     let new_gap_start = pn + 1;
                     let old_gap_count = co - old_gap_start;
-                    for g in 0..old_gap_count {
+                    let new_gap_count = cn - new_gap_start;
+                    let gap_count = old_gap_count.min(new_gap_count);
+                    for g in 0..gap_count {
                         let o = old_gap_start + g;
                         let n = new_gap_start + g;
-                        if n < difft.new_lines.len()
+                        // Skip lines inside hunks (those are changed, not context).
+                        let in_hunk = hunks.iter().any(|h| {
+                            let ho = (h.old_start as usize).saturating_sub(1);
+                            let hn = (h.new_start as usize).saturating_sub(1);
+                            (h.old_count > 0 && o >= ho && o < ho + h.old_count as usize)
+                                || (h.new_count > 0 && n >= hn && n < hn + h.new_count as usize)
+                        });
+                        // Also skip if old line would violate monotonic ordering.
+                        let max_rendered_old = rendered_old.iter().copied().max().unwrap_or(0);
+                        if !in_hunk
+                            && o > max_rendered_old
+                            && n < difft.new_lines.len()
                             && !rendered_old.contains(&o) && !rendered_new.contains(&n)
                             && !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
                         {
@@ -3324,6 +3343,34 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                     .with_context(|| format!("Failed to parse {}", entry.path().display()))?;
                 if let Some(ref path) = difft.path {
                     data.insert(path.clone(), difft);
+                }
+            }
+        }
+    }
+
+    // Warn if collected data may be stale (HEAD has moved since collection).
+    if !no_diff_data {
+        let meta_path = data_dir.join(".meta.json");
+        if let Ok(meta_str) = fs::read_to_string(&meta_path) {
+            if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&meta_str) {
+                if let Some(collected_head) = meta.get("head_sha").and_then(|v| v.as_str()) {
+                    let current_head = std::process::Command::new("git")
+                        .args(["rev-parse", "HEAD"])
+                        .output()
+                        .ok()
+                        .filter(|o| o.status.success())
+                        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+                    if let Some(ref cur) = current_head {
+                        if cur != collected_head {
+                            let short_collected = &collected_head[..collected_head.len().min(8)];
+                            let short_current = &cur[..cur.len().min(8)];
+                            eprintln!(
+                                "Warning: collected data is from HEAD {} but current HEAD is {}. \
+                                 Re-run `walkthrough collect` if the diff has changed.",
+                                short_collected, short_current,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -6299,6 +6346,48 @@ mod tests {
              Rendered new lines: {:?}\n\
              Rows: {:?}",
             rendered_new_lines, rows,
+        );
+    }
+
+    /// Old-side line numbers must be non-decreasing in the rendered output.
+    /// When a chunk pairs old lines 484+ with new lines 477+ (a refactoring
+    /// that moved code), consolidation and sort must not produce jumbled
+    /// old-side ordering.
+    #[test]
+    fn old_side_ordering_in_refactored_chunk() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test_fixtures/jumbled-old-lines/services__agentplat__sbox__sboxd__internal__workspace__manager.go.json");
+        if !fixture_path.exists() {
+            eprintln!("Fixture not found, skipping");
+            return;
+        }
+        let json_str = fs::read_to_string(&fixture_path).unwrap();
+        let difft: DifftOutput = serde_json::from_str(&json_str).unwrap();
+        let file_path = difft.path.as_deref().unwrap_or("unknown");
+
+        let mut hl = Highlighter::new();
+        let html = render_chunks(&difft, &[3], file_path, None, &mut hl, CollapseMode::None);
+        let rows = extract_rows(&html);
+
+        let old_lns: Vec<u64> = rows.iter()
+            .filter_map(|(_, o, _)| *o)
+            .collect();
+
+        // Old-side line numbers must be non-decreasing.
+        let mut violations = Vec::new();
+        for i in 0..old_lns.len().saturating_sub(1) {
+            if old_lns[i] > old_lns[i + 1] {
+                violations.push(format!(
+                    "row {}: old {} > row {}: old {}",
+                    i, old_lns[i], i + 1, old_lns[i + 1]
+                ));
+            }
+        }
+        assert!(
+            violations.is_empty(),
+            "Old-side line numbers are jumbled in chunk 3:\n{}\n\
+             All old lines: {:?}",
+            violations.join("\n"), old_lns,
         );
     }
 }

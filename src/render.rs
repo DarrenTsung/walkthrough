@@ -3676,9 +3676,12 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                                     })
                                     .collect()
                             } else {
+                                // Single-line: strip leading whitespace from the
+                                // markdown text. The extracted code indent is
+                                // prepended separately to match the stripped code.
                                 text.split('\n')
                                     .filter(|l| !l.is_empty())
-                                    .map(String::from)
+                                    .map(|l| l.trim_start().to_string())
                                     .collect()
                             };
                             let lang = arborium::detect_language(&last_block_file);

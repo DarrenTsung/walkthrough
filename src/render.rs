@@ -278,7 +278,12 @@ pre {
     border-radius: 4px;
     border: 1px solid var(--border);
     overflow-x: auto;
+    width: max-content;
+    min-width: min(100%, 860px);
+    max-width: 1400px;
     margin: 0 0 0.75em;
+    margin-left: 50%;
+    transform: translateX(-50%);
 }
 
 pre code {

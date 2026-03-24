@@ -120,6 +120,29 @@ already there, so focus on:
 
 5. Use `chunks=all` for new files, deleted files, or files with only one or two chunks.
 
+### Syntax-highlighted code blocks
+
+Fenced code blocks with a language tag are syntax-highlighted via tree-sitter. Always
+specify the language. Use `plain` for blocks with no syntax highlighting.
+
+````markdown
+```typescript
+const ws = await createWorkspace(context, { bootstrap: config });
+```
+
+```plain
+some output with no highlighting
+```
+````
+
+Supported languages include: typescript/ts, javascript/js, tsx, jsx, rust/rs, python/py,
+go, ruby/rb, java, c, cpp, css, html, json, yaml, toml, bash/sh/shell, sql, swift, kotlin/kt.
+
+### Task lists
+
+Markdown task lists (`- [x]` and `- [ ]`) render as styled checkboxes. Use them in
+overviews or summaries to show progress or completion status.
+
 ### Source blocks
 
 Use `` ```src `` code blocks to show existing code for context alongside diffs. This is

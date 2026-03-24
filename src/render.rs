@@ -14,6 +14,113 @@ use crate::difft_json::{DifftOutput, LineEntry, LineSide};
 /// Number of unchanged context lines to show before/after each chunk.
 const CONTEXT_LINES: usize = 3;
 
+/// Max extra context lines to add when expanding to show complete expressions
+/// (e.g. multi-line function calls cut off by the CONTEXT_LINES limit).
+const MAX_EXPRESSION_CONTEXT: usize = 8;
+
+/// Count bracket balance on a line: `({[` contribute +1, `)}]` contribute -1.
+fn bracket_balance(line: &str) -> i32 {
+    let mut bal: i32 = 0;
+    for ch in line.chars() {
+        match ch {
+            '(' | '{' | '[' => bal += 1,
+            ')' | '}' | ']' => bal -= 1,
+            _ => {}
+        }
+    }
+    bal
+}
+
+/// Expand context boundaries outward when the visible range cuts off a
+/// multi-line expression that the changed lines participate in.
+///
+/// Only triggers when the *changed lines + post-context* contain unmatched
+/// closers (expand before) or the *pre-context + changed lines* contain
+/// unmatched openers (expand after). Brackets that appear solely in context
+/// lines on the opposite side of the change are ignored, preventing expansion
+/// into unrelated code.
+///
+/// Returns `(expanded_ctx_before, expanded_ctx_after)`.
+fn expand_context_for_expressions(
+    lines: &[String],
+    ctx_before: usize,
+    first_changed: usize,
+    last_changed: usize,
+    ctx_after: usize,
+) -> (usize, usize) {
+    let end = ctx_after.min(lines.len());
+    if first_changed >= end || first_changed > last_changed {
+        return (ctx_before, ctx_after);
+    }
+    let last = last_changed.min(end - 1);
+
+    let mut new_before = ctx_before;
+    let mut new_after = ctx_after;
+
+    // Before-expansion: scan from first changed line forward. Use only the
+    // depth at the first line where depth drops below 0 (the immediate
+    // enclosing expression's closer). Further closers from outer/sibling
+    // expressions are ignored to prevent over-expansion.
+    {
+        let mut depth: i32 = 0;
+        let mut min_depth: i32 = 0;
+        for idx in first_changed..end {
+            depth += bracket_balance(&lines[idx]);
+            if depth < 0 {
+                min_depth = depth;
+                break;
+            }
+        }
+        if min_depth < 0 {
+            let saved = new_before;
+            let mut accumulated: i32 = 0;
+            let mut extra = 0;
+            while new_before > 0 && extra < MAX_EXPRESSION_CONTEXT {
+                new_before -= 1;
+                accumulated += bracket_balance(&lines[new_before]);
+                extra += 1;
+                if accumulated >= -min_depth {
+                    break;
+                }
+            }
+            // If we hit the cap without balancing, the extra lines are
+            // mid-expression noise. Fall back to normal context.
+            if accumulated < -min_depth {
+                new_before = saved;
+            }
+        }
+    }
+
+    // After-expansion: scan from start of visible range through last changed
+    // line. If depth > 0, there are openers (among or before the changed
+    // lines) whose closers are below the post-context boundary.
+    {
+        let mut depth: i32 = 0;
+        for idx in ctx_before..=last {
+            depth += bracket_balance(&lines[idx]);
+        }
+        if depth > 0 {
+            let saved = new_after;
+            let mut remaining = depth;
+            let mut extra = 0;
+            while new_after < lines.len() && extra < MAX_EXPRESSION_CONTEXT {
+                remaining += bracket_balance(&lines[new_after]);
+                new_after += 1;
+                extra += 1;
+                if remaining <= 0 {
+                    break;
+                }
+            }
+            // If we hit the cap without balancing, fall back.
+            if remaining > 0 {
+                new_after = saved;
+            }
+        }
+    }
+
+    (new_before, new_after)
+}
+
 const CSS: &str = r#"
 :root {
     --bg: #fff;
@@ -2008,10 +2115,20 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
             }
         };
 
-        let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
-        let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
-        let old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
-        let new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+        let mut old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
+        let mut new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
+        let mut old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
+        let mut new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+
+        // Expand context when the boundary cuts off a multi-line expression.
+        let (exp_new_before, exp_new_after) =
+            expand_context_for_expressions(&difft.new_lines, new_ctx_before, new_first, new_last, new_ctx_after);
+        let new_before_delta = new_ctx_before - exp_new_before;
+        let new_after_delta = exp_new_after - new_ctx_after;
+        new_ctx_before = exp_new_before;
+        new_ctx_after = exp_new_after;
+        old_ctx_before = old_ctx_before.saturating_sub(new_before_delta);
+        old_ctx_after = (old_ctx_after + new_after_delta).min(difft.old_lines.len());
 
         let old_ctx_start = match last_old_rendered {
             Some(last) if last + 1 > old_ctx_before => last + 1,
@@ -2788,10 +2905,21 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         }
 
         // Compute context boundaries (after filter so they reflect the filtered range).
-        let old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
-        let new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
+        let mut old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
+        let mut new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
         let mut old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
         let mut new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+
+        // Expand context when the boundary cuts off a multi-line expression.
+        let (exp_new_before, exp_new_after) =
+            expand_context_for_expressions(&difft.new_lines, new_ctx_before, new_first, new_last, new_ctx_after);
+        let new_before_delta = new_ctx_before - exp_new_before;
+        let new_after_delta = exp_new_after - new_ctx_after;
+        new_ctx_before = exp_new_before;
+        new_ctx_after = exp_new_after;
+        // Apply the same expansion to old side so both sides stay in sync.
+        old_ctx_before = old_ctx_before.saturating_sub(new_before_delta);
+        old_ctx_after = (old_ctx_after + new_after_delta).min(difft.old_lines.len());
 
         // Cap post-context at the next chunk's start to prevent ordering issues
         // where post-context lines appear before the next chunk's changed lines.
@@ -3832,6 +3960,91 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                 format!("<pre><code class=\"language-mermaid\">{}</code></pre>", caps[1].to_string())
             }
         }
+    }).to_string();
+
+    // Reject fenced code blocks without a language tag.
+    // pulldown-cmark renders bare ``` blocks as <pre><code>...</code></pre> (no class).
+    let bare_code_re = Regex::new(r#"(?s)<pre><code>([^<]*?)</code></pre>"#)?;
+    if let Some(m) = bare_code_re.find(&html_body) {
+        // Extract a snippet of the content for the error message.
+        let start = m.start();
+        let snippet_re = Regex::new(r#"(?s)<pre><code>(.{0,60})"#)?;
+        let snippet = snippet_re.captures(&html_body[start..])
+            .map(|c| c[1].replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">"))
+            .unwrap_or_default();
+        let snippet = snippet.lines().next().unwrap_or(&snippet);
+        anyhow::bail!(
+            "Fenced code block without a language tag:\n\n  ```\n  {}...\n  ```\n\n\
+             All code blocks must specify a language (e.g. ```typescript, ```rust, ```bash). \
+             Use ```plain for blocks with no syntax highlighting.",
+            snippet
+        );
+    }
+
+    // Syntax-highlight fenced code blocks.
+    // pulldown-cmark renders ```lang as <pre><code class="language-lang">...</code></pre>.
+    // Map the language tag to a file extension for arborium::detect_language.
+    let code_block_re = Regex::new(r#"(?s)<pre><code class="language-([^"]+)">(.*?)</code></pre>"#)?;
+    let mut hl = Highlighter::new();
+    html_body = code_block_re.replace_all(&html_body, |caps: &regex::Captures| {
+        let lang_tag = &caps[1];
+        let html_encoded_body = &caps[2];
+
+        // "plain" means no syntax highlighting; keep the block as-is.
+        if lang_tag == "plain" || lang_tag == "text" || lang_tag == "txt" {
+            return format!("<pre><code>{}</code></pre>", html_encoded_body);
+        }
+
+        // Map common markdown fence tags to file extensions for detect_language.
+        let ext = match lang_tag {
+            "typescript" | "ts" => "ts",
+            "tsx" => "tsx",
+            "javascript" | "js" => "js",
+            "jsx" => "jsx",
+            "rust" | "rs" => "rs",
+            "python" | "py" => "py",
+            "go" | "golang" => "go",
+            "ruby" | "rb" => "rb",
+            "java" => "java",
+            "c" => "c",
+            "cpp" | "c++" | "cxx" => "cpp",
+            "css" => "css",
+            "html" => "html",
+            "json" => "json",
+            "yaml" | "yml" => "yaml",
+            "toml" => "toml",
+            "bash" | "sh" | "shell" | "zsh" => "sh",
+            "sql" => "sql",
+            "swift" => "swift",
+            "kotlin" | "kt" => "kt",
+            other => other,
+        };
+        let fake_path = format!("file.{}", ext);
+        let lang = arborium::detect_language(&fake_path);
+
+        if lang.is_none() {
+            return caps[0].to_string();
+        }
+
+        // Decode HTML entities back to source text for highlighting.
+        let source = html_encoded_body
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"");
+
+        let lines: Vec<String> = source.lines().map(String::from).collect();
+        let highlighted = syntax_highlight_lines(&lines, &mut hl, lang);
+
+        let mut out = String::from("<pre><code>");
+        for (i, line) in highlighted.iter().enumerate() {
+            out.push_str(line);
+            if i + 1 < highlighted.len() {
+                out.push('\n');
+            }
+        }
+        out.push_str("</code></pre>");
+        out
     }).to_string();
 
     // Replace @service inline code with styled service badges.
@@ -5641,5 +5854,364 @@ mod tests {
                 expected, rendered_old_lines, rows,
             );
         }
+    }
+
+    /// Context lines should expand beyond CONTEXT_LINES when the boundary
+    /// cuts off a multi-line expression (e.g. a function call). The expansion
+    /// uses bracket nesting to find the enclosing opener/closer, capped at
+    /// MAX_EXPRESSION_CONTEXT extra lines.
+    #[test]
+    fn context_expands_to_show_enclosing_expression() {
+        // Simulate a file where a changed line sits inside a multi-line
+        // function call. With CONTEXT_LINES=3, the call opener would be
+        // cut off. The renderer should expand to include it.
+        //
+        //  0: function deploy() {
+        //  1:   const result = await sendEvent(context, {
+        //  2:     cluster: env,
+        //  3:     service: 'web',
+        //  4:     orchestrator: 'N/A',
+        //  5:     manuallyTriggered: true,     <-- CHANGED (old: false)
+        //  6:     additionalEventTags: tags,
+        //  7:   });
+        //  8:   if (result.ok) {
+        //  9:     return true;
+        // 10:   }
+        // 11: }
+        let old_lines = vec![
+            "function deploy() {",
+            "  const result = await sendEvent(context, {",
+            "    cluster: env,",
+            "    service: 'web',",
+            "    orchestrator: 'N/A',",
+            "    manuallyTriggered: false,",
+            "    additionalEventTags: tags,",
+            "  });",
+            "  if (result.ok) {",
+            "    return true;",
+            "  }",
+            "}",
+        ];
+        let new_lines = vec![
+            "function deploy() {",
+            "  const result = await sendEvent(context, {",
+            "    cluster: env,",
+            "    service: 'web',",
+            "    orchestrator: 'N/A',",
+            "    manuallyTriggered: true,",
+            "    additionalEventTags: tags,",
+            "  });",
+            "  if (result.ok) {",
+            "    return true;",
+            "  }",
+            "}",
+        ];
+
+        // Changed line is index 5 (0-based). difft uses 0-based line numbers.
+        let chunk = vec![
+            LineEntry {
+                lhs: Some(side(5, vec![span("false", 25, 30)])),
+                rhs: Some(side(5, vec![span("true", 25, 29)])),
+            },
+        ];
+
+        // Hunk: the change is at old line 6, new line 6 (1-based for git hunks)
+        let hunks = vec![DiffHunk { old_start: 6, old_count: 1, new_start: 6, new_count: 1 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+        let rows = extract_rows(&html);
+
+        let rendered_new_lines: Vec<u64> = rows.iter()
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+
+        // With plain CONTEXT_LINES=3, we'd see display lines 3..9.
+        // Display line 2 ("const result = await sendEvent(context, {")
+        // would be cut off (0-based index 1, display = index+1 = 2).
+        // The expression-aware expansion should include it because the
+        // visible range contains a closer without the matching opener.
+        assert!(
+            rendered_new_lines.contains(&2),
+            "Expected the function call opener (display line 2) to be included \
+             via expression-aware context expansion.\n\
+             Rendered new lines: {:?}\n\
+             Rows: {:?}",
+            rendered_new_lines, rows,
+        );
+    }
+
+    /// When an entire new function is added, the pre-context shows the end of
+    /// the previous function. Expression expansion should NOT pull in unrelated
+    /// code from the previous function just because the context has a closing
+    /// brace.
+    #[test]
+    fn added_function_does_not_expand_into_previous_function() {
+        //  0: async function previousFunction() {
+        //  1:   const x = await fetch(url, {
+        //  2:     method: 'POST',
+        //  3:     body: JSON.stringify(data),
+        //  4:   });
+        //  5:   return x;
+        //  6: }
+        //  7:
+        //  8: /**                                          <-- ADDED from here
+        //  9:  * Bootstrap via workspace/create.
+        // 10:  */
+        // 11: async function bootstrapViaWorkspaceCreate(
+        // 12:   context: Context,
+        // 13:   config: BootstrapConfig,
+        // 14: ) {
+        // 15:   const ws = await createWorkspace(context, {
+        // 16:     bootstrap: config,
+        // 17:   });
+        // 18:   return ws;
+        // 19: }
+        let old_lines: Vec<&str> = vec![
+            "async function previousFunction() {",
+            "  const x = await fetch(url, {",
+            "    method: 'POST',",
+            "    body: JSON.stringify(data),",
+            "  });",
+            "  return x;",
+            "}",
+            "",
+        ];
+        let new_lines: Vec<&str> = vec![
+            "async function previousFunction() {",
+            "  const x = await fetch(url, {",
+            "    method: 'POST',",
+            "    body: JSON.stringify(data),",
+            "  });",
+            "  return x;",
+            "}",
+            "",
+            "/**",
+            " * Bootstrap via workspace/create.",
+            " */",
+            "async function bootstrapViaWorkspaceCreate(",
+            "  context: Context,",
+            "  config: BootstrapConfig,",
+            ") {",
+            "  const ws = await createWorkspace(context, {",
+            "    bootstrap: config,",
+            "  });",
+            "  return ws;",
+            "}",
+        ];
+
+        // Added lines: 0-based indices 8..19 on the new side.
+        let chunk: Vec<LineEntry> = (8..20).map(|i| {
+            LineEntry { lhs: None, rhs: Some(side(i, vec![])) }
+        }).collect();
+
+        // Hunk: insertion after old line 8, adding 12 new lines starting at new line 9
+        let hunks = vec![DiffHunk { old_start: 9, old_count: 0, new_start: 9, new_count: 12 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+        let rows = extract_rows(&html);
+
+        let rendered_new_lines: Vec<u64> = rows.iter()
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+
+        // Pre-context should be at most 3 lines (display lines 6, 7, 8 =
+        // 0-based 5, 6, 7). The expansion should NOT reach back to display
+        // line 2 ("const x = await fetch(url, {") or earlier, because the
+        // added function's brackets are self-contained.
+        let min_new = rendered_new_lines.iter().copied().min().unwrap_or(0);
+        assert!(
+            min_new >= 6,
+            "Expression expansion reached into the previous function. \
+             Earliest rendered new line is display {}, expected >= 6.\n\
+             Rendered new lines: {:?}\n\
+             Rows: {:?}",
+            min_new, rendered_new_lines, rows,
+        );
+    }
+
+    /// When expression expansion hits MAX_EXPRESSION_CONTEXT without finding
+    /// the matching bracket, the extra lines are mid-expression noise. The
+    /// expansion should be abandoned entirely, falling back to CONTEXT_LINES.
+    #[test]
+    fn incomplete_expression_expansion_falls_back_to_normal_context() {
+        // A long array literal where the changed line is near the end.
+        // The `]` closer is within post-context, triggering before-expansion,
+        // but the `[` opener is 12+ lines above, unreachable within
+        // MAX_EXPRESSION_CONTEXT=8. The expansion should give up and use
+        // normal 3-line context rather than showing 8 random mid-array lines.
+        //
+        //  0: const FLAGS = [
+        //  1:   'flag_a',
+        //  ...  (many flags)
+        // 13:   'flag_n',
+        // 14:   'flag_changed',          <-- CHANGED
+        // 15: ] as const;               <-- closer in post-context
+        // 16:
+        // 17: export default FLAGS;
+        let mut old_lines: Vec<&str> = vec!["const FLAGS = ["];
+        for i in 0..13 {
+            old_lines.push(match i {
+                0 => "  'flag_a',",
+                1 => "  'flag_b',",
+                2 => "  'flag_c',",
+                3 => "  'flag_d',",
+                4 => "  'flag_e',",
+                5 => "  'flag_f',",
+                6 => "  'flag_g',",
+                7 => "  'flag_h',",
+                8 => "  'flag_i',",
+                9 => "  'flag_j',",
+                10 => "  'flag_k',",
+                11 => "  'flag_l',",
+                _ => "  'flag_m',",
+            });
+        }
+        old_lines.push("  'flag_old',");   // index 14
+        old_lines.push("] as const;");     // index 15
+        old_lines.push("");                // index 16
+        old_lines.push("export default FLAGS;"); // index 17
+
+        let mut new_lines = old_lines.clone();
+        new_lines[14] = "  'flag_changed',";
+
+        let chunk = vec![
+            LineEntry {
+                lhs: Some(side(14, vec![span("flag_old", 3, 11)])),
+                rhs: Some(side(14, vec![span("flag_changed", 3, 15)])),
+            },
+        ];
+
+        let hunks = vec![DiffHunk { old_start: 15, old_count: 1, new_start: 15, new_count: 1 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+        let rows = extract_rows(&html);
+
+        let rendered_new_lines: Vec<u64> = rows.iter()
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+
+        let min_new = rendered_new_lines.iter().copied().min().unwrap_or(0);
+
+        // Normal 3-line context: display lines 12..18 (0-based 11..17).
+        // The `[` opener is at display line 1, unreachable within 8 extra lines
+        // from display line 12. Since expansion can't complete the expression,
+        // it should not expand at all.
+        assert!(
+            min_new >= 12,
+            "Incomplete expression expansion should fall back to normal context. \
+             Earliest rendered line is display {}, expected >= 12.\n\
+             Rendered new lines: {:?}",
+            min_new, rendered_new_lines,
+        );
+    }
+
+    /// When an added line is inside a function call and the post-context
+    /// contains `});` (closing the call) followed by `}` (closing an outer
+    /// if/else block), the expansion should only account for the immediate
+    /// enclosing call's brackets, not the outer block's closer. Otherwise
+    /// it expands past the enclosing call into unrelated code above.
+    #[test]
+    fn expansion_stops_at_nearest_enclosing_call() {
+        //  0: if (condition) {
+        //  1:   await sendDeployRollbackEventStep(context, {
+        //  2:     manuallyTriggered,
+        //  3:     successfullyRolledBack: endState === 'rollback',
+        //  4:     deployEndState: endState,
+        //  5:     additionalEventTags: commitTags,
+        //  6:   });
+        //  7: } else {
+        //  8:   await sendDeploySuccessEventStep(context, {
+        //  9:     cluster: env,
+        // 10:     service: 'web',
+        // 11:     orchestrator: 'N/A',
+        // 12:     branch,
+        // 13:     additionalEventTags: commitTags,   <-- ADDED
+        // 14:   });
+        // 15: }
+        // 16: if (endState === 'success') {
+        let old_lines = vec![
+            "if (condition) {",
+            "  await sendDeployRollbackEventStep(context, {",
+            "    manuallyTriggered,",
+            "    successfullyRolledBack: endState === 'rollback',",
+            "    deployEndState: endState,",
+            "    additionalEventTags: commitTags,",
+            "  });",
+            "} else {",
+            "  await sendDeploySuccessEventStep(context, {",
+            "    cluster: env,",
+            "    service: 'web',",
+            "    orchestrator: 'N/A',",
+            "    branch,",
+            "  });",
+            "}",
+            "if (endState === 'success') {",
+        ];
+        let new_lines = vec![
+            "if (condition) {",
+            "  await sendDeployRollbackEventStep(context, {",
+            "    manuallyTriggered,",
+            "    successfullyRolledBack: endState === 'rollback',",
+            "    deployEndState: endState,",
+            "    additionalEventTags: commitTags,",
+            "  });",
+            "} else {",
+            "  await sendDeploySuccessEventStep(context, {",
+            "    cluster: env,",
+            "    service: 'web',",
+            "    orchestrator: 'N/A',",
+            "    branch,",
+            "    additionalEventTags: commitTags,",
+            "  });",
+            "}",
+            "if (endState === 'success') {",
+        ];
+
+        // Added line at new-side index 13 (inside sendDeploySuccessEventStep)
+        let chunk = vec![
+            LineEntry {
+                lhs: None,
+                rhs: Some(side(13, vec![])),
+            },
+        ];
+
+        // Hunk: insertion at new line 14, adding 1 line
+        let hunks = vec![DiffHunk { old_start: 13, old_count: 0, new_start: 14, new_count: 1 }];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let html = test_render_chunks(&difft, &[0], "test.ts", None);
+        let rows = extract_rows(&html);
+
+        let rendered_new_lines: Vec<u64> = rows.iter()
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+
+        let min_new = rendered_new_lines.iter().copied().min().unwrap_or(0);
+
+        // The added line (display 14) is inside sendDeploySuccessEventStep
+        // at display 9. Expansion should reach display 9 at most.
+        // It should NOT go past "} else {" (display 8) into the rollback
+        // call. The `}` at display 16 closes the if/else block, not the
+        // function call, and shouldn't inflate the expansion.
+        assert!(
+            min_new >= 9,
+            "Expansion went past the enclosing function call into the \
+             rollback branch. Earliest rendered line is display {}, \
+             expected >= 9.\n\
+             Rendered new lines: {:?}",
+            min_new, rendered_new_lines,
+        );
+
+        // Verify the enclosing call IS included
+        assert!(
+            rendered_new_lines.contains(&9),
+            "Expected sendDeploySuccessEventStep call opener (display 9) \
+             to be included.\n\
+             Rendered new lines: {:?}",
+            rendered_new_lines,
+        );
     }
 }

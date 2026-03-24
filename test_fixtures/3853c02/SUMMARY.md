@@ -66,6 +66,13 @@ The TS client's `createWorkspace` method needs to accept the new `bootstrap` fie
  235      let callback: Callback<WorkspaceMetadata | undefined>
  236      if (typeof cbOrOpts === 'function') {
  237        callback = cbOrOpts
+ 238      } else {
+ 239        opts = cbOrOpts ?? {}
+ 240        if (!cb) {
+ 241          throw new Error('createWorkspace: callback is required when passing options')
+ 242        }
+ 243        callback = cb
+ 244      }
 ```
 
 ## 3. New bootstrap function and call site

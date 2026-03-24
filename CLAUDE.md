@@ -92,6 +92,16 @@ Diff blocks have `max-height: 80vh` with `overflow: hidden` (no scrollbar). A JS
 
 The render command writes back to the input markdown file, replacing each difft code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs. This enables an LLM workflow where the narrative is written first, then refined after seeing the actual diffs inline.
 
+### Expression-aware context expansion
+
+Context lines normally show 3 lines before and after each chunk (`CONTEXT_LINES`). When a changed line sits inside a multi-line expression (e.g. a function call) whose opener would be cut off by the 3-line limit, the renderer expands context backward to include the enclosing expression's opener. Similarly, if changed lines contain unclosed openers, context expands forward.
+
+The expansion uses bracket counting (`({[` vs `)}]`) and is scoped to the **nearest enclosing expression**: only the first bracket dip below 0 (scanning forward from the changed line) triggers expansion. This prevents expansion from bleeding into unrelated outer expressions. Capped at `MAX_EXPRESSION_CONTEXT` (8) extra lines, and if the cap is hit without balancing the brackets, the expansion is abandoned entirely (falls back to normal 3-line context).
+
+### Syntax-highlighted code blocks
+
+Fenced code blocks with a language tag (e.g. `` ```typescript ``, `` ```rust ``) are syntax-highlighted using arborium (tree-sitter). The language tag is mapped to a file extension for `arborium::detect_language`. Blocks without a language tag render as plain text.
+
 ### Line mapping
 
 `new_to_old_line` and `old_to_new_line` map between old/new file lines using unified diff hunk boundaries. Used to compute context line correspondence and resolve one-sided chunks (e.g. added-only) to the correct old-file position.

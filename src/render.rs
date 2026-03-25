@@ -4171,10 +4171,15 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
 
     // Replace @service inline code with styled service badges.
     // pulldown-cmark renders `@sboxd` as <code>@sboxd</code>.
+    // Use `\@name` in backticks to suppress the badge (renders as plain `@name`).
+    let service_escape_re = Regex::new(r#"<code>\\@([^<]+)</code>"#)?;
+    html_body = service_escape_re.replace_all(&html_body, "\x00ESCAPED_AT$1\x00").to_string();
     let service_re = Regex::new(r#"<code>@([^<]+)</code>"#)?;
     html_body = service_re.replace_all(&html_body, |caps: &regex::Captures| {
         format!("<span class=\"service-badge\">{}</span>", &caps[1])
     }).to_string();
+    let escaped_at_re = Regex::new(r#"\x00ESCAPED_AT([^\x00]+)\x00"#)?;
+    html_body = escaped_at_re.replace_all(&html_body, "<code>@$1</code>").to_string();
 
     // Add anchor IDs to headings and extract the first h1 for <title>.
     let heading_re = Regex::new(r"<(h[1-6])>(.*?)</h[1-6]>")?;

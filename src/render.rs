@@ -1706,6 +1706,18 @@ fn render_diff_row(
         let old_highlighted = old_hl.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
         let new_highlighted = new_hl.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
 
+        // Difft sometimes includes unchanged lines in a chunk because the
+        // surrounding syntactic structure changed (e.g. a JSDoc comment got
+        // longer). Render these as context, not as paired changes.
+        // Difft sometimes includes unchanged lines in a chunk because the
+        // surrounding syntactic structure changed (e.g. a JSDoc comment got
+        // longer). Render these as context, not as paired changes.
+        if old_line == new_line {
+            return render_context_row(
+                lhs.line_number as usize, rhs.line_number as usize, old_hl, new_hl,
+            );
+        }
+
         let old_code;
         let new_code;
         let is_full_line;
@@ -2345,8 +2357,12 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
                             let n = rhs.line_number as usize;
                             let old_line = difft.old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
                             let new_line = difft.new_lines.get(n).map(|s| s.as_str()).unwrap_or("");
-                            out.push_str(&fmt_line("-", n, old_line));
-                            out.push_str(&fmt_line("+", n, new_line));
+                            if old_line == new_line {
+                                out.push_str(&fmt_line(" ", n, new_line));
+                            } else {
+                                out.push_str(&fmt_line("-", n, old_line));
+                                out.push_str(&fmt_line("+", n, new_line));
+                            }
                         }
                         (Some(lhs), None) => {
                             let n = to_0based(old_to_new_line(lhs.line_number + 1, hunks));
@@ -2849,10 +2865,15 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         let mut split_sides: Vec<LineSide> = Vec::new();
         let is_low_similarity = |row: &DiffRow| -> bool {
             if let (Some(lhs), Some(rhs)) = (row.lhs, row.rhs) {
-                let old_text = difft.old_lines.get(lhs.line_number as usize)
-                    .map(|s| s.trim().len()).unwrap_or(0);
-                let new_text = difft.new_lines.get(rhs.line_number as usize)
-                    .map(|s| s.trim().len()).unwrap_or(0);
+                // Skip entries where content is identical (difft includes
+                // unchanged lines in chunks when the surrounding structure
+                // changed, e.g. a JSDoc comment grew longer).
+                let old_line = difft.old_lines.get(lhs.line_number as usize);
+                let new_line = difft.new_lines.get(rhs.line_number as usize);
+                if old_line == new_line { return false; }
+
+                let old_text = old_line.map(|s| s.trim().len()).unwrap_or(0);
+                let new_text = new_line.map(|s| s.trim().len()).unwrap_or(0);
                 let old_changed: usize = lhs.changes.iter()
                     .map(|c| c.end.saturating_sub(c.start))
                     .sum();
@@ -6574,5 +6595,125 @@ mod tests {
                 .filter(|(_, o, n)| *o == Some(494) || *n == Some(491))
                 .collect::<Vec<_>>(),
         );
+    }
+
+    /// Difft sometimes includes unchanged lines in a chunk when the
+    /// surrounding syntactic structure changed (e.g. a JSDoc comment grew
+    /// from 4 to 7 lines). The change spans cover the full line on both
+    /// sides (syntax highlighting), but the content is identical. These
+    /// should render as context rows, not as paired changes or separate
+    /// removed + added rows.
+    #[test]
+    fn identical_content_entries_render_as_context() {
+        use crate::difft_json::*;
+
+        // Simulate a JSDoc comment that grew: old has `/**` through `*/`,
+        // new has the same lines plus extra comment lines before `*/`.
+        let old_lines: Vec<String> = vec![
+            "/**",
+            " * Calls workspace/create with structured config.",
+            " * Bootstrap is idempotent.",
+            " */",
+            "async function bootstrap() {",
+        ].into_iter().map(String::from).collect();
+        let new_lines: Vec<String> = vec![
+            "/**",
+            " * Calls workspace/create with structured config.",
+            " * Bootstrap is idempotent.",
+            " *",
+            " * Returns immediately; bootstrap runs async.",
+            " */",
+            "async function bootstrap() {",
+        ].into_iter().map(String::from).collect();
+
+        // Build a chunk that mirrors what difft produces: paired entries
+        // for the identical lines (full-line change spans), plus added-only
+        // entries for the new lines.
+        let make_full_span = |line: &str| -> Vec<ChangeSpan> {
+            vec![ChangeSpan {
+                content: line.to_string(),
+                start: 0,
+                end: line.len(),
+                highlight: "comment".to_string(),
+            }]
+        };
+
+        let chunks = vec![vec![
+            // Added-only entries for new comment lines
+            LineEntry {
+                lhs: None,
+                rhs: Some(LineSide { line_number: 3, changes: make_full_span(" *") }),
+            },
+            LineEntry {
+                lhs: None,
+                rhs: Some(LineSide { line_number: 4, changes: make_full_span(" * Returns immediately; bootstrap runs async.") }),
+            },
+            LineEntry {
+                lhs: None,
+                rhs: Some(LineSide { line_number: 5, changes: make_full_span(" */") }),
+            },
+            // Paired entries with identical content (difft structural match)
+            LineEntry {
+                lhs: Some(LineSide { line_number: 0, changes: make_full_span("/**") }),
+                rhs: Some(LineSide { line_number: 0, changes: make_full_span("/**") }),
+            },
+            LineEntry {
+                lhs: Some(LineSide { line_number: 1, changes: make_full_span(" * Calls workspace/create with structured config.") }),
+                rhs: Some(LineSide { line_number: 1, changes: make_full_span(" * Calls workspace/create with structured config.") }),
+            },
+            LineEntry {
+                lhs: Some(LineSide { line_number: 2, changes: make_full_span(" * Bootstrap is idempotent.") }),
+                rhs: Some(LineSide { line_number: 2, changes: make_full_span(" * Bootstrap is idempotent.") }),
+            },
+            // Paired entry where content actually differs
+            LineEntry {
+                lhs: Some(LineSide { line_number: 3, changes: make_full_span(" */") }),
+                rhs: Some(LineSide { line_number: 3, changes: vec![
+                    ChangeSpan { content: " *".to_string(), start: 0, end: 2, highlight: "comment".to_string() },
+                ] }),
+            },
+        ]];
+
+        let difft = DifftOutput {
+            chunks,
+            language: Some("TypeScript".to_string()),
+            path: Some("test.ts".to_string()),
+            status: None,
+            old_lines,
+            new_lines,
+            hunks: vec![DiffHunk { old_start: 1, old_count: 5, new_start: 1, new_count: 7 }],
+        };
+
+        let mut hl = Highlighter::new();
+        let html = render_chunks(&difft, &[0], "test.ts", None, &mut hl, CollapseMode::None);
+        let rows = extract_rows(&html);
+
+        // Lines 0-2 (display 1-3) have identical content. They must render
+        // as context, not as removed/added or paired changes.
+        for display_ln in 1..=3u64 {
+            let is_context = rows.iter().any(|(c, o, n)| {
+                c == "line-context"
+                    && (*o == Some(display_ln) || *n == Some(display_ln))
+            });
+            let is_changed = rows.iter().any(|(c, o, n)| {
+                c != "line-context" && c != "chunk-sep"
+                    && (*o == Some(display_ln) || *n == Some(display_ln))
+            });
+            assert!(
+                is_context && !is_changed,
+                "Identical-content line {} should be context, not changed.\nRows: {:?}",
+                display_ln,
+                rows.iter()
+                    .filter(|(_, o, n)| *o == Some(display_ln) || *n == Some(display_ln))
+                    .collect::<Vec<_>>(),
+            );
+        }
+
+        // Line 4 (display) on the old side (` */`) should be changed since
+        // it differs from new line 4 (` *`).
+        let old_4_changed = rows.iter().any(|(c, o, _)| {
+            c != "line-context" && c != "chunk-sep" && *o == Some(4)
+        });
+        assert!(old_4_changed, "Differing line old=4 should be changed, not context");
     }
 }

@@ -2840,6 +2840,81 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             })
         });
 
+        // Un-pair low-similarity entries. Difft sometimes pairs lines by
+        // position even when content is almost entirely different. Split
+        // these into adjacent removed + added items at the same sort key.
+        let mut split_rows: Vec<DiffRow> = Vec::new();
+        // Owned LineSides with cleared changes for split rows, so they
+        // render as full-line removals/additions instead of partial highlights.
+        let mut split_sides: Vec<LineSide> = Vec::new();
+        let is_low_similarity = |row: &DiffRow| -> bool {
+            if let (Some(lhs), Some(rhs)) = (row.lhs, row.rhs) {
+                let old_text = difft.old_lines.get(lhs.line_number as usize)
+                    .map(|s| s.trim().len()).unwrap_or(0);
+                let new_text = difft.new_lines.get(rhs.line_number as usize)
+                    .map(|s| s.trim().len()).unwrap_or(0);
+                let old_changed: usize = lhs.changes.iter()
+                    .map(|c| c.end.saturating_sub(c.start))
+                    .sum();
+                let new_changed: usize = rhs.changes.iter()
+                    .map(|c| c.end.saturating_sub(c.start))
+                    .sum();
+                let old_pct = if old_text > 0 { old_changed * 100 / old_text } else { 0 };
+                let new_pct = if new_text > 0 { new_changed * 100 / new_text } else { 0 };
+                old_pct > 70 && new_pct > 70
+            } else {
+                false
+            }
+        };
+        // First pass: identify which items need splitting and create the
+        // split DiffRows (need stable references before building new items).
+        let split_indices: Vec<usize> = items.iter().enumerate()
+            .filter_map(|(i, (_, item))| {
+                if let RenderItem::DifftRow(row) = item {
+                    if is_low_similarity(row) { return Some(i); }
+                }
+                None
+            })
+            .collect();
+        for &idx in &split_indices {
+            if let RenderItem::DifftRow(row) = &items[idx].1 {
+                // Create owned LineSides with empty changes so the split
+                // rows render as full-line removals/additions.
+                if let Some(lhs) = row.lhs {
+                    split_sides.push(LineSide { line_number: lhs.line_number, changes: vec![] });
+                }
+                if let Some(rhs) = row.rhs {
+                    split_sides.push(LineSide { line_number: rhs.line_number, changes: vec![] });
+                }
+            }
+        }
+        // Build split DiffRows referencing the owned sides.
+        {
+            let mut side_idx = 0;
+            for _ in &split_indices {
+                split_rows.push(DiffRow { lhs: Some(&split_sides[side_idx]), rhs: None });
+                split_rows.push(DiffRow { lhs: None, rhs: Some(&split_sides[side_idx + 1]) });
+                side_idx += 2;
+            }
+        }
+        // Second pass: rebuild items, replacing split entries with references
+        // to the split_rows.
+        if !split_indices.is_empty() {
+            let split_set: std::collections::HashSet<usize> = split_indices.into_iter().collect();
+            let mut new_items: Vec<(u64, RenderItem)> = Vec::new();
+            let mut split_idx = 0;
+            for (i, (key, item)) in items.into_iter().enumerate() {
+                if split_set.contains(&i) {
+                    new_items.push((key, RenderItem::DifftRow(&split_rows[split_idx])));
+                    new_items.push((key + 1, RenderItem::DifftRow(&split_rows[split_idx + 1])));
+                    split_idx += 2;
+                } else {
+                    new_items.push((key, item));
+                }
+            }
+            items = new_items;
+        }
+
         // Enforce old-side monotonicity. When old and new sides have
         // different ordering (refactored code), the new-side-based sort can
         // scatter old-side line numbers. Stable-sort items so old-side line
@@ -6432,6 +6507,72 @@ mod tests {
             "Old-side line numbers are jumbled in chunk 3:\n{}\n\
              All old lines: {:?}",
             violations.join("\n"), old_lns,
+        );
+    }
+
+    /// When difft pairs lines by position but the content is almost entirely
+    /// different (e.g. `defer m.mu.RUnlock()` ↔ `if id == ""`), the pairing
+    /// should be split into separate removed + added rows. Entries where both
+    /// sides have >70% of content in change spans are low-similarity and
+    /// should render as unpaired.
+    #[test]
+    fn low_similarity_pairs_are_unpaired() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test_fixtures/low-similarity-pairs/services__agentplat__sbox__sboxd__internal__workspace__manager.go.json");
+        if !fixture_path.exists() {
+            eprintln!("Fixture not found, skipping");
+            return;
+        }
+        let json_str = fs::read_to_string(&fixture_path).unwrap();
+        let difft: DifftOutput = serde_json::from_str(&json_str).unwrap();
+        let file_path = difft.path.as_deref().unwrap_or("unknown");
+
+        let mut hl = Highlighter::new();
+        let html = render_chunks(&difft, &[3], file_path, None, &mut hl, CollapseMode::None);
+        let rows = extract_rows(&html);
+
+        // old=487 (display 488) is "m.mu.RLock()" and new=480 (display 481)
+        // is "id := string(wsID)". These are 100%/89% changed and should NOT
+        // appear as a paired row (line-paired).
+        let bad_pair = rows.iter().any(|(class, old, new)| {
+            class.contains("paired") && *old == Some(488) && *new == Some(481)
+        });
+        assert!(
+            !bad_pair,
+            "Low-similarity pair old=488/new=481 should not render as paired.\n\
+             Rows: {:?}",
+            rows.iter()
+                .filter(|(_, o, n)| *o == Some(488) || *n == Some(481))
+                .collect::<Vec<_>>(),
+        );
+
+        // old=488 (display 489) "defer m.mu.RUnlock()" should also not be
+        // paired with new=481 (display 482) "if id == ..."
+        let bad_pair2 = rows.iter().any(|(class, old, new)| {
+            class.contains("paired") && *old == Some(489) && *new == Some(482)
+        });
+        assert!(
+            !bad_pair2,
+            "Low-similarity pair old=489/new=482 should not render as paired.\n\
+             Rows: {:?}",
+            rows.iter()
+                .filter(|(_, o, n)| *o == Some(489) || *n == Some(482))
+                .collect::<Vec<_>>(),
+        );
+
+        // But old=493 (display 494) "return ws.RootPath, nil" paired with
+        // new=490 (display 491) "return resolved, nil" should stay paired
+        // (48%/40% changed - good pairing).
+        let good_pair = rows.iter().any(|(class, old, new)| {
+            class.contains("paired") && *old == Some(494) && *new == Some(491)
+        });
+        assert!(
+            good_pair,
+            "Good-similarity pair old=494/new=491 should remain paired.\n\
+             Rows: {:?}",
+            rows.iter()
+                .filter(|(_, o, n)| *o == Some(494) || *n == Some(491))
+                .collect::<Vec<_>>(),
         );
     }
 }

@@ -3217,11 +3217,13 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         let mut old_ctx_after = (old_last + 1 + EXPANDED_CONTEXT_LINES).min(difft.old_lines.len());
         let mut new_ctx_after = (new_last + 1 + EXPANDED_CONTEXT_LINES).min(difft.new_lines.len());
 
-        // Cap post-context at the next chunk's start to prevent ordering issues
-        // where post-context lines appear before the next chunk's changed lines.
+        // Cap post-context at the next chunk's visible pre-context start.
+        // Leave CONTEXT_LINES lines before the next chunk's first change so
+        // the next chunk's visible pre-context isn't consumed by hidden
+        // expanded post-context from this chunk.
         if let Some(&(next_old_min, next_new_min)) = chunk_boundaries.get(chunk_order + 1) {
-            old_ctx_after = old_ctx_after.min(next_old_min);
-            new_ctx_after = new_ctx_after.min(next_new_min);
+            old_ctx_after = old_ctx_after.min(next_old_min.saturating_sub(CONTEXT_LINES));
+            new_ctx_after = new_ctx_after.min(next_new_min.saturating_sub(CONTEXT_LINES));
         }
 
         let old_ctx_start = match last_old_rendered {

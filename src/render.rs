@@ -2899,13 +2899,24 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             .collect();
         for &idx in &split_indices {
             if let RenderItem::DifftRow(row) = &items[idx].1 {
-                // Create owned LineSides with empty changes so the split
-                // rows render as full-line removals/additions.
+                // Create owned LineSides with full-line change spans so
+                // the rows render with full-line background (no token
+                // highlights implying a semantic match).
                 if let Some(lhs) = row.lhs {
-                    split_sides.push(LineSide { line_number: lhs.line_number, changes: vec![] });
+                    let len = difft.old_lines.get(lhs.line_number as usize)
+                        .map(|s| s.len()).unwrap_or(0);
+                    split_sides.push(LineSide {
+                        line_number: lhs.line_number,
+                        changes: vec![crate::difft_json::ChangeSpan { content: String::new(), start: 0, end: len, highlight: String::new() }],
+                    });
                 }
                 if let Some(rhs) = row.rhs {
-                    split_sides.push(LineSide { line_number: rhs.line_number, changes: vec![] });
+                    let len = difft.new_lines.get(rhs.line_number as usize)
+                        .map(|s| s.len()).unwrap_or(0);
+                    split_sides.push(LineSide {
+                        line_number: rhs.line_number,
+                        changes: vec![crate::difft_json::ChangeSpan { content: String::new(), start: 0, end: len, highlight: String::new() }],
+                    });
                 }
             }
         }
@@ -2918,17 +2929,29 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 side_idx += 2;
             }
         }
-        // Second pass: rebuild items, replacing split entries with references
-        // to the split_rows.
+        // Second pass: rebuild items. Re-pair the split entries
+        // positionally (old line N beside new line N) so they share a
+        // row in side-by-side view. Changes are cleared so they render
+        // with full-row background, not token highlights.
         if !split_indices.is_empty() {
+            // Rebuild split_rows as re-paired: combine each removed/added
+            // pair into a single row with both sides but no change spans.
+            let mut repaired: Vec<DiffRow> = Vec::new();
+            for si in (0..split_rows.len()).step_by(2) {
+                repaired.push(DiffRow {
+                    lhs: split_sides.get(si).map(|s| s as &LineSide),
+                    rhs: split_sides.get(si + 1).map(|s| s as &LineSide),
+                });
+            }
+            split_rows = repaired;
+
             let split_set: std::collections::HashSet<usize> = split_indices.into_iter().collect();
             let mut new_items: Vec<(u64, RenderItem)> = Vec::new();
-            let mut split_idx = 0;
+            let mut repaired_idx = 0;
             for (i, (key, item)) in items.into_iter().enumerate() {
                 if split_set.contains(&i) {
-                    new_items.push((key, RenderItem::DifftRow(&split_rows[split_idx])));
-                    new_items.push((key + 1, RenderItem::DifftRow(&split_rows[split_idx + 1])));
-                    split_idx += 2;
+                    new_items.push((key, RenderItem::DifftRow(&split_rows[repaired_idx])));
+                    repaired_idx += 1;
                 } else {
                     new_items.push((key, item));
                 }
@@ -6531,13 +6554,12 @@ mod tests {
         );
     }
 
-    /// When difft pairs lines by position but the content is almost entirely
-    /// different (e.g. `defer m.mu.RUnlock()` ↔ `if id == ""`), the pairing
-    /// should be split into separate removed + added rows. Entries where both
-    /// sides have >70% of content in change spans are low-similarity and
-    /// should render as unpaired.
+    /// Low-similarity pairs (>70% changed on both sides) should render
+    /// as `line-paired-full` (full-line red/green, no token highlights)
+    /// rather than `line-paired` (token-level diff). They stay on the
+    /// same row for visual compactness.
     #[test]
-    fn low_similarity_pairs_are_unpaired() {
+    fn low_similarity_pairs_use_full_line_background() {
         let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("test_fixtures/low-similarity-pairs/services__agentplat__sbox__sboxd__internal__workspace__manager.go.json");
         if !fixture_path.exists() {
@@ -6550,50 +6572,47 @@ mod tests {
 
         let mut hl = Highlighter::new();
         let html = render_chunks(&difft, &[3], file_path, None, &mut hl, CollapseMode::None);
-        let rows = extract_rows(&html);
 
-        // old=487 (display 488) is "m.mu.RLock()" and new=480 (display 481)
-        // is "id := string(wsID)". These are 100%/89% changed and should NOT
-        // appear as a paired row (line-paired).
-        let bad_pair = rows.iter().any(|(class, old, new)| {
-            class.contains("paired") && *old == Some(488) && *new == Some(481)
-        });
-        assert!(
-            !bad_pair,
-            "Low-similarity pair old=488/new=481 should not render as paired.\n\
-             Rows: {:?}",
-            rows.iter()
-                .filter(|(_, o, n)| *o == Some(488) || *n == Some(481))
-                .collect::<Vec<_>>(),
+        // Check raw HTML for class attributes since extract_rows
+        // normalizes line-paired-full to line-paired.
+        let row_re = Regex::new(r#"<tr class="(line-paired(?:-full)?)"[^>]*>"#).unwrap();
+        let ln_re = Regex::new(r#"<td class="ln ln-lhs"[^>]*>(\d+)</td>"#).unwrap();
+
+        // Collect (class, old_ln) from the raw single-table HTML (before
+        // split_into_two_tables runs on it — render_chunks returns this).
+        let paired_rows: Vec<(&str, u64)> = row_re.captures_iter(&html)
+            .filter_map(|cap| {
+                let class = cap.get(1).unwrap().as_str();
+                let after = &html[cap.get(0).unwrap().end()..];
+                ln_re.captures(after).and_then(|lc| {
+                    lc[1].parse::<u64>().ok().map(|ln| (class, ln))
+                })
+            })
+            .collect();
+
+        // old=487 (display 488) "m.mu.RLock()" / new=480 (display 481)
+        // "id := string(wsID)" are 100%/89% changed. Must be
+        // line-paired-full, not line-paired.
+        let row_488 = paired_rows.iter().find(|(_, ln)| *ln == 488);
+        assert_eq!(
+            row_488.map(|(c, _)| *c), Some("line-paired-full"),
+            "Low-similarity old=488 should be line-paired-full.\nAll paired: {:?}", paired_rows,
         );
 
-        // old=488 (display 489) "defer m.mu.RUnlock()" should also not be
-        // paired with new=481 (display 482) "if id == ..."
-        let bad_pair2 = rows.iter().any(|(class, old, new)| {
-            class.contains("paired") && *old == Some(489) && *new == Some(482)
-        });
-        assert!(
-            !bad_pair2,
-            "Low-similarity pair old=489/new=482 should not render as paired.\n\
-             Rows: {:?}",
-            rows.iter()
-                .filter(|(_, o, n)| *o == Some(489) || *n == Some(482))
-                .collect::<Vec<_>>(),
+        // old=488 (display 489) "defer m.mu.RUnlock()" same treatment.
+        let row_489 = paired_rows.iter().find(|(_, ln)| *ln == 489);
+        assert_eq!(
+            row_489.map(|(c, _)| *c), Some("line-paired-full"),
+            "Low-similarity old=489 should be line-paired-full.\nAll paired: {:?}", paired_rows,
         );
 
-        // But old=493 (display 494) "return ws.RootPath, nil" paired with
-        // new=490 (display 491) "return resolved, nil" should stay paired
-        // (48%/40% changed - good pairing).
-        let good_pair = rows.iter().any(|(class, old, new)| {
-            class.contains("paired") && *old == Some(494) && *new == Some(491)
-        });
-        assert!(
-            good_pair,
-            "Good-similarity pair old=494/new=491 should remain paired.\n\
-             Rows: {:?}",
-            rows.iter()
-                .filter(|(_, o, n)| *o == Some(494) || *n == Some(491))
-                .collect::<Vec<_>>(),
+        // Good-similarity: old=493 (display 494) "return ws.RootPath, nil"
+        // / new=490 (display 491) "return resolved, nil" (~40% changed)
+        // should remain line-paired with token highlights.
+        let row_494 = paired_rows.iter().find(|(_, ln)| *ln == 494);
+        assert_eq!(
+            row_494.map(|(c, _)| *c), Some("line-paired"),
+            "Good-similarity old=494 should remain line-paired.\nAll paired: {:?}", paired_rows,
         );
     }
 
@@ -6639,11 +6658,7 @@ mod tests {
         };
 
         let chunks = vec![vec![
-            // Added-only entries for new comment lines
-            LineEntry {
-                lhs: None,
-                rhs: Some(LineSide { line_number: 3, changes: make_full_span(" *") }),
-            },
+            // Added-only entries for truly new comment lines
             LineEntry {
                 lhs: None,
                 rhs: Some(LineSide { line_number: 4, changes: make_full_span(" * Returns immediately; bootstrap runs async.") }),
@@ -6666,11 +6681,12 @@ mod tests {
                 rhs: Some(LineSide { line_number: 2, changes: make_full_span(" * Bootstrap is idempotent.") }),
             },
             // Paired entry where content actually differs
+            // (" */" → " *", partial change on lhs only)
             LineEntry {
-                lhs: Some(LineSide { line_number: 3, changes: make_full_span(" */") }),
-                rhs: Some(LineSide { line_number: 3, changes: vec![
-                    ChangeSpan { content: " *".to_string(), start: 0, end: 2, highlight: "comment".to_string() },
+                lhs: Some(LineSide { line_number: 3, changes: vec![
+                    ChangeSpan { content: "/".to_string(), start: 2, end: 3, highlight: "comment".to_string() },
                 ] }),
+                rhs: Some(LineSide { line_number: 3, changes: vec![] }),
             },
         ]];
 

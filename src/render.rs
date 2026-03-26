@@ -3354,11 +3354,12 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                     expand_id_pre, colspan, hidden_pre_count, plural
                 ));
             } else {
-                // Large region but only one edge has visible content: single ↓ button
+                // Large region, no content above: single ↑ button
+                // (hidden lines are above, expanding reveals upward)
                 html.push_str(&format!(
-                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
+                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
                      <td class=\"expand-btn\" colspan=\"{}\">\
-                     \u{2193} Show {} more lines</td></tr>",
+                     \u{2191} Show {} more lines</td></tr>",
                     expand_id_pre, colspan, EXPAND_STEP.min(hidden_pre_count)
                 ));
             }

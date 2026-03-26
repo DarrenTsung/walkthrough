@@ -1245,14 +1245,8 @@ const JS: &str = r#"
         var sides = row.closest('.diff-sides');
         var scope = sides || row.closest('.diff-body');
         if (!scope) return;
-        if (dir === 'all') {
-            revealAll(scope, id);
-            if (sides) sides.dispatchEvent(new Event('fold-toggle'));
-            return;
-        }
         // Reveal STEP lines from one direction in each table,
-        // then reposition the clicked button to stay adjacent to
-        // the remaining hidden lines.
+        // then reposition the button to stay adjacent to remaining hidden lines.
         var tables = scope.querySelectorAll('table');
         var remaining = 0;
         tables.forEach(function(table) {
@@ -1264,41 +1258,23 @@ const JS: &str = r#"
                 line.removeAttribute('hidden');
                 line.classList.remove('expand-line');
             });
-            // Move this table's button to stay next to remaining hidden lines.
-            var myBtn = table.querySelector('tr.expand-summary[data-expand-id="' + id + '"][data-dir="' + dir + '"]');
+            // Reposition this table's button next to remaining hidden lines.
+            var myBtn = table.querySelector('tr.expand-summary[data-expand-id="' + id + '"]');
             if (myBtn && batch.length > 0) {
                 var lastRevealed = batch[batch.length - 1];
                 var firstRevealed = batch[0];
                 if (dir === 'down') {
-                    // Move after the last revealed line
                     lastRevealed.parentNode.insertBefore(myBtn, lastRevealed.nextSibling);
                 } else {
-                    // Move before the first revealed line
                     firstRevealed.parentNode.insertBefore(myBtn, firstRevealed);
                 }
             }
         });
-        // Update button labels.
         updateButton(row, remaining);
-        var otherDir = dir === 'down' ? 'up' : 'down';
-        scope.querySelectorAll('tr.expand-summary[data-expand-id="' + id + '"][data-dir="' + otherDir + '"]').forEach(function(s) {
-            updateButton(s, remaining);
+        // Update the same button in the other table (two-table mode).
+        scope.querySelectorAll('tr.expand-summary[data-expand-id="' + id + '"]').forEach(function(s) {
+            if (s !== row) updateButton(s, remaining);
         });
-        // If remaining fits in one click, merge into a single "all" button
-        // at the position of the clicked button (which was just repositioned).
-        if (remaining > 0 && remaining <= 2 * STEP) {
-            var label = '\u21C5 Show ' + remaining + ' more ' + (remaining === 1 ? 'line' : 'lines');
-            // Remove the opposite-direction buttons, keep the clicked one.
-            scope.querySelectorAll('tr.expand-summary[data-expand-id="' + id + '"]').forEach(function(s) {
-                if (s === row || s.getAttribute('data-dir') === dir) {
-                    s.setAttribute('data-dir', 'all');
-                    var td = s.querySelector('td');
-                    if (td) td.textContent = label;
-                } else {
-                    s.remove();
-                }
-            });
-        }
         if (sides) sides.dispatchEvent(new Event('fold-toggle'));
     }
     document.querySelectorAll('tr.expand-summary').forEach(function(row) {
@@ -3296,21 +3272,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         let expand_id_pre = format!("expand-pre-{}", chunk_order);
 
         // Hidden expandable context lines (before visible context).
-        // Two buttons (↓ top, ↑ bottom) only when the hidden region is
-        // sandwiched between visible content on both sides. The ↓ button
-        // needs visible content above (previous chunk rendered something).
-        let has_content_above = last_old_rendered.is_some() || last_new_rendered.is_some();
-        let use_two_buttons_pre = hidden_pre_count > 2 * EXPAND_STEP && has_content_above;
+        // Single ↑ button at the bottom (closest to visible code).
         let colspan = if single { 3 } else { 6 };
-
-        if use_two_buttons_pre && hidden_pre_count > 0 {
-            html.push_str(&format!(
-                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
-                 <td class=\"expand-btn\" colspan=\"{}\">\
-                 \u{2193} Show {} more lines</td></tr>",
-                expand_id_pre, colspan, EXPAND_STEP
-            ));
-        }
 
         for i in 0..hidden_pre_count {
             let o = old_first.saturating_sub(pre_count) + i;
@@ -3336,33 +3299,14 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         }
 
         if hidden_pre_count > 0 {
-            if use_two_buttons_pre {
-                // ↑ button at bottom of hidden region (expand toward visible context below)
-                html.push_str(&format!(
-                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
-                     <td class=\"expand-btn\" colspan=\"{}\">\
-                     \u{2191} Show {} more lines</td></tr>",
-                    expand_id_pre, colspan, EXPAND_STEP
-                ));
-            } else if hidden_pre_count <= 2 * EXPAND_STEP {
-                // Small enough to reveal all at once
-                let plural = if hidden_pre_count == 1 { "line" } else { "lines" };
-                html.push_str(&format!(
-                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"all\">\
-                     <td class=\"expand-btn\" colspan=\"{}\">\
-                     \u{21C5} Show {} more {}</td></tr>",
-                    expand_id_pre, colspan, hidden_pre_count, plural
-                ));
-            } else {
-                // Large region, no content above: single ↑ button
-                // (hidden lines are above, expanding reveals upward)
-                html.push_str(&format!(
-                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
-                     <td class=\"expand-btn\" colspan=\"{}\">\
-                     \u{2191} Show {} more lines</td></tr>",
-                    expand_id_pre, colspan, EXPAND_STEP.min(hidden_pre_count)
-                ));
-            }
+            let step = hidden_pre_count.min(EXPAND_STEP);
+            let plural = if step == 1 { "line" } else { "lines" };
+            html.push_str(&format!(
+                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
+                 <td class=\"expand-btn\" colspan=\"{}\">\
+                 \u{2191} Show {} more {}</td></tr>",
+                expand_id_pre, colspan, step, plural
+            ));
         }
 
         // Visible context lines (normal CONTEXT_LINES range).
@@ -3578,38 +3522,17 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             }
         }
 
-        // Expander button(s) and hidden post-context lines.
-        // The ↑ button at the bottom only makes sense if there's a
-        // following chunk that will render visible content below.
-        let has_content_below = chunk_order + 1 < chunk_boundaries.len();
-        let use_two_buttons_post = hidden_post_count > 2 * EXPAND_STEP && has_content_below;
-
+        // Expander button and hidden post-context lines.
+        // Single ↓ button at the top (closest to visible code).
         if hidden_post_count > 0 {
-            if use_two_buttons_post {
-                html.push_str(&format!(
-                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
-                     <td class=\"expand-btn\" colspan=\"{}\">\
-                     \u{2193} Show {} more lines</td></tr>",
-                    expand_id_post, colspan, EXPAND_STEP
-                ));
-            } else if hidden_post_count <= 2 * EXPAND_STEP {
-                // Small enough to reveal all at once
-                let plural = if hidden_post_count == 1 { "line" } else { "lines" };
-                html.push_str(&format!(
-                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"all\">\
-                     <td class=\"expand-btn\" colspan=\"{}\">\
-                     \u{21C5} Show {} more {}</td></tr>",
-                    expand_id_post, colspan, hidden_post_count, plural
-                ));
-            } else {
-                // Large region but only one edge has visible content: single ↓ button
-                html.push_str(&format!(
-                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
-                     <td class=\"expand-btn\" colspan=\"{}\">\
-                     \u{2193} Show {} more lines</td></tr>",
-                    expand_id_post, colspan, EXPAND_STEP.min(hidden_post_count)
-                ));
-            }
+            let step = hidden_post_count.min(EXPAND_STEP);
+            let plural = if step == 1 { "line" } else { "lines" };
+            html.push_str(&format!(
+                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
+                 <td class=\"expand-btn\" colspan=\"{}\">\
+                 \u{2193} Show {} more {}</td></tr>",
+                expand_id_post, colspan, step, plural
+            ));
         }
 
         // Hidden expandable post-context lines.
@@ -3639,15 +3562,6 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 rendered_new.insert(n);
                 html.push_str(&render_context_row_expandable(o, n, &old_hl, &new_hl, &expand_id_post));
             }
-        }
-
-        if use_two_buttons_post && hidden_post_count > 0 {
-            html.push_str(&format!(
-                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
-                 <td class=\"expand-btn\" colspan=\"{}\">\
-                 \u{2191} Show {} more lines</td></tr>",
-                expand_id_post, colspan, EXPAND_STEP
-            ));
         }
 
         if post_count > 0 {

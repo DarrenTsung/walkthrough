@@ -14,6 +14,13 @@ use crate::difft_json::{DifftOutput, LineEntry, LineSide};
 /// Number of unchanged context lines to show before/after each chunk.
 const CONTEXT_LINES: usize = 3;
 
+/// Total context lines captured for HTML rendering. Lines beyond CONTEXT_LINES
+/// are hidden behind an expandable "show more" control.
+const EXPANDED_CONTEXT_LINES: usize = 40;
+
+/// Lines revealed per click on the "show more" expander.
+const EXPAND_STEP: usize = 8;
+
 /// Max extra context lines to add when expanding to show complete expressions
 /// (e.g. multi-line function calls cut off by the CONTEXT_LINES limit).
 const MAX_EXPRESSION_CONTEXT: usize = 8;
@@ -602,6 +609,38 @@ tr.line-paired-full .sign-rhs { color: #1a7f37; }
     border-bottom: 1px solid var(--border);
 }
 
+/* Expandable context lines (hidden by default) */
+tr.expand-line[hidden] {
+    content-visibility: hidden;
+    line-height: 0;
+    font-size: 0;
+}
+tr.expand-line[hidden] td {
+    padding: 0 !important;
+    height: 0;
+    border: none !important;
+    overflow: hidden;
+}
+tr.expand-summary td {
+    background: var(--sep-bg);
+    cursor: pointer;
+    text-align: center;
+    padding: 2px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    user-select: none;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+tr.expand-summary:hover td {
+    background: #ddf4ff;
+    color: #0969da;
+}
+@media (prefers-color-scheme: dark) {
+    tr.expand-summary:hover td { background: #0d2440; color: #58a6ff; }
+}
+
 /* Code annotations: yellow right-edge indicator */
 tr.annotated td:last-child {
     border-right: 3px solid #f0c000;
@@ -1176,6 +1215,105 @@ const JS: &str = r#"
                     }
                 }
             }, 0);
+        });
+    });
+})();
+
+// Expandable context: click to reveal hidden context lines
+(function() {
+    var STEP = 8;
+    function revealAll(scope, id) {
+        scope.querySelectorAll('tr.expand-line[data-expand-id="' + id + '"]').forEach(function(l) {
+            l.removeAttribute('hidden');
+            l.classList.remove('expand-line');
+        });
+        scope.querySelectorAll('tr.expand-summary[data-expand-id="' + id + '"]').forEach(function(s) {
+            s.remove();
+        });
+    }
+    function updateButton(btn, remaining) {
+        if (remaining <= 0) { btn.remove(); return; }
+        var next = Math.min(remaining, STEP);
+        var dir = btn.getAttribute('data-dir');
+        var arrow = dir === 'down' ? '\u2193' : dir === 'up' ? '\u2191' : '\u21C5';
+        var td = btn.querySelector('td');
+        if (td) td.textContent = arrow + ' Show ' + next + ' more ' + (next === 1 ? 'line' : 'lines');
+    }
+    function revealStep(row) {
+        var id = row.getAttribute('data-expand-id');
+        var dir = row.getAttribute('data-dir') || 'all';
+        var sides = row.closest('.diff-sides');
+        var scope = sides || row.closest('.diff-body');
+        if (!scope) return;
+        if (dir === 'all') {
+            revealAll(scope, id);
+            if (sides) sides.dispatchEvent(new Event('fold-toggle'));
+            return;
+        }
+        // Reveal STEP lines from one direction in each table,
+        // then reposition the clicked button to stay adjacent to
+        // the remaining hidden lines.
+        var tables = scope.querySelectorAll('table');
+        var remaining = 0;
+        tables.forEach(function(table) {
+            var hidden = Array.from(table.querySelectorAll(
+                'tr.expand-line[data-expand-id="' + id + '"][hidden]'));
+            var batch = dir === 'down' ? hidden.slice(0, STEP) : hidden.slice(-STEP);
+            remaining = Math.max(remaining, hidden.length - batch.length);
+            batch.forEach(function(line) {
+                line.removeAttribute('hidden');
+                line.classList.remove('expand-line');
+            });
+            // Move this table's button to stay next to remaining hidden lines.
+            var myBtn = table.querySelector('tr.expand-summary[data-expand-id="' + id + '"][data-dir="' + dir + '"]');
+            if (myBtn && batch.length > 0) {
+                var lastRevealed = batch[batch.length - 1];
+                var firstRevealed = batch[0];
+                if (dir === 'down') {
+                    // Move after the last revealed line
+                    lastRevealed.parentNode.insertBefore(myBtn, lastRevealed.nextSibling);
+                } else {
+                    // Move before the first revealed line
+                    firstRevealed.parentNode.insertBefore(myBtn, firstRevealed);
+                }
+            }
+        });
+        // Update button labels.
+        updateButton(row, remaining);
+        var otherDir = dir === 'down' ? 'up' : 'down';
+        scope.querySelectorAll('tr.expand-summary[data-expand-id="' + id + '"][data-dir="' + otherDir + '"]').forEach(function(s) {
+            updateButton(s, remaining);
+        });
+        // If remaining fits in one click, merge into a single "all" button
+        // at the position of the clicked button (which was just repositioned).
+        if (remaining > 0 && remaining <= 2 * STEP) {
+            var label = '\u21C5 Show ' + remaining + ' more ' + (remaining === 1 ? 'line' : 'lines');
+            // Remove the opposite-direction buttons, keep the clicked one.
+            scope.querySelectorAll('tr.expand-summary[data-expand-id="' + id + '"]').forEach(function(s) {
+                if (s === row || s.getAttribute('data-dir') === dir) {
+                    s.setAttribute('data-dir', 'all');
+                    var td = s.querySelector('td');
+                    if (td) td.textContent = label;
+                } else {
+                    s.remove();
+                }
+            });
+        }
+        if (sides) sides.dispatchEvent(new Event('fold-toggle'));
+    }
+    document.querySelectorAll('tr.expand-summary').forEach(function(row) {
+        row.addEventListener('click', function() { revealStep(row); });
+    });
+    // Auto-expand all when browser find matches hidden context
+    document.querySelectorAll('tr.expand-line').forEach(function(line) {
+        line.addEventListener('beforematch', function() {
+            var id = line.getAttribute('data-expand-id');
+            var sides = line.closest('.diff-sides');
+            var scope = sides || line.closest('.diff-body');
+            if (scope) {
+                revealAll(scope, id);
+                if (sides) sides.dispatchEvent(new Event('fold-toggle'));
+            }
         });
     });
 })();
@@ -1852,6 +1990,28 @@ fn render_single_context_row(idx: usize, hl_lines: &[String]) -> String {
     format!(
         "<tr class=\"line-context\"><td class=\"ln\">{}</td><td class=\"sign\"></td><td class=\"code\">{}</td></tr>",
         idx + 1, content
+    )
+}
+
+/// Render a hidden expandable context row (side-by-side, 6 cols).
+fn render_context_row_expandable(old_idx: usize, new_idx: usize, old_hl: &[String], new_hl: &[String], expand_id: &str) -> String {
+    let old_content = old_hl.get(old_idx).map(|s| s.as_str()).unwrap_or("");
+    let new_content = new_hl.get(new_idx).map(|s| s.as_str()).unwrap_or("");
+    format!(
+        "<tr class=\"line-context expand-line\" data-expand-id=\"{}\" hidden=\"until-found\">\
+         <td class=\"ln ln-lhs\">{}</td><td class=\"sign sign-lhs\"></td><td class=\"code-lhs\">{}</td>\
+         <td class=\"ln ln-rhs\">{}</td><td class=\"sign sign-rhs\"></td><td class=\"code-rhs\">{}</td></tr>",
+        expand_id, old_idx + 1, old_content, new_idx + 1, new_content
+    )
+}
+
+/// Render a hidden expandable single-column context row.
+fn render_single_context_row_expandable(idx: usize, hl_lines: &[String], expand_id: &str) -> String {
+    let content = hl_lines.get(idx).map(|s| s.as_str()).unwrap_or("");
+    format!(
+        "<tr class=\"line-context expand-line\" data-expand-id=\"{}\" hidden=\"until-found\">\
+         <td class=\"ln\">{}</td><td class=\"sign\"></td><td class=\"code\">{}</td></tr>",
+        expand_id, idx + 1, content
     )
 }
 
@@ -3059,22 +3219,27 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             }
         }
 
-        // Compute context boundaries (after filter so they reflect the filtered range).
-        let mut old_ctx_before = old_first.saturating_sub(CONTEXT_LINES);
-        let mut new_ctx_before = new_first.saturating_sub(CONTEXT_LINES);
-        let mut old_ctx_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
-        let mut new_ctx_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
+        // Compute visible context boundaries (CONTEXT_LINES + expression expansion).
+        let mut old_vis_before = old_first.saturating_sub(CONTEXT_LINES);
+        let mut new_vis_before = new_first.saturating_sub(CONTEXT_LINES);
+        let mut old_vis_after = (old_last + 1 + CONTEXT_LINES).min(difft.old_lines.len());
+        let mut new_vis_after = (new_last + 1 + CONTEXT_LINES).min(difft.new_lines.len());
 
-        // Expand context when the boundary cuts off a multi-line expression.
+        // Expand visible context when the boundary cuts off a multi-line expression.
         let (exp_new_before, exp_new_after) =
-            expand_context_for_expressions(&difft.new_lines, new_ctx_before, new_first, new_last, new_ctx_after);
-        let new_before_delta = new_ctx_before - exp_new_before;
-        let new_after_delta = exp_new_after - new_ctx_after;
-        new_ctx_before = exp_new_before;
-        new_ctx_after = exp_new_after;
-        // Apply the same expansion to old side so both sides stay in sync.
-        old_ctx_before = old_ctx_before.saturating_sub(new_before_delta);
-        old_ctx_after = (old_ctx_after + new_after_delta).min(difft.old_lines.len());
+            expand_context_for_expressions(&difft.new_lines, new_vis_before, new_first, new_last, new_vis_after);
+        let new_before_delta = new_vis_before - exp_new_before;
+        let new_after_delta = exp_new_after - new_vis_after;
+        new_vis_before = exp_new_before;
+        new_vis_after = exp_new_after;
+        old_vis_before = old_vis_before.saturating_sub(new_before_delta);
+        old_vis_after = (old_vis_after + new_after_delta).min(difft.old_lines.len());
+
+        // Wider expanded context boundaries for hidden expandable rows.
+        let mut old_ctx_before = old_first.saturating_sub(EXPANDED_CONTEXT_LINES);
+        let mut new_ctx_before = new_first.saturating_sub(EXPANDED_CONTEXT_LINES);
+        let mut old_ctx_after = (old_last + 1 + EXPANDED_CONTEXT_LINES).min(difft.old_lines.len());
+        let mut new_ctx_after = (new_last + 1 + EXPANDED_CONTEXT_LINES).min(difft.new_lines.len());
 
         // Cap post-context at the next chunk's start to prevent ordering issues
         // where post-context lines appear before the next chunk's changed lines.
@@ -3108,6 +3273,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         first_chunk = false;
 
         // Render context lines BEFORE the chunk.
+        // Lines from ctx_start..vis_before are hidden (expandable).
+        // Lines from vis_before..first are visible.
         let old_pre_count = old_first.saturating_sub(old_ctx_start);
         let new_pre_count = new_first.saturating_sub(new_ctx_start);
         let pre_count = match layout {
@@ -3116,7 +3283,89 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             DiffLayout::SideBySide => old_pre_count.min(new_pre_count),
         };
 
-        for i in 0..pre_count {
+        // Visible start: the first line that should be shown without expanding.
+        let old_vis_start = old_vis_before.max(old_ctx_start);
+        let new_vis_start = new_vis_before.max(new_ctx_start);
+        let vis_pre_count = match layout {
+            DiffLayout::AddOnly => new_first.saturating_sub(new_vis_start),
+            DiffLayout::RemoveOnly => old_first.saturating_sub(old_vis_start),
+            DiffLayout::SideBySide => old_first.saturating_sub(old_vis_start)
+                .min(new_first.saturating_sub(new_vis_start)),
+        };
+        let hidden_pre_count = pre_count.saturating_sub(vis_pre_count);
+        let expand_id_pre = format!("expand-pre-{}", chunk_order);
+
+        // Hidden expandable context lines (before visible context).
+        // Two buttons (↓ top, ↑ bottom) only when the hidden region is
+        // sandwiched between visible content on both sides. The ↓ button
+        // needs visible content above (previous chunk rendered something).
+        let has_content_above = last_old_rendered.is_some() || last_new_rendered.is_some();
+        let use_two_buttons_pre = hidden_pre_count > 2 * EXPAND_STEP && has_content_above;
+        let colspan = if single { 3 } else { 6 };
+
+        if use_two_buttons_pre && hidden_pre_count > 0 {
+            html.push_str(&format!(
+                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
+                 <td class=\"expand-btn\" colspan=\"{}\">\
+                 \u{2193} Show {} more lines</td></tr>",
+                expand_id_pre, colspan, EXPAND_STEP
+            ));
+        }
+
+        for i in 0..hidden_pre_count {
+            let o = old_first.saturating_sub(pre_count) + i;
+            let n = new_first.saturating_sub(pre_count) + i;
+            if single {
+                let (idx, hl_lines) = if layout == DiffLayout::AddOnly {
+                    (n, &new_hl)
+                } else {
+                    (o, &old_hl)
+                };
+                if (layout == DiffLayout::AddOnly && !item_new_lines.contains(&idx) && rendered_new.insert(idx))
+                    || (layout == DiffLayout::RemoveOnly && !item_old_lines.contains(&idx) && rendered_old.insert(idx))
+                {
+                    html.push_str(&render_single_context_row_expandable(idx, hl_lines, &expand_id_pre));
+                }
+            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
+                && !rendered_old.contains(&o) && !rendered_new.contains(&n)
+            {
+                rendered_old.insert(o);
+                rendered_new.insert(n);
+                html.push_str(&render_context_row_expandable(o, n, &old_hl, &new_hl, &expand_id_pre));
+            }
+        }
+
+        if hidden_pre_count > 0 {
+            if use_two_buttons_pre {
+                // ↑ button at bottom of hidden region (expand toward visible context below)
+                html.push_str(&format!(
+                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
+                     <td class=\"expand-btn\" colspan=\"{}\">\
+                     \u{2191} Show {} more lines</td></tr>",
+                    expand_id_pre, colspan, EXPAND_STEP
+                ));
+            } else if hidden_pre_count <= 2 * EXPAND_STEP {
+                // Small enough to reveal all at once
+                let plural = if hidden_pre_count == 1 { "line" } else { "lines" };
+                html.push_str(&format!(
+                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"all\">\
+                     <td class=\"expand-btn\" colspan=\"{}\">\
+                     \u{21C5} Show {} more {}</td></tr>",
+                    expand_id_pre, colspan, hidden_pre_count, plural
+                ));
+            } else {
+                // Large region but only one edge has visible content: single ↓ button
+                html.push_str(&format!(
+                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
+                     <td class=\"expand-btn\" colspan=\"{}\">\
+                     \u{2193} Show {} more lines</td></tr>",
+                    expand_id_pre, colspan, EXPAND_STEP.min(hidden_pre_count)
+                ));
+            }
+        }
+
+        // Visible context lines (normal CONTEXT_LINES range).
+        for i in hidden_pre_count..pre_count {
             let o = old_first.saturating_sub(pre_count) + i;
             let n = new_first.saturating_sub(pre_count) + i;
             if single {
@@ -3278,6 +3527,8 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         }
 
         // Render context lines AFTER the chunk.
+        // Lines from post_start..vis_after are visible.
+        // Lines from vis_after..ctx_after are hidden (expandable).
         let old_post_start = old_last + 1;
         let new_post_start = new_last + 1;
         let old_post_count = old_ctx_after.saturating_sub(old_post_start);
@@ -3288,7 +3539,17 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             DiffLayout::SideBySide => old_post_count.min(new_post_count),
         };
 
-        for i in 0..post_count {
+        let vis_post_count = match layout {
+            DiffLayout::AddOnly => new_vis_after.saturating_sub(new_post_start),
+            DiffLayout::RemoveOnly => old_vis_after.saturating_sub(old_post_start),
+            DiffLayout::SideBySide => old_vis_after.saturating_sub(old_post_start)
+                .min(new_vis_after.saturating_sub(new_post_start)),
+        }.min(post_count);
+        let hidden_post_count = post_count.saturating_sub(vis_post_count);
+        let expand_id_post = format!("expand-post-{}", chunk_order);
+
+        // Visible post-context lines.
+        for i in 0..vis_post_count {
             let o = old_post_start + i;
             let n = new_post_start + i;
             if single {
@@ -3314,6 +3575,78 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 rendered_new.insert(n);
                 html.push_str(&render_context_row(o, n, &old_hl, &new_hl));
             }
+        }
+
+        // Expander button(s) and hidden post-context lines.
+        // The ↑ button at the bottom only makes sense if there's a
+        // following chunk that will render visible content below.
+        let has_content_below = chunk_order + 1 < chunk_boundaries.len();
+        let use_two_buttons_post = hidden_post_count > 2 * EXPAND_STEP && has_content_below;
+
+        if hidden_post_count > 0 {
+            if use_two_buttons_post {
+                html.push_str(&format!(
+                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
+                     <td class=\"expand-btn\" colspan=\"{}\">\
+                     \u{2193} Show {} more lines</td></tr>",
+                    expand_id_post, colspan, EXPAND_STEP
+                ));
+            } else if hidden_post_count <= 2 * EXPAND_STEP {
+                // Small enough to reveal all at once
+                let plural = if hidden_post_count == 1 { "line" } else { "lines" };
+                html.push_str(&format!(
+                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"all\">\
+                     <td class=\"expand-btn\" colspan=\"{}\">\
+                     \u{21C5} Show {} more {}</td></tr>",
+                    expand_id_post, colspan, hidden_post_count, plural
+                ));
+            } else {
+                // Large region but only one edge has visible content: single ↓ button
+                html.push_str(&format!(
+                    "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
+                     <td class=\"expand-btn\" colspan=\"{}\">\
+                     \u{2193} Show {} more lines</td></tr>",
+                    expand_id_post, colspan, EXPAND_STEP.min(hidden_post_count)
+                ));
+            }
+        }
+
+        // Hidden expandable post-context lines.
+        for i in vis_post_count..post_count {
+            let o = old_post_start + i;
+            let n = new_post_start + i;
+            if single {
+                let (idx, hl_lines, item_lines) = if layout == DiffLayout::AddOnly {
+                    (n, &new_hl, &item_new_lines)
+                } else {
+                    (o, &old_hl, &item_old_lines)
+                };
+                let already = if layout == DiffLayout::AddOnly {
+                    rendered_new.contains(&idx)
+                } else {
+                    rendered_old.contains(&idx)
+                };
+                if !item_lines.contains(&idx) && !already {
+                    if layout == DiffLayout::AddOnly { rendered_new.insert(idx); }
+                    else { rendered_old.insert(idx); }
+                    html.push_str(&render_single_context_row_expandable(idx, hl_lines, &expand_id_post));
+                }
+            } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
+                && !rendered_old.contains(&o) && !rendered_new.contains(&n)
+            {
+                rendered_old.insert(o);
+                rendered_new.insert(n);
+                html.push_str(&render_context_row_expandable(o, n, &old_hl, &new_hl, &expand_id_post));
+            }
+        }
+
+        if use_two_buttons_post && hidden_post_count > 0 {
+            html.push_str(&format!(
+                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
+                 <td class=\"expand-btn\" colspan=\"{}\">\
+                 \u{2191} Show {} more lines</td></tr>",
+                expand_id_post, colspan, EXPAND_STEP
+            ));
         }
 
         if post_count > 0 {
@@ -4515,6 +4848,10 @@ mod tests {
     ///   - Single-column mode (diff-single): 1 ln cell mapped to the active side
     ///   - Legacy 6-column mode: first 2 ln cells are old/new
     fn extract_rows(html: &str) -> Vec<(String, Option<u64>, Option<u64>)> {
+        // Strip hidden expandable context rows and expander buttons before parsing.
+        let expand_re = Regex::new(r#"(?s)<tr [^>]*class="[^"]*expand-(line|summary)[^"]*"[^>]*>.*?</tr>"#).unwrap();
+        let html = &expand_re.replace_all(html, "");
+
         let is_two_table = html.contains("diff-table-lhs") && html.contains("diff-table-rhs");
         let is_single = html.contains("diff-single");
         let single_is_add = html.contains("diff-add-only");

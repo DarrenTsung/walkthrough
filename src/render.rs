@@ -1710,6 +1710,7 @@ fn find_change_bounds(old: &str, new: &str) -> (usize, usize, usize, usize) {
 }
 
 /// A row to render in the diff table.
+#[derive(Clone, Copy)]
 struct DiffRow<'a> {
     lhs: Option<&'a LineSide>,
     rhs: Option<&'a LineSide>,
@@ -1768,6 +1769,154 @@ fn consolidate_chunk<'a>(entries: &'a [LineEntry]) -> Vec<DiffRow<'a>> {
     }
 
     rows
+}
+
+/// Compute the Longest Common Subsequence of two string slices.
+/// Returns pairs of (old_idx, new_idx) that form the LCS.
+fn longest_common_subsequence(old: &[&str], new: &[&str]) -> Vec<(usize, usize)> {
+    let m = old.len();
+    let n = new.len();
+    // dp[i][j] = LCS length for old[..i] vs new[..j]
+    let mut dp = vec![vec![0u32; n + 1]; m + 1];
+
+    for i in 1..=m {
+        for j in 1..=n {
+            if old[i - 1] == new[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = dp[i - 1][j].max(dp[i][j - 1]);
+            }
+        }
+    }
+
+    // Backtrack to find matched pairs
+    let mut matches = Vec::new();
+    let mut i = m;
+    let mut j = n;
+    while i > 0 && j > 0 {
+        if old[i - 1] == new[j - 1] {
+            matches.push((i - 1, j - 1));
+            i -= 1;
+            j -= 1;
+        } else if dp[i - 1][j] >= dp[i][j - 1] {
+            i -= 1;
+        } else {
+            j -= 1;
+        }
+    }
+    matches.reverse();
+    matches
+}
+
+/// Post-process consolidated rows to detect reordered lines. When a block of
+/// "changed" rows contains lines that appear in both old and new (just at
+/// different positions), re-pair them as context so only the truly moved lines
+/// show as removed/added.
+///
+/// Uses LCS to determine which lines are in the same relative order (context)
+/// vs which were actually moved (shown as remove + add).
+fn fix_reorders<'a>(
+    rows: Vec<DiffRow<'a>>,
+    old_lines: &[String],
+    new_lines: &[String],
+) -> Vec<DiffRow<'a>> {
+    let is_context = |row: &DiffRow| -> bool {
+        if let (Some(lhs), Some(rhs)) = (row.lhs, row.rhs) {
+            let old = old_lines.get(lhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+            let new = new_lines.get(rhs.line_number as usize).map(|s| s.as_str()).unwrap_or("");
+            old == new
+        } else {
+            false
+        }
+    };
+
+    let mut result = Vec::with_capacity(rows.len());
+    let mut i = 0;
+
+    while i < rows.len() {
+        if is_context(&rows[i]) {
+            result.push(rows[i]);
+            i += 1;
+            continue;
+        }
+
+        // Collect a maximal run of non-context (changed) rows
+        let run_start = i;
+        while i < rows.len() && !is_context(&rows[i]) {
+            i += 1;
+        }
+        let run = &rows[run_start..i];
+
+        // Collect old-side and new-side entries from the run
+        let mut old_entries: Vec<&'a LineSide> = Vec::new();
+        let mut new_entries: Vec<&'a LineSide> = Vec::new();
+
+        for row in run {
+            if let Some(lhs) = row.lhs {
+                old_entries.push(lhs);
+            }
+            if let Some(rhs) = row.rhs {
+                new_entries.push(rhs);
+            }
+        }
+
+        // Need at least 2 entries on each side for reorder detection
+        // (and cap at 200 to avoid expensive LCS on huge runs)
+        if old_entries.len() < 2 || new_entries.len() < 2
+            || old_entries.len() > 200 || new_entries.len() > 200
+        {
+            result.extend_from_slice(run);
+            continue;
+        }
+
+        // Build content vectors for LCS
+        let old_contents: Vec<&str> = old_entries.iter()
+            .map(|s| old_lines.get(s.line_number as usize).map(|l| l.as_str()).unwrap_or(""))
+            .collect();
+        let new_contents: Vec<&str> = new_entries.iter()
+            .map(|s| new_lines.get(s.line_number as usize).map(|l| l.as_str()).unwrap_or(""))
+            .collect();
+
+        let lcs = longest_common_subsequence(&old_contents, &new_contents);
+
+        // Only re-pair when a large portion of lines have exact content
+        // matches (evidence of reordering, not a refactor with coincidental
+        // matches). Require >= 50% of both sides to be matched.
+        let min_side = old_entries.len().min(new_entries.len());
+        if lcs.len() * 2 < min_side {
+            result.extend_from_slice(run);
+            continue;
+        }
+
+        // Build sets of matched indices
+        let mut matched_old = vec![false; old_entries.len()];
+        let mut matched_new = vec![false; new_entries.len()];
+        // Map from new_idx → old_idx for LCS matches
+        let mut new_to_old: HashMap<usize, usize> = HashMap::new();
+        for &(oi, ni) in &lcs {
+            matched_old[oi] = true;
+            matched_new[ni] = true;
+            new_to_old.insert(ni, oi);
+        }
+
+        // Emit unmatched old entries as removals (in old-file order)
+        for (oi, &old_side) in old_entries.iter().enumerate() {
+            if !matched_old[oi] {
+                result.push(DiffRow { lhs: Some(old_side), rhs: None });
+            }
+        }
+
+        // Emit new entries in order: matched as paired context, unmatched as additions
+        for (ni, &new_side) in new_entries.iter().enumerate() {
+            if let Some(&oi) = new_to_old.get(&ni) {
+                result.push(DiffRow { lhs: Some(old_entries[oi]), rhs: Some(new_side) });
+            } else {
+                result.push(DiffRow { lhs: None, rhs: Some(new_side) });
+            }
+        }
+    }
+
+    result
 }
 
 /// Merge adjacent difft change spans separated by whitespace or punctuation.
@@ -2334,6 +2483,7 @@ fn render_chunks_text(difft: &DifftOutput, chunk_indices: &[usize], line_filter:
         }
 
         let rows = consolidate_chunk(chunk);
+        let rows = fix_reorders(rows, &difft.old_lines, &difft.new_lines);
         let mut items: Vec<(u64, TextItem)> = Vec::new();
         let mut prev_rhs_t: Option<u64> = None;
         let mut removed_seq_t: u64 = 0;
@@ -2883,6 +3033,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         }
 
         let rows = consolidate_chunk(chunk);
+        let rows = fix_reorders(rows, &difft.old_lines, &difft.new_lines);
 
         // Compute gap lines first so we can use gap-paired positions to
         // assign correct sort keys for removed-only difft entries that
@@ -4410,14 +4561,16 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
             .replace("&gt;", ">")
             .replace("&quot;", "\"");
 
-        // Write mermaid source to temp file, run mmdc, read SVG output
+        // Write mermaid source to a unique temp file, run mmdc, read SVG output.
+        // Use a per-process unique prefix to avoid races between concurrent renders.
         let tmp_dir = std::env::temp_dir();
-        let input_path = tmp_dir.join("walkthrough_mermaid_input.mmd");
-        let output_svg = tmp_dir.join("walkthrough_mermaid_output.svg");
+        let unique = format!("walkthrough_mermaid_{}", std::process::id());
+        let input_path = tmp_dir.join(format!("{}.mmd", unique));
+        let output_svg = tmp_dir.join(format!("{}.svg", unique));
         let _ = fs::write(&input_path, &body);
 
         // Write puppeteer config to use system Chrome
-        let puppeteer_config = tmp_dir.join("walkthrough_puppeteer.json");
+        let puppeteer_config = tmp_dir.join(format!("{}_puppeteer.json", unique));
         let _ = fs::write(&puppeteer_config, r#"{"executablePath":"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome","args":["--no-sandbox"]}"#);
 
         let result = std::process::Command::new("mmdc")

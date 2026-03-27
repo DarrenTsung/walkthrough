@@ -27,7 +27,10 @@ Parse `$ARGUMENTS` to determine the mode:
 
 ### Diff walkthrough mode (default)
 
-- **No args**: working tree changes (`git diff`)
+- **No args / on a branch**: `walkthrough collect` with no diff args. The tool auto-detects
+  the current branch, finds the merge-base with origin/master (or origin/main), and diffs
+  only the branch's changes. **This is the preferred mode when on a feature branch.** Do
+  NOT manually construct diff ranges when on a branch.
 - `staged` or `--cached`: staged changes (`git diff --cached`)
 - A commit SHA (e.g. `abc123`): that commit (`git diff abc123~1 abc123`)
 - A range `A..B`: that range (`git diff A..B`)
@@ -35,7 +38,9 @@ Parse `$ARGUMENTS` to determine the mode:
 - `--output <path>`: output path for the walkthrough markdown (default: `walkthrough-{timestamp}.md`)
 
 Derive two values from this:
-- `DIFF_ARGS`: the arguments to pass after `git diff` (e.g. `--cached`, `HEAD~1 HEAD`, etc.)
+- `DIFF_ARGS`: the arguments to pass after `--` to `walkthrough collect`. **Leave empty
+  when on a branch** (the tool handles merge-base detection automatically). Only set this
+  for explicit overrides like `--cached` or specific commit ranges.
 - `OUTPUT_PATH`: where to write the walkthrough markdown
 
 ### Plain markdown mode
@@ -58,7 +63,21 @@ cargo install --path ~/Documents/walkthrough
 
 ## Step 2: Collect diffs
 
-Run the collect command:
+First, check if you're on a feature branch:
+```bash
+git branch --show-current
+```
+
+If on a feature branch (not master/main), run collect with **no diff args**:
+```bash
+walkthrough collect -o .walkthrough_data/
+```
+
+The tool auto-detects the merge-base with origin/master (or origin/main) and diffs only
+the branch's changes. This is reliable even when the local master ref is stale or the
+branch has been rebased.
+
+Only pass explicit diff args for special cases (staged changes, specific commit ranges):
 ```bash
 walkthrough collect -o .walkthrough_data/ -- $DIFF_ARGS
 ```

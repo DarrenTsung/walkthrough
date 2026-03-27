@@ -4,6 +4,33 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
+/// Detect the default branch remote tracking ref (origin/master or
+/// origin/main). Falls back to local master/main if no remote exists.
+fn detect_base_ref() -> Result<String> {
+    // Prefer remote tracking refs to avoid stale local branches
+    for candidate in ["origin/master", "origin/main"] {
+        let out = Command::new("git")
+            .args(["rev-parse", "--verify", candidate])
+            .output();
+        if let Ok(o) = out {
+            if o.status.success() {
+                return Ok(candidate.to_string());
+            }
+        }
+    }
+    for candidate in ["master", "main"] {
+        let out = Command::new("git")
+            .args(["rev-parse", "--verify", candidate])
+            .output();
+        if let Ok(o) = out {
+            if o.status.success() {
+                return Ok(candidate.to_string());
+            }
+        }
+    }
+    bail!("Could not detect default branch (tried origin/master, origin/main, master, main)")
+}
+
 /// Get old and new file content by reading blob SHAs from `git diff --raw`.
 fn get_file_contents(
     diff_args: &[String],
@@ -101,6 +128,19 @@ fn get_diff_hunks(
 }
 
 pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
+    // When no diff args provided, use three-dot syntax against the remote
+    // default branch. Three-dot (`A...B`) tells git diff to compute the
+    // merge-base itself, giving only the changes on our branch.
+    let auto_args;
+    let diff_args = if diff_args.is_empty() {
+        let base_ref = detect_base_ref()?;
+        auto_args = vec![format!("{}...HEAD", base_ref)];
+        eprintln!("Auto-detected diff range: {}...HEAD", base_ref);
+        &auto_args
+    } else {
+        diff_args
+    };
+
     fs::create_dir_all(output_dir)
         .with_context(|| format!("Failed to create output dir: {}", output_dir.display()))?;
 

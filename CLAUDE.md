@@ -13,8 +13,12 @@ Rust CLI that generates narrative walkthroughs of code changes with difftastic d
 ## Commands
 
 ```
-# Collect difft data for changes between commits (args after -- are passed to git diff)
+# Collect difft data for the current branch (auto-detects merge-base with origin/master or origin/main)
+cargo run -- collect
+
+# Collect with explicit diff range (only needed for non-branch cases)
 cargo run -- collect -- HEAD~3..HEAD
+cargo run -- collect -- --cached
 
 # Verify all chunks are covered in a walkthrough markdown file
 cargo run -- verify walkthrough.md
@@ -22,6 +26,10 @@ cargo run -- verify walkthrough.md
 # Render walkthrough markdown to HTML
 cargo run -- render walkthrough.md -o walkthrough.html
 ```
+
+When on a feature branch, prefer `collect` with no args. It uses `origin/master...HEAD`
+(three-dot syntax) to diff only the branch's changes against the merge-base, which is
+reliable even when the local master ref is stale or the branch has been rebased.
 
 Default data directory for all commands: `.walkthrough_data` (in the current directory)
 

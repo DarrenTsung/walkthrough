@@ -538,6 +538,7 @@ tr.line-paired .sign-rhs { color: #1a7f37; }
     overflow-x: auto;
 }
 .diff-side-old {
+    border-right: 1px solid var(--border);
 }
 
 /* Placeholder rows: zero-height empty rows on the "other" side of a

@@ -3428,6 +3428,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         // Single ↑ button at the bottom (closest to visible code).
         let colspan = if single { 3 } else { 6 };
 
+        let mut actual_hidden_pre = 0usize;
         for i in 0..hidden_pre_count {
             let o = old_first.saturating_sub(pre_count) + i;
             let n = new_first.saturating_sub(pre_count) + i;
@@ -3441,6 +3442,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                     || (layout == DiffLayout::RemoveOnly && !item_old_lines.contains(&idx) && rendered_old.insert(idx))
                 {
                     html.push_str(&render_single_context_row_expandable(idx, hl_lines, &expand_id_pre));
+                    actual_hidden_pre += 1;
                 }
             } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
                 && !rendered_old.contains(&o) && !rendered_new.contains(&n)
@@ -3448,11 +3450,12 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 rendered_old.insert(o);
                 rendered_new.insert(n);
                 html.push_str(&render_context_row_expandable(o, n, &old_hl, &new_hl, &expand_id_pre));
+                actual_hidden_pre += 1;
             }
         }
 
-        if hidden_pre_count > 0 {
-            let step = hidden_pre_count.min(EXPAND_STEP);
+        if actual_hidden_pre > 0 {
+            let step = actual_hidden_pre.min(EXPAND_STEP);
             let plural = if step == 1 { "line" } else { "lines" };
             html.push_str(&format!(
                 "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"up\">\
@@ -3643,7 +3646,6 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             DiffLayout::SideBySide => old_vis_after.saturating_sub(old_post_start)
                 .min(new_vis_after.saturating_sub(new_post_start)),
         }.min(post_count);
-        let hidden_post_count = post_count.saturating_sub(vis_post_count);
         let expand_id_post = format!("expand-post-{}", chunk_order);
 
         // Visible post-context lines.
@@ -3676,19 +3678,14 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         }
 
         // Expander button and hidden post-context lines.
-        // Single ↓ button at the top (closest to visible code).
-        if hidden_post_count > 0 {
-            let step = hidden_post_count.min(EXPAND_STEP);
-            let plural = if step == 1 { "line" } else { "lines" };
-            html.push_str(&format!(
-                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
-                 <td class=\"expand-btn\" colspan=\"{}\">\
-                 \u{2193} Show {} more {}</td></tr>",
-                expand_id_post, colspan, step, plural
-            ));
-        }
+        // Single ↓ button at the top (closest to visible code), emitted first
+        // so it appears adjacent to visible code. Count actual rows to avoid
+        // a button with no hidden rows (e.g. when lines= filters a chunk and
+        // the expanded context falls on changed lines from other splits).
+        let post_html_start = html.len();
 
         // Hidden expandable post-context lines.
+        let mut actual_hidden_post = 0usize;
         for i in vis_post_count..post_count {
             let o = old_post_start + i;
             let n = new_post_start + i;
@@ -3707,6 +3704,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                     if layout == DiffLayout::AddOnly { rendered_new.insert(idx); }
                     else { rendered_old.insert(idx); }
                     html.push_str(&render_single_context_row_expandable(idx, hl_lines, &expand_id_post));
+                    actual_hidden_post += 1;
                 }
             } else if !item_old_lines.contains(&o) && !item_new_lines.contains(&n)
                 && !rendered_old.contains(&o) && !rendered_new.contains(&n)
@@ -3714,7 +3712,22 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
                 rendered_old.insert(o);
                 rendered_new.insert(n);
                 html.push_str(&render_context_row_expandable(o, n, &old_hl, &new_hl, &expand_id_post));
+                actual_hidden_post += 1;
             }
+        }
+
+        // Insert the ↓ button before the hidden rows so it stays adjacent to
+        // visible code, but only if there are actual hidden rows to reveal.
+        if actual_hidden_post > 0 {
+            let step = actual_hidden_post.min(EXPAND_STEP);
+            let plural = if step == 1 { "line" } else { "lines" };
+            let btn = format!(
+                "<tr class=\"expand-summary\" data-expand-id=\"{}\" data-dir=\"down\">\
+                 <td class=\"expand-btn\" colspan=\"{}\">\
+                 \u{2193} Show {} more {}</td></tr>",
+                expand_id_post, colspan, step, plural
+            );
+            html.insert_str(post_html_start, &btn);
         }
 
         if post_count > 0 {
@@ -7138,5 +7151,69 @@ mod tests {
             c != "line-context" && c != "chunk-sep" && *o == Some(4)
         });
         assert!(old_4_changed, "Differing line old=4 should be changed, not context");
+    }
+
+    #[test]
+    fn line_filter_no_phantom_expand_buttons() {
+        // Regression: when lines= splits a contiguous add-only chunk, the
+        // expanded context region around each split falls on changed lines
+        // from adjacent splits. Those lines are in item_new_lines so no
+        // hidden rows are emitted, but the expand button was generated from
+        // arithmetic counts, producing a "Show N more lines" button with
+        // nothing to reveal.
+        //
+        // Use a file where ALL lines are added (entire file is new), so
+        // there's no non-changed content for context. Splitting with lines=
+        // means every split's expanded context lands on other splits' changed
+        // lines, leaving zero valid hidden context rows.
+        let n_lines = 60;
+        let old_lines: Vec<&str> = Vec::new();
+        let new_vec: Vec<String> = (0..n_lines).map(|i| format!("added line {}", i)).collect();
+        let new_lines: Vec<&str> = new_vec.iter().map(|s| s.as_str()).collect();
+
+        let chunk: Vec<LineEntry> = (0..n_lines as u64)
+            .map(|n| LineEntry { lhs: None, rhs: Some(side(n, vec![])) })
+            .collect();
+
+        // Single hunk: pure insertion of n_lines at the start
+        let hunks = vec![
+            DiffHunk { old_start: 1, old_count: 0, new_start: 1, new_count: n_lines as u64 },
+        ];
+        let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
+
+        let expand_btn_re = Regex::new(r"Show \d+ more").unwrap();
+        let hidden_row_re = Regex::new(r#"expand-line[^>]*hidden"#).unwrap();
+
+        // Helper: verify every expand button has at least one hidden row
+        let check = |label: &str, html: &str| {
+            let btns: Vec<_> = expand_btn_re.find_iter(html).collect();
+            let hidden = hidden_row_re.find_iter(html).count();
+            for btn in &btns {
+                assert!(
+                    hidden > 0,
+                    "{} has expand button '{}' but 0 hidden rows",
+                    label, btn.as_str()
+                );
+            }
+            btns.len()
+        };
+
+        // Split 1: first 20 lines. Pre-context has nothing (start of file),
+        // post-context lands on lines 20-59 (all changed). No buttons.
+        let html1 = test_render_chunks(&difft, &[0], "test.go", Some((0, 19)));
+        let btns1 = check("Split 1 (0-19)", &html1);
+        assert_eq!(btns1, 0, "First split of a new file should have no expand buttons");
+
+        // Split 2: middle 20 lines. Both pre and post context land on other
+        // splits' changed lines. No buttons.
+        let html2 = test_render_chunks(&difft, &[0], "test.go", Some((20, 39)));
+        let btns2 = check("Split 2 (20-39)", &html2);
+        assert_eq!(btns2, 0, "Middle split of a new file should have no expand buttons");
+
+        // Split 3: last 20 lines. Pre-context lands on changed lines,
+        // post-context has nothing (end of file). No buttons.
+        let html3 = test_render_chunks(&difft, &[0], "test.go", Some((40, 59)));
+        let btns3 = check("Split 3 (40-59)", &html3);
+        assert_eq!(btns3, 0, "Last split of a new file should have no expand buttons");
     }
 }

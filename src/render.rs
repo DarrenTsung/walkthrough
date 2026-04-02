@@ -2298,6 +2298,40 @@ fn hunk_gap_lines(
         }
     }
 
+    // Capture inter-hunk lines: when a chunk spans multiple hunks, unchanged
+    // lines between the hunks are not inside any hunk range. Add them so they
+    // appear as context in the rendered output. Only fill gaps on sides that
+    // have actual difft entries (synthetic ranges from new_to_old_line can
+    // produce spurious gap lines).
+    let hunk_covered_new: std::collections::HashSet<usize> = hunks.iter()
+        .flat_map(|h| {
+            let s = (h.new_start as usize).saturating_sub(1);
+            s..s + h.new_count as usize
+        })
+        .collect();
+    let hunk_covered_old: std::collections::HashSet<usize> = hunks.iter()
+        .flat_map(|h| {
+            let s = (h.old_start as usize).saturating_sub(1);
+            s..s + h.old_count as usize
+        })
+        .collect();
+    if !difft_new.is_empty() {
+        let raw_added_set: std::collections::HashSet<usize> = raw_added.iter().copied().collect();
+        for line_0 in new_first..=new_last {
+            if !difft_new.contains(&line_0) && !hunk_covered_new.contains(&line_0) && !raw_added_set.contains(&line_0) {
+                raw_added.push(line_0);
+            }
+        }
+    }
+    if !difft_old.is_empty() {
+        let raw_removed_set: std::collections::HashSet<usize> = raw_removed.iter().copied().collect();
+        for line_0 in old_first..=old_last {
+            if !difft_old.contains(&line_0) && !hunk_covered_old.contains(&line_0) && !raw_removed_set.contains(&line_0) {
+                raw_removed.push(line_0);
+            }
+        }
+    }
+
     // Pair gap lines by content similarity. Match criteria (in priority order):
     // 1. Exact trimmed equality (content is identical, just leading/trailing ws)
     // 2. Whitespace-normalized equality (only internal whitespace differs, e.g.
@@ -7215,5 +7249,37 @@ mod tests {
         let html3 = test_render_chunks(&difft, &[0], "test.go", Some((40, 59)));
         let btns3 = check("Split 3 (40-59)", &html3);
         assert_eq!(btns3, 0, "Last split of a new file should have no expand buttons");
+    }
+
+    /// When a difft chunk spans two separate unified diff hunks, unchanged lines
+    /// between the hunks must appear as context in the rendered output.
+    #[test]
+    fn inter_hunk_gap_lines_rendered() {
+        let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test_fixtures/inter-hunk-gap/services__agentplat__sbox__sboxd__internal__workspace__manager.go.json");
+        if !fixture_path.exists() {
+            eprintln!("Fixture not found, skipping");
+            return;
+        }
+        let json_str = fs::read_to_string(&fixture_path).unwrap();
+        let difft: DifftOutput = serde_json::from_str(&json_str).unwrap();
+        let file_path = difft.path.as_deref().unwrap_or("unknown");
+
+        // Chunk 13 has rhs entries at 0-based lines 799-804 and 807-809.
+        // Lines 805-806 (0-based) fall between hunk 13 (new 799-805) and
+        // hunk 14 (new 807-809). Line 806 (= file line 807, "case StateReady:")
+        // is not inside either hunk and must still appear as a gap/context line.
+        let mut hl = Highlighter::new();
+        let html = render_chunks(&difft, &[13], file_path, None, &mut hl, CollapseMode::None);
+        let rows = extract_rows(&html);
+
+        // 1-based line 807 = 0-based 806. Rendered line numbers are 1-based.
+        let has_807 = rows.iter().any(|(_, _, rhs)| *rhs == Some(807));
+        assert!(
+            has_807,
+            "New-side line 807 (case StateReady:) missing from chunk 13 render. \
+             Rendered RHS lines: {:?}",
+            rows.iter().filter_map(|(_, _, rhs)| *rhs).collect::<Vec<_>>(),
+        );
     }
 }

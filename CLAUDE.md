@@ -1,19 +1,19 @@
 # Walkthrough
 
-Rust CLI that generates narrative walkthroughs of code changes with difftastic diffs, rendered as GitHub-style side-by-side HTML.
+Rust CLI that generates narrative walkthroughs of code changes with side-by-side diffs, rendered as GitHub-style HTML.
 
 ## Architecture
 
 - `src/main.rs` - CLI entry point with three subcommands via clap
-- `src/collect.rs` - Runs `difft --display json` via `GIT_EXTERNAL_DIFF` on each changed file, enriches the JSON with file contents and unified diff hunks, writes per-file JSON to an output directory
-- `src/difft_json.rs` - Serde types for difftastic's JSON output (`DifftOutput`, `LineEntry`, `LineSide`, `ChangeSpan`, `DiffHunk`)
+- `src/collect.rs` - Runs `git diff -U0` to get unified diff hunks, reads file contents via `git cat-file`, generates chunks by positionally pairing old/new lines within each hunk, writes per-file JSON to an output directory
+- `src/difft_json.rs` - Serde types for the collected JSON output (`DifftOutput`, `LineEntry`, `LineSide`, `ChangeSpan`, `DiffHunk`)
 - `src/render.rs` - Parses walkthrough markdown, replaces `` ```difft `` code blocks with rendered HTML diff tables, converts the rest via pulldown-cmark. Also writes enriched markdown back to the input file with text diffs in the code block bodies.
 - `src/verify.rs` - Checks that every chunk in the collected data is referenced by at least one difft code block in the walkthrough
 
 ## Commands
 
 ```
-# Collect difft data for the current branch (auto-detects merge-base with origin/master or origin/main)
+# Collect diff data for the current branch (auto-detects merge-base with origin/master or origin/main)
 cargo run -- collect
 
 # Collect with explicit diff range (only needed for non-branch cases)
@@ -75,7 +75,6 @@ Collapsed folds show italic pseudocode text with a yellow background and left ye
 
 ## External dependencies
 
-- **difftastic** (`difft`) must be installed and on PATH. Used with `--display json --color never` and `DFT_UNSTABLE=yes`.
 - **mermaid-cli** (`mmdc`) for pre-rendering mermaid diagrams to inline SVG. Install with `npm install -g @mermaid-js/mermaid-cli`. Uses system Chrome via a puppeteer config. If not installed, mermaid blocks fall back to showing source code.
 
 ## Build and check
@@ -88,17 +87,13 @@ cargo clippy
 
 ## Rendering details
 
-### Highlight span merging
-
-Adjacent difft highlight spans that are directly adjacent or separated only by whitespace are merged into single `<span>` regions (`merge_whitespace_spans` in render.rs). Without this, difft's structural matching produces separate spans for each token (e.g. `meta:`, `{`, `level`, `},`), leaving unhighlighted gaps between them.
-
 ### Scroll-pinned diff blocks
 
 Diff blocks have `max-height: 80vh` with `overflow: hidden` (no scrollbar). A JS script intercepts `wheel` events at the window level: when a diff block's top reaches near the viewport top, page scroll is captured and redirected to scroll the block internally. The page's `scrollY` is pinned via a `scroll` event listener to prevent trackpad momentum from pushing surrounding text off-screen. The sticky `.diff-header` stays pinned at the top of the block. When the diff content reaches its end, the pin releases and normal page scrolling resumes.
 
 ### Markdown enrichment
 
-The render command writes back to the input markdown file, replacing each difft code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs. This enables an LLM workflow where the narrative is written first, then refined after seeing the actual diffs inline.
+The render command writes back to the input markdown file, replacing each difft code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs.
 
 ### Expression-aware context expansion
 
@@ -116,7 +111,7 @@ Fenced code blocks with a language tag (e.g. `` ```typescript ``, `` ```rust ``)
 
 ## Fixture-based rendering tests
 
-The `test_fixtures/` directory holds per-commit fixture data (JSON from `walkthrough collect`) that `cargo test` uses to verify the rendering pipeline. Each subdirectory is named by commit hash and contains `*.json` files.
+The `test_fixtures/` directory holds fixture data (JSON from `walkthrough collect`) that `cargo test` uses to verify the rendering pipeline. Each subdirectory contains `*.json` files.
 
 ### What the tests check
 
@@ -139,26 +134,21 @@ cargo run -- collect -o test_fixtures/<commit> -- <commit>~1..<commit>
 # 2. Remove internal files (keep SUMMARY.md for rendering)
 rm -f test_fixtures/<commit>/.gitignore test_fixtures/<commit>/.meta.json
 
-# 3. Optionally capture difft CLI text for visual reference
-GIT_EXTERNAL_DIFF="difft --display side-by-side-show-both --color never" \
-  git diff <commit>~1..<commit> -- <file> > test_fixtures/<commit>/<file>.difft.txt
-
-# 4. Run tests
+# 3. Run tests
 cargo test fixture_rendering_matches
 
-# 5. Render the fixture walkthrough (uses SUMMARY.md from collect)
+# 4. Render the fixture walkthrough (uses SUMMARY.md from collect)
 walkthrough render test_fixtures/<commit>/SUMMARY.md \
   --data-dir test_fixtures/<commit>/ -o walkthrough-<commit>.html
 ```
 
 Each fixture directory contains:
-- `*.json` - enriched difft JSON (from `walkthrough collect`)
+- `*.json` - collected diff JSON (from `walkthrough collect`)
 - `SUMMARY.md` - walkthrough markdown referencing all chunks (renderable)
-- `*.difft.txt` - optional difft CLI text output for LLM visual reference
 
 ### When to add fixtures
 
-Add a fixture when you find rendering that differs from difft's CLI output. The fixture captures the exact difft JSON that triggered the issue, ensuring the fix is regression-tested.
+Add a fixture when you find a rendering bug. The fixture captures the exact JSON that triggered the issue, ensuring the fix is regression-tested.
 
 ## Testing rendered HTML with playwright-cli
 

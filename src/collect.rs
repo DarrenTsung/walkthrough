@@ -92,6 +92,69 @@ fn get_file_contents(
     Ok((old_lines, new_lines))
 }
 
+/// Generate chunks from unified diff hunks. Each hunk becomes one chunk with
+/// positionally paired old/new lines. This replaces difftastic's structural
+/// matching, which could silently exclude lines it considers "moved."
+fn generate_chunks_from_hunks(
+    hunks: &[serde_json::Value],
+    old_lines: &[String],
+    new_lines: &[String],
+) -> Vec<serde_json::Value> {
+    let mut chunks = Vec::new();
+
+    for hunk in hunks {
+        let old_start = hunk["old_start"].as_u64().unwrap_or(0);
+        let old_count = hunk["old_count"].as_u64().unwrap_or(0);
+        let new_start = hunk["new_start"].as_u64().unwrap_or(0);
+        let new_count = hunk["new_count"].as_u64().unwrap_or(0);
+
+        // Convert 1-based hunk positions to 0-based indices
+        let old_0 = if old_start > 0 { old_start - 1 } else { 0 };
+        let new_0 = if new_start > 0 { new_start - 1 } else { 0 };
+
+        let mut entries = Vec::new();
+        let paired = old_count.min(new_count);
+
+        // Paired lines (both old and new)
+        for i in 0..paired {
+            let old_idx = old_0 + i;
+            let new_idx = new_0 + i;
+            // Skip pairs where both lines are identical (context within hunk).
+            // The renderer would show these as context anyway, but including
+            // them inflates the chunk with non-changes.
+            let old_text = old_lines.get(old_idx as usize).map(|s| s.as_str()).unwrap_or("");
+            let new_text = new_lines.get(new_idx as usize).map(|s| s.as_str()).unwrap_or("");
+            if old_text == new_text {
+                continue;
+            }
+            entries.push(serde_json::json!({
+                "lhs": { "line_number": old_idx, "changes": [] },
+                "rhs": { "line_number": new_idx, "changes": [] },
+            }));
+        }
+
+        // Extra old lines (removed-only)
+        for i in paired..old_count {
+            entries.push(serde_json::json!({
+                "lhs": { "line_number": old_0 + i, "changes": [] },
+            }));
+        }
+
+        // Extra new lines (added-only)
+        for i in paired..new_count {
+            entries.push(serde_json::json!({
+                "rhs": { "line_number": new_0 + i, "changes": [] },
+            }));
+        }
+
+        if !entries.is_empty() {
+            chunks.push(serde_json::Value::Array(entries));
+        }
+    }
+
+    chunks
+}
+
 /// Get unified diff hunk headers for a file. These give exact old/new line mappings.
 fn get_diff_hunks(
     diff_args: &[String],
@@ -234,132 +297,44 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
     for (status, file_path) in &files {
         eprint!("  {} {} ... ", status, file_path);
 
-        // Run difft for this file via GIT_EXTERNAL_DIFF
-        let output = Command::new("git")
-            .arg("diff")
-            .args(diff_args)
-            .arg("--")
-            .arg(file_path)
-            .env("GIT_EXTERNAL_DIFF", "difft --display json --color never")
-            .env("DFT_UNSTABLE", "yes")
-            .output()
-            .with_context(|| format!("Failed to run difft for {}", file_path))?;
+        // Get file contents and unified diff hunks
+        let (old_lines, new_lines) = get_file_contents(diff_args, file_path)
+            .unwrap_or_else(|e| {
+                eprintln!("(warning: could not get file contents: {})", e);
+                (Vec::new(), Vec::new())
+            });
 
-        let json_str = String::from_utf8_lossy(&output.stdout);
+        let hunks = get_diff_hunks(diff_args, file_path)
+            .unwrap_or_else(|e| {
+                eprintln!("(warning: could not get diff hunks: {})", e);
+                Vec::new()
+            });
 
-        if json_str.trim().is_empty() {
-            eprintln!("(no output, skipping)");
+        if hunks.is_empty() && old_lines.is_empty() && new_lines.is_empty() {
+            eprintln!("(no changes, skipping)");
             continue;
         }
 
-        // Parse JSON and inject path, status, and file contents
-        let mut json: serde_json::Value = serde_json::from_str(&json_str).with_context(|| {
-            format!(
-                "Failed to parse difft JSON for {}: {}",
-                file_path,
-                &json_str[..json_str.len().min(200)]
-            )
-        })?;
+        // Generate chunks from hunks (each hunk = one chunk, positional pairing)
+        let chunks = generate_chunks_from_hunks(&hunks, &old_lines, &new_lines);
 
-        if let Some(obj) = json.as_object_mut() {
-            obj.insert(
-                "path".to_string(),
-                serde_json::Value::String(file_path.clone()),
-            );
-            let difft_status = match status.chars().next() {
-                Some('A') => "added",
-                Some('D') => "deleted",
-                Some('M') => "changed",
-                Some('R') => "renamed",
-                _ => "changed",
-            };
-            obj.entry("status".to_string())
-                .or_insert_with(|| serde_json::Value::String(difft_status.to_string()));
+        let diff_status = match status.chars().next() {
+            Some('A') => "added",
+            Some('D') => "deleted",
+            Some('M') => "changed",
+            Some('R') => "renamed",
+            _ => "changed",
+        };
 
-            // Embed old/new file contents for full-line rendering
-            match get_file_contents(diff_args, file_path) {
-                Ok((old_lines, new_lines)) => {
-                    obj.insert(
-                        "old_lines".to_string(),
-                        serde_json::Value::Array(
-                            old_lines
-                                .into_iter()
-                                .map(serde_json::Value::String)
-                                .collect(),
-                        ),
-                    );
-                    obj.insert(
-                        "new_lines".to_string(),
-                        serde_json::Value::Array(
-                            new_lines
-                                .into_iter()
-                                .map(serde_json::Value::String)
-                                .collect(),
-                        ),
-                    );
-                }
-                Err(e) => {
-                    eprintln!("(warning: could not get file contents: {})", e);
-                }
-            }
-
-            // Embed unified diff hunks for accurate line mapping
-            match get_diff_hunks(diff_args, file_path) {
-                Ok(hunks) => {
-                    obj.insert(
-                        "hunks".to_string(),
-                        serde_json::Value::Array(hunks),
-                    );
-                }
-                Err(e) => {
-                    eprintln!("(warning: could not get diff hunks: {})", e);
-                }
-            }
-        }
-
-        // Ensure chunks field exists (difft omits it for binary/large files).
-        // For deleted/added files with 0 chunks, synthesize a chunk from file
-        // contents so there's something to render.
-        if let Some(obj) = json.as_object_mut() {
-            obj.entry("chunks".to_string())
-                .or_insert_with(|| serde_json::Value::Array(Vec::new()));
-
-            let needs_synthetic = obj.get("chunks")
-                .and_then(|c| c.as_array())
-                .map_or(false, |a| a.is_empty());
-
-            if needs_synthetic {
-                let is_deleted = obj.get("status")
-                    .and_then(|s| s.as_str()) == Some("deleted");
-                let is_added = obj.get("status")
-                    .and_then(|s| s.as_str()) == Some("added");
-                let line_count = if is_deleted {
-                    obj.get("old_lines").and_then(|v| v.as_array()).map(|a| a.len())
-                } else if is_added {
-                    obj.get("new_lines").and_then(|v| v.as_array()).map(|a| a.len())
-                } else {
-                    None
-                };
-                if let Some(count) = line_count {
-                    if count > 0 {
-                        let entries: Vec<serde_json::Value> = (0..count)
-                            .map(|i| {
-                                let side = serde_json::json!({
-                                    "line_number": i,
-                                    "changes": []
-                                });
-                                if is_deleted {
-                                    serde_json::json!({"lhs": side, "rhs": null})
-                                } else {
-                                    serde_json::json!({"lhs": null, "rhs": side})
-                                }
-                            })
-                            .collect();
-                        obj.insert("chunks".to_string(), serde_json::json!([entries]));
-                    }
-                }
-            }
-        }
+        let json = serde_json::json!({
+            "path": file_path,
+            "status": diff_status,
+            "language": null,
+            "chunks": chunks,
+            "old_lines": old_lines,
+            "new_lines": new_lines,
+            "hunks": hunks,
+        });
 
         let chunk_count = json
             .get("chunks")

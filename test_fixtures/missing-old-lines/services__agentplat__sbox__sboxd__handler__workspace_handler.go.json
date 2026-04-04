@@ -1,0 +1,731 @@
+{
+  "chunks": [
+    [
+      {
+        "lhs": {
+          "line_number": 23,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 23,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 24,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 24,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 25,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 25,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 26,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 26,
+          "changes": []
+        }
+      }
+    ],
+    [
+      {
+        "lhs": {
+          "line_number": 28,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 28,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 29,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 29,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 30,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 30,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 31,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 31,
+          "changes": []
+        }
+      },
+      {
+        "rhs": {
+          "line_number": 32,
+          "changes": []
+        }
+      }
+    ],
+    [
+      {
+        "lhs": {
+          "line_number": 48,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 49,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 49,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 50,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 51,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 52,
+          "changes": []
+        }
+      }
+    ],
+    [
+      {
+        "lhs": {
+          "line_number": 55,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 52,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 56,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 53,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 57,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 54,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 58,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 55,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 59,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 56,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 60,
+          "changes": []
+        },
+        "rhs": {
+          "line_number": 57,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 61,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 62,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 63,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 64,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 65,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 66,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 67,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 68,
+          "changes": []
+        }
+      },
+      {
+        "lhs": {
+          "line_number": 69,
+          "changes": []
+        }
+      }
+    ]
+  ],
+  "hunks": [
+    {
+      "new_count": 4,
+      "new_start": 24,
+      "old_count": 4,
+      "old_start": 24
+    },
+    {
+      "new_count": 5,
+      "new_start": 29,
+      "old_count": 4,
+      "old_start": 29
+    },
+    {
+      "new_count": 1,
+      "new_start": 50,
+      "old_count": 5,
+      "old_start": 49
+    },
+    {
+      "new_count": 6,
+      "new_start": 53,
+      "old_count": 15,
+      "old_start": 56
+    }
+  ],
+  "language": "Go",
+  "new_lines": [
+    "package handler",
+    "",
+    "import (",
+    "\t\"context\"",
+    "\t\"fmt\"",
+    "",
+    "\t\"figma.com/services/agentplat/proto\"",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/metrics\"",
+    ")",
+    "",
+    "// WorkspaceHandler handles workspace management operations (workspace/*).",
+    "type WorkspaceHandler struct {",
+    "\tserver  Server",
+    "\tmetrics *metrics.Reporter",
+    "}",
+    "",
+    "// NewWorkspaceHandler creates a new workspace handler.",
+    "func NewWorkspaceHandler(server Server, metricsReporter *metrics.Reporter) *WorkspaceHandler {",
+    "\treturn &WorkspaceHandler{server: server, metrics: metricsReporter}",
+    "}",
+    "",
+    "// Create handles workspace/create requests.",
+    "// This is a write operation (requires write permission).",
+    "// Bootstrap config is required. The handler creates the workspace directory and",
+    "// returns immediately while bootstrap runs asynchronously in a goroutine.",
+    "// Prompts gate on WaitForReadyAndResolve, which blocks until the workspace",
+    "// reaches Ready state.",
+    "func (h *WorkspaceHandler) Create(ctx context.Context, req *proto.WorkspaceCreateRequest) (*proto.WorkspaceCreateResponse, error) {",
+    "\tif req.Bootstrap == nil {",
+    "\t\treturn nil, &HandlerError{Code: \"invalid_argument\", Message: \"bootstrap config is required\"}",
+    "\t}",
+    "\tif err := req.Bootstrap.Validate(); err != nil {",
+    "\t\treturn nil, err",
+    "\t}",
+    "",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default, matching other endpoints.",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\twsID, metadata, created, err := wsMgr.CreateWorkspace(wsID, req.Env)",
+    "\tif err != nil {",
+    "\t\treturn nil, fmt.Errorf(\"create workspace: %w\", err)",
+    "\t}",
+    "",
+    "\tif h.metrics != nil {",
+    "\t\th.metrics.RecordWorkspaceCreate(\"true\")",
+    "\t}",
+    "",
+    "\t// Non-blocking bootstrap: spawns a goroutine tracked by bootstrapWg",
+    "\t// for graceful shutdown. The goroutine transitions the workspace from",
+    "\t// Ready to Creating (via CreateWorkspaceForBootstrap), runs bootstrap,",
+    "\t// then transitions to Ready on success or Failed on error. Prompts",
+    "\t// arriving before bootstrap completes block on WaitForReadyAndResolve.",
+    "\th.server.BootstrapWorkspaceAsync(ctx, wsID, req.Bootstrap)",
+    "",
+    "\treturn &proto.WorkspaceCreateResponse{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tMetadata:    metadata,",
+    "\t\tCreated:     created,",
+    "\t}, nil",
+    "}",
+    "",
+    "// List handles workspace/list requests.",
+    "// Named List to match message type and read-only (List prefix).",
+    "func (h *WorkspaceHandler) List(ctx context.Context, req *proto.WorkspaceListRequest) (*proto.WorkspaceListResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "\tworkspaces := wsMgr.ListWorkspaces()",
+    "",
+    "\treturn &proto.WorkspaceListResponse{",
+    "\t\tWorkspaces: workspaces,",
+    "\t}, nil",
+    "}",
+    "",
+    "// Status handles workspace/status requests.",
+    "// Named Status to match message type and read-only (Status prefix).",
+    "func (h *WorkspaceHandler) Status(ctx context.Context, req *proto.WorkspaceStatusRequest) (*proto.WorkspaceStatusResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\tstatus := wsMgr.GetWorkspaceStatus(wsID, req.RepoIDs)",
+    "\tif status == nil {",
+    "\t\treturn nil, ErrWorkspaceNotFound",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceStatusResponse{",
+    "\t\tWorkspaceID:  status.WorkspaceID,",
+    "\t\tMetadata:     status.Metadata,",
+    "\t\tRepositories: status.Repositories,",
+    "\t}, nil",
+    "}",
+    "",
+    "// Delete handles workspace/delete requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) Delete(ctx context.Context, req *proto.WorkspaceDeleteRequest) (*proto.WorkspaceDeleteResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\tif req.WorkspaceID.IsZero() {",
+    "\t\treturn nil, &HandlerError{Code: \"invalid_argument\", Message: \"workspaceId is required\"}",
+    "\t}",
+    "",
+    "\terr := wsMgr.DeleteWorkspace(req.WorkspaceID)",
+    "\tif err != nil {",
+    "\t\treturn nil, err",
+    "\t}",
+    "",
+    "\th.server.EvictBootstrapCache(req.WorkspaceID)",
+    "",
+    "\treturn &proto.WorkspaceDeleteResponse{",
+    "\t\tSuccess: true,",
+    "\t}, nil",
+    "}",
+    "",
+    "// SetupRepos handles workspace/setup_repos requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) SetupRepos(ctx context.Context, req *proto.WorkspaceSetupReposRequest) (*proto.WorkspaceSetupReposResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\t// Verify workspace exists",
+    "\tstatus := wsMgr.GetWorkspaceStatus(wsID, nil)",
+    "\tif status == nil {",
+    "\t\treturn nil, ErrWorkspaceNotFound",
+    "\t}",
+    "",
+    "\t// Convert to pointer slice for workspace manager",
+    "\trepos := make([]*proto.Repository, len(req.Repositories))",
+    "\tfor i := range req.Repositories {",
+    "\t\trepos[i] = &req.Repositories[i]",
+    "\t}",
+    "",
+    "\trepoStatuses := wsMgr.SetupWorkspaceRepos(wsID, repos, req.Initialize)",
+    "",
+    "\t// Get workspace metadata",
+    "\twsStatus := wsMgr.GetWorkspaceStatus(wsID, nil)",
+    "\tvar metadata *proto.WorkspaceMetadata",
+    "\tif wsStatus != nil {",
+    "\t\tmetadata = wsStatus.Metadata",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceSetupReposResponse{",
+    "\t\tWorkspaceID:  wsID,",
+    "\t\tMetadata:     metadata,",
+    "\t\tRepositories: repoStatuses,",
+    "\t}, nil",
+    "}",
+    "",
+    "// Save handles workspace/save requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) Save(ctx context.Context, req *proto.WorkspaceSaveRequest) (*proto.WorkspaceSaveResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\tpush := true",
+    "\tif req.Push != nil {",
+    "\t\tpush = *req.Push",
+    "\t}",
+    "",
+    "\tresults := wsMgr.SaveWorkspaceRepos(ctx, wsID, req.RepoIDs, req.Message, push)",
+    "",
+    "\t// Convert pointer slice to value slice for response",
+    "\tresultsValue := make([]proto.RepoSaveResult, len(results))",
+    "\tfor i, r := range results {",
+    "\t\tif r != nil {",
+    "\t\t\tresultsValue[i] = *r",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceSaveResponse{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tResults:     resultsValue,",
+    "\t}, nil",
+    "}",
+    "",
+    "// UpdateCredentials handles workspace/update_credentials requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) UpdateCredentials(ctx context.Context, req *proto.WorkspaceUpdateCredentialsRequest) (*proto.WorkspaceUpdateCredentialsResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\tif req.RepoID.IsZero() {",
+    "\t\treturn nil, &HandlerError{Code: \"invalid_argument\", Message: \"repoId is required\"}",
+    "\t}",
+    "",
+    "\terr := wsMgr.UpdateRepoCredentials(wsID, req.RepoID, req.Credentials)",
+    "",
+    "\tif err != nil {",
+    "\t\treturn &proto.WorkspaceUpdateCredentialsResponse{",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   err.Error(),",
+    "\t\t}, nil",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceUpdateCredentialsResponse{",
+    "\t\tSuccess: true,",
+    "\t}, nil",
+    "}"
+  ],
+  "old_lines": [
+    "package handler",
+    "",
+    "import (",
+    "\t\"context\"",
+    "\t\"fmt\"",
+    "",
+    "\t\"figma.com/services/agentplat/proto\"",
+    "\t\"figma.com/services/agentplat/sbox/sboxd/internal/metrics\"",
+    ")",
+    "",
+    "// WorkspaceHandler handles workspace management operations (workspace/*).",
+    "type WorkspaceHandler struct {",
+    "\tserver  Server",
+    "\tmetrics *metrics.Reporter",
+    "}",
+    "",
+    "// NewWorkspaceHandler creates a new workspace handler.",
+    "func NewWorkspaceHandler(server Server, metricsReporter *metrics.Reporter) *WorkspaceHandler {",
+    "\treturn &WorkspaceHandler{server: server, metrics: metricsReporter}",
+    "}",
+    "",
+    "// Create handles workspace/create requests.",
+    "// This is a write operation (requires write permission).",
+    "// When req.Bootstrap is set, bootstrap runs asynchronously: the handler creates",
+    "// the workspace directory and returns immediately while BootstrapWorkspace runs",
+    "// in a goroutine. Prompts gate on WaitForReadyAndResolve, which blocks until",
+    "// the workspace reaches Ready state.",
+    "func (h *WorkspaceHandler) Create(ctx context.Context, req *proto.WorkspaceCreateRequest) (*proto.WorkspaceCreateResponse, error) {",
+    "\tif req.Bootstrap != nil {",
+    "\t\tif err := req.Bootstrap.Validate(); err != nil {",
+    "\t\t\treturn nil, err",
+    "\t\t}",
+    "\t}",
+    "",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default, matching other endpoints.",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\twsID, metadata, created, err := wsMgr.CreateWorkspace(wsID, req.Env)",
+    "\tif err != nil {",
+    "\t\treturn nil, fmt.Errorf(\"create workspace: %w\", err)",
+    "\t}",
+    "",
+    "\tif h.metrics != nil {",
+    "\t\thasBootstrap := \"false\"",
+    "\t\tif req.Bootstrap != nil {",
+    "\t\t\thasBootstrap = \"true\"",
+    "\t\t}",
+    "\t\th.metrics.RecordWorkspaceCreate(hasBootstrap)",
+    "\t}",
+    "",
+    "\tif req.Bootstrap != nil {",
+    "\t\t// Non-blocking bootstrap: spawns a goroutine tracked by bootstrapWg",
+    "\t\t// for graceful shutdown. The goroutine transitions the workspace from",
+    "\t\t// Ready to Creating (via CreateWorkspaceForBootstrap), runs bootstrap,",
+    "\t\t// then transitions to Ready on success or Failed on error. Prompts",
+    "\t\t// arriving before bootstrap completes block on WaitForReadyAndResolve.",
+    "\t\t//",
+    "\t\t// There is a sub-millisecond window between handler return and the",
+    "\t\t// goroutine calling CreateWorkspaceForBootstrap where the workspace",
+    "\t\t// is Ready (not bootstrapped). A prompt arriving in this window would",
+    "\t\t// bypass WaitForReadyAndResolve. In practice this is unreachable:",
+    "\t\t// the response must traverse sboxd \u2192 cortex \u2192 frontend \u2192 cortex \u2192",
+    "\t\t// sboxd (50-200ms) before a prompt can arrive.",
+    "\t\th.server.BootstrapWorkspaceAsync(ctx, wsID, req.Bootstrap)",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceCreateResponse{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tMetadata:    metadata,",
+    "\t\tCreated:     created,",
+    "\t}, nil",
+    "}",
+    "",
+    "// List handles workspace/list requests.",
+    "// Named List to match message type and read-only (List prefix).",
+    "func (h *WorkspaceHandler) List(ctx context.Context, req *proto.WorkspaceListRequest) (*proto.WorkspaceListResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "\tworkspaces := wsMgr.ListWorkspaces()",
+    "",
+    "\treturn &proto.WorkspaceListResponse{",
+    "\t\tWorkspaces: workspaces,",
+    "\t}, nil",
+    "}",
+    "",
+    "// Status handles workspace/status requests.",
+    "// Named Status to match message type and read-only (Status prefix).",
+    "func (h *WorkspaceHandler) Status(ctx context.Context, req *proto.WorkspaceStatusRequest) (*proto.WorkspaceStatusResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\tstatus := wsMgr.GetWorkspaceStatus(wsID, req.RepoIDs)",
+    "\tif status == nil {",
+    "\t\treturn nil, ErrWorkspaceNotFound",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceStatusResponse{",
+    "\t\tWorkspaceID:  status.WorkspaceID,",
+    "\t\tMetadata:     status.Metadata,",
+    "\t\tRepositories: status.Repositories,",
+    "\t}, nil",
+    "}",
+    "",
+    "// Delete handles workspace/delete requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) Delete(ctx context.Context, req *proto.WorkspaceDeleteRequest) (*proto.WorkspaceDeleteResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\tif req.WorkspaceID.IsZero() {",
+    "\t\treturn nil, &HandlerError{Code: \"invalid_argument\", Message: \"workspaceId is required\"}",
+    "\t}",
+    "",
+    "\terr := wsMgr.DeleteWorkspace(req.WorkspaceID)",
+    "\tif err != nil {",
+    "\t\treturn nil, err",
+    "\t}",
+    "",
+    "\th.server.EvictBootstrapCache(req.WorkspaceID)",
+    "",
+    "\treturn &proto.WorkspaceDeleteResponse{",
+    "\t\tSuccess: true,",
+    "\t}, nil",
+    "}",
+    "",
+    "// SetupRepos handles workspace/setup_repos requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) SetupRepos(ctx context.Context, req *proto.WorkspaceSetupReposRequest) (*proto.WorkspaceSetupReposResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\t// Verify workspace exists",
+    "\tstatus := wsMgr.GetWorkspaceStatus(wsID, nil)",
+    "\tif status == nil {",
+    "\t\treturn nil, ErrWorkspaceNotFound",
+    "\t}",
+    "",
+    "\t// Convert to pointer slice for workspace manager",
+    "\trepos := make([]*proto.Repository, len(req.Repositories))",
+    "\tfor i := range req.Repositories {",
+    "\t\trepos[i] = &req.Repositories[i]",
+    "\t}",
+    "",
+    "\trepoStatuses := wsMgr.SetupWorkspaceRepos(wsID, repos, req.Initialize)",
+    "",
+    "\t// Get workspace metadata",
+    "\twsStatus := wsMgr.GetWorkspaceStatus(wsID, nil)",
+    "\tvar metadata *proto.WorkspaceMetadata",
+    "\tif wsStatus != nil {",
+    "\t\tmetadata = wsStatus.Metadata",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceSetupReposResponse{",
+    "\t\tWorkspaceID:  wsID,",
+    "\t\tMetadata:     metadata,",
+    "\t\tRepositories: repoStatuses,",
+    "\t}, nil",
+    "}",
+    "",
+    "// Save handles workspace/save requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) Save(ctx context.Context, req *proto.WorkspaceSaveRequest) (*proto.WorkspaceSaveResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\tpush := true",
+    "\tif req.Push != nil {",
+    "\t\tpush = *req.Push",
+    "\t}",
+    "",
+    "\tresults := wsMgr.SaveWorkspaceRepos(ctx, wsID, req.RepoIDs, req.Message, push)",
+    "",
+    "\t// Convert pointer slice to value slice for response",
+    "\tresultsValue := make([]proto.RepoSaveResult, len(results))",
+    "\tfor i, r := range results {",
+    "\t\tif r != nil {",
+    "\t\t\tresultsValue[i] = *r",
+    "\t\t}",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceSaveResponse{",
+    "\t\tWorkspaceID: wsID,",
+    "\t\tResults:     resultsValue,",
+    "\t}, nil",
+    "}",
+    "",
+    "// UpdateCredentials handles workspace/update_credentials requests.",
+    "// This is a write operation (requires write permission).",
+    "func (h *WorkspaceHandler) UpdateCredentials(ctx context.Context, req *proto.WorkspaceUpdateCredentialsRequest) (*proto.WorkspaceUpdateCredentialsResponse, error) {",
+    "\twsMgr := h.server.WorkspaceManager()",
+    "",
+    "\t// Resolve workspace ID with fallback to default",
+    "\twsID := req.WorkspaceID",
+    "\tif wsID.IsZero() {",
+    "\t\twsID = proto.DefaultWorkspaceID",
+    "\t}",
+    "",
+    "\tif req.RepoID.IsZero() {",
+    "\t\treturn nil, &HandlerError{Code: \"invalid_argument\", Message: \"repoId is required\"}",
+    "\t}",
+    "",
+    "\terr := wsMgr.UpdateRepoCredentials(wsID, req.RepoID, req.Credentials)",
+    "",
+    "\tif err != nil {",
+    "\t\treturn &proto.WorkspaceUpdateCredentialsResponse{",
+    "\t\t\tSuccess: false,",
+    "\t\t\tError:   err.Error(),",
+    "\t\t}, nil",
+    "\t}",
+    "",
+    "\treturn &proto.WorkspaceUpdateCredentialsResponse{",
+    "\t\tSuccess: true,",
+    "\t}, nil",
+    "}"
+  ],
+  "path": "services/agentplat/sbox/sboxd/handler/workspace_handler.go",
+  "status": "changed"
+}

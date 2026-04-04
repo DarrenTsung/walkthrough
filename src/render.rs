@@ -3141,7 +3141,7 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
             out.push_str(&format!("## {}\n\n", file));
             out.push_str(&format!("<!-- {}, {} -->\n\n", status, chunk_count));
             let text = render_chunks_text(difft, &(0..chunk_count).collect::<Vec<_>>(), None);
-            out.push_str(&format!("```difft {} chunks=all\n", file));
+            out.push_str(&format!("```diff {} chunks=all\n", file));
             out.push_str(&text);
             out.push_str("```\n\n");
         } else {
@@ -3163,7 +3163,7 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
                 };
                 out.push_str(&format!("<!-- chunk {}{} -->\n\n", i, line_info));
                 let text = render_chunks_text(difft, &[i], None);
-                out.push_str(&format!("```difft {} chunks={}\n", file, i));
+                out.push_str(&format!("```diff {} chunks={}\n", file, i));
                 out.push_str(&text);
                 out.push_str("```\n\n");
             }
@@ -3203,7 +3203,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
         raw_content
     };
 
-    let difft_re = Regex::new(r"^difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
+    let difft_re = Regex::new(r"^difft?\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
     let src_re = Regex::new(r"^src\s+(?:old\s+)?(\S+):(\d+)-(\d+)(?:\s+old)?")?;
 
     let mut hl = Highlighter::new();

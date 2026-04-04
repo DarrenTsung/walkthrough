@@ -94,7 +94,7 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path) -> Result<bool> {
     let md_content = fs::read_to_string(walkthrough_path)
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
 
-    let re = Regex::new(r"```difft\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
+    let re = Regex::new(r"```difft?\s+(\S+)\s+chunks=(\S+)(?:\s+lines=(\S+))?")?;
 
     let mut coverage: HashMap<(String, usize), Coverage> = HashMap::new();
 

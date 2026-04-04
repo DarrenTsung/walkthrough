@@ -7,8 +7,8 @@ Rust CLI that generates narrative walkthroughs of code changes with side-by-side
 - `src/main.rs` - CLI entry point with three subcommands via clap
 - `src/collect.rs` - Runs `git diff -U0` to get unified diff hunks, reads file contents via `git cat-file`, generates chunks by positionally pairing old/new lines within each hunk, writes per-file JSON to an output directory
 - `src/difft_json.rs` - Serde types for the collected JSON output (`DifftOutput`, `LineEntry`, `LineSide`, `ChangeSpan`, `DiffHunk`)
-- `src/render.rs` - Parses walkthrough markdown, replaces `` ```difft `` code blocks with rendered HTML diff tables, converts the rest via pulldown-cmark. Also writes enriched markdown back to the input file with text diffs in the code block bodies.
-- `src/verify.rs` - Checks that every chunk in the collected data is referenced by at least one difft code block in the walkthrough
+- `src/render.rs` - Parses walkthrough markdown, replaces `` ```diff `` code blocks with rendered HTML diff tables, converts the rest via pulldown-cmark. Also writes enriched markdown back to the input file with text diffs in the code block bodies.
+- `src/verify.rs` - Checks that every chunk in the collected data is referenced by at least one diff code block in the walkthrough
 
 ## Commands
 
@@ -35,16 +35,16 @@ Default data directory for all commands: `.walkthrough_data` (in the current dir
 
 ## Walkthrough markdown syntax
 
-Difft code blocks reference collected data by file path and chunk indices:
+Diff code blocks reference collected data by file path and chunk indices (`difft` is also accepted for backwards compatibility):
 
 ````markdown
-```difft src/foo.rs chunks=0,1,3
+```diff src/foo.rs chunks=0,1,3
 ```
 
-```difft src/bar.rs chunks=all
+```diff src/bar.rs chunks=all
 ```
 
-```difft src/baz.rs chunks=1 lines=164-200
+```diff src/baz.rs chunks=1 lines=164-200
 ```
 ````
 
@@ -52,10 +52,10 @@ The optional `lines=START-END` parameter (1-based, inclusive, relative to the ch
 
 ### Code folds
 
-A `folds` block placed immediately after a difft block collapses line ranges into clickable pseudocode summaries. Line numbers are 1-based, relative to the first line on the targeted side of the chunk:
+A `folds` block placed immediately after a diff block collapses line ranges into clickable pseudocode summaries. Line numbers are 1-based, relative to the first line on the targeted side of the chunk:
 
 ````markdown
-```difft src/foo.rs chunks=0
+```diff src/foo.rs chunks=0
 ```
 
 ```folds
@@ -93,7 +93,7 @@ Diff blocks have `max-height: 80vh` with `overflow: hidden` (no scrollbar). A JS
 
 ### Markdown enrichment
 
-The render command writes back to the input markdown file, replacing each difft code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs.
+The render command writes back to the input markdown file, replacing each diff code block body with a unified-diff-style text representation (` ` context, `-` removed, `+` added). This uses the same chunk processing logic as the HTML renderer (context lines, consolidation). The enriched markdown is idempotent: re-running render produces identical HTML and re-populates the same text diffs.
 
 ### Expression-aware context expansion
 

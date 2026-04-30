@@ -25,6 +25,10 @@ enum Commands {
         #[arg(short, long, default_value = ".walkthrough_data")]
         output: PathBuf,
 
+        /// Include whitespace-only changes (default: ignore them, i.e. pass -w to git diff)
+        #[arg(long)]
+        include_whitespace: bool,
+
         /// Arguments to pass to git diff (put after --)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         diff_args: Vec<String>,
@@ -69,7 +73,9 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Collect { output, diff_args } => collect::run(&diff_args, &output),
+        Commands::Collect { output, include_whitespace, diff_args } => {
+            collect::run(&diff_args, &output, !include_whitespace)
+        }
 
         Commands::Verify {
             walkthrough,

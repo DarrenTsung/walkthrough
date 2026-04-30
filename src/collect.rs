@@ -92,60 +92,80 @@ fn get_file_contents(
     Ok((old_lines, new_lines))
 }
 
-/// Generate chunks from unified diff hunks. Each hunk becomes one chunk with
-/// positionally paired old/new lines. This replaces difftastic's structural
-/// matching, which could silently exclude lines it considers "moved."
-fn generate_chunks_from_hunks(
-    hunks: &[serde_json::Value],
-    old_lines: &[String],
-    new_lines: &[String],
-) -> Vec<serde_json::Value> {
+/// A parsed unified-diff hunk: header positions plus the body's +/-/' ' lines.
+struct ParsedHunk {
+    old_start: u64,
+    old_count: u64,
+    new_start: u64,
+    new_count: u64,
+    /// Body lines, each tagged with its prefix: '-', '+', or ' '.
+    body: Vec<(char, String)>,
+}
+
+/// Generate chunks by walking each hunk body. Within a hunk, runs of `-` lines
+/// are positionally paired with the immediately following run of `+` lines;
+/// any unpaired remainder is recorded as removed-only or added-only. Context
+/// lines (' ') just advance the line counters and split paired runs.
+fn generate_chunks_from_hunks(hunks: &[ParsedHunk]) -> Vec<serde_json::Value> {
     let mut chunks = Vec::new();
 
     for hunk in hunks {
-        let old_start = hunk["old_start"].as_u64().unwrap_or(0);
-        let old_count = hunk["old_count"].as_u64().unwrap_or(0);
-        let new_start = hunk["new_start"].as_u64().unwrap_or(0);
-        let new_count = hunk["new_count"].as_u64().unwrap_or(0);
-
-        // Convert 1-based hunk positions to 0-based indices
-        let old_0 = if old_start > 0 { old_start - 1 } else { 0 };
-        let new_0 = if new_start > 0 { new_start - 1 } else { 0 };
+        let mut old_line = if hunk.old_start > 0 { hunk.old_start - 1 } else { 0 };
+        let mut new_line = if hunk.new_start > 0 { hunk.new_start - 1 } else { 0 };
 
         let mut entries = Vec::new();
-        let paired = old_count.min(new_count);
 
-        // Paired lines (both old and new)
-        for i in 0..paired {
-            let old_idx = old_0 + i;
-            let new_idx = new_0 + i;
-            // Skip pairs where both lines are identical (context within hunk).
-            // The renderer would show these as context anyway, but including
-            // them inflates the chunk with non-changes.
-            let old_text = old_lines.get(old_idx as usize).map(|s| s.as_str()).unwrap_or("");
-            let new_text = new_lines.get(new_idx as usize).map(|s| s.as_str()).unwrap_or("");
-            if old_text == new_text {
-                continue;
+        // Walk the body, accumulating runs of removals followed by additions
+        // and flushing them as paired entries when the run ends.
+        let mut removed: Vec<u64> = Vec::new();
+        let mut added: Vec<u64> = Vec::new();
+
+        let flush = |removed: &mut Vec<u64>, added: &mut Vec<u64>, entries: &mut Vec<serde_json::Value>| {
+            let paired = removed.len().min(added.len());
+            for i in 0..paired {
+                entries.push(serde_json::json!({
+                    "lhs": { "line_number": removed[i], "changes": [] },
+                    "rhs": { "line_number": added[i], "changes": [] },
+                }));
             }
-            entries.push(serde_json::json!({
-                "lhs": { "line_number": old_idx, "changes": [] },
-                "rhs": { "line_number": new_idx, "changes": [] },
-            }));
-        }
+            for &idx in &removed[paired..] {
+                entries.push(serde_json::json!({
+                    "lhs": { "line_number": idx, "changes": [] },
+                }));
+            }
+            for &idx in &added[paired..] {
+                entries.push(serde_json::json!({
+                    "rhs": { "line_number": idx, "changes": [] },
+                }));
+            }
+            removed.clear();
+            added.clear();
+        };
 
-        // Extra old lines (removed-only)
-        for i in paired..old_count {
-            entries.push(serde_json::json!({
-                "lhs": { "line_number": old_0 + i, "changes": [] },
-            }));
+        for (prefix, _text) in &hunk.body {
+            match prefix {
+                '-' => {
+                    removed.push(old_line);
+                    old_line += 1;
+                }
+                '+' => {
+                    added.push(new_line);
+                    new_line += 1;
+                }
+                ' ' => {
+                    // Context line splits the run; flush before advancing.
+                    flush(&mut removed, &mut added, &mut entries);
+                    old_line += 1;
+                    new_line += 1;
+                }
+                _ => {}
+            }
         }
+        flush(&mut removed, &mut added, &mut entries);
 
-        // Extra new lines (added-only)
-        for i in paired..new_count {
-            entries.push(serde_json::json!({
-                "rhs": { "line_number": new_0 + i, "changes": [] },
-            }));
-        }
+        // Sanity: counters should match the hunk header.
+        let _ = hunk.old_count;
+        let _ = hunk.new_count;
 
         if !entries.is_empty() {
             chunks.push(serde_json::Value::Array(entries));
@@ -155,42 +175,80 @@ fn generate_chunks_from_hunks(
     chunks
 }
 
-/// Get unified diff hunk headers for a file. These give exact old/new line mappings.
+/// Parse a unified-diff hunk header line into the four numbers.
+fn parse_hunk_header(line: &str) -> Option<(u64, u64, u64, u64)> {
+    let hunk_re = regex::Regex::new(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@").ok()?;
+    let cap = hunk_re.captures(line)?;
+    let old_start: u64 = cap[1].parse().ok()?;
+    let old_count: u64 = cap.get(2).map_or(1, |m| m.as_str().parse().unwrap_or(1));
+    let new_start: u64 = cap[3].parse().ok()?;
+    let new_count: u64 = cap.get(4).map_or(1, |m| m.as_str().parse().unwrap_or(1));
+    Some((old_start, old_count, new_start, new_count))
+}
+
+/// Get unified diff hunks (header + body) for a file.
 fn get_diff_hunks(
     diff_args: &[String],
     file_path: &str,
-) -> Result<Vec<serde_json::Value>> {
-    let output = Command::new("git")
-        .arg("diff")
+    ignore_whitespace: bool,
+) -> Result<Vec<ParsedHunk>> {
+    let mut cmd = Command::new("git");
+    cmd.arg("diff")
         .args(diff_args)
         .arg("-U0")
-        .arg("--no-ext-diff")
+        .arg("--inter-hunk-context=3")
+        .arg("--no-ext-diff");
+    if ignore_whitespace {
+        cmd.arg("-w");
+    }
+    let output = cmd
         .arg("--")
         .arg(file_path)
         .output()
         .context("Failed to run git diff -U0")?;
 
     let diff_str = String::from_utf8_lossy(&output.stdout);
-    let hunk_re = regex::Regex::new(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")?;
+    let mut hunks: Vec<ParsedHunk> = Vec::new();
+    let mut in_body = false;
 
-    let mut hunks = Vec::new();
-    for cap in hunk_re.captures_iter(&diff_str) {
-        let old_start: u64 = cap[1].parse()?;
-        let old_count: u64 = cap.get(2).map_or(1, |m| m.as_str().parse().unwrap_or(1));
-        let new_start: u64 = cap[3].parse()?;
-        let new_count: u64 = cap.get(4).map_or(1, |m| m.as_str().parse().unwrap_or(1));
-        hunks.push(serde_json::json!({
-            "old_start": old_start,
-            "old_count": old_count,
-            "new_start": new_start,
-            "new_count": new_count,
-        }));
+    for line in diff_str.lines() {
+        if line.starts_with("@@") {
+            if let Some((os, oc, ns, nc)) = parse_hunk_header(line) {
+                hunks.push(ParsedHunk {
+                    old_start: os,
+                    old_count: oc,
+                    new_start: ns,
+                    new_count: nc,
+                    body: Vec::new(),
+                });
+                in_body = true;
+            } else {
+                in_body = false;
+            }
+            continue;
+        }
+        if !in_body {
+            continue;
+        }
+        // Body lines start with '-', '+', or ' '. Skip everything else
+        // (including "\ No newline at end of file").
+        let prefix = line.chars().next().unwrap_or('?');
+        if prefix == '-' || prefix == '+' || prefix == ' ' {
+            // Skip the file headers `--- a/...` / `+++ b/...` that may slip
+            // in if a new file appears mid-stream — they only show up before
+            // any `@@`, so `in_body` already excludes them.
+            if let Some(h) = hunks.last_mut() {
+                h.body.push((prefix, line[1..].to_string()));
+            }
+        } else {
+            in_body = false;
+        }
     }
 
     Ok(hunks)
 }
 
-pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
+pub fn run(diff_args: &[String], output_dir: &Path, ignore_whitespace: bool) -> Result<()> {
     // When no diff args provided, use three-dot syntax against the remote
     // default branch. Three-dot (`A...B`) tells git diff to compute the
     // merge-base itself, giving only the changes on our branch.
@@ -304,7 +362,7 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
                 (Vec::new(), Vec::new())
             });
 
-        let hunks = get_diff_hunks(diff_args, file_path)
+        let hunks = get_diff_hunks(diff_args, file_path, ignore_whitespace)
             .unwrap_or_else(|e| {
                 eprintln!("(warning: could not get diff hunks: {})", e);
                 Vec::new()
@@ -315,8 +373,27 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
             continue;
         }
 
-        // Generate chunks from hunks (each hunk = one chunk, positional pairing)
-        let chunks = generate_chunks_from_hunks(&hunks, &old_lines, &new_lines);
+        // With -w, a modified file may have no non-whitespace hunks at all.
+        if ignore_whitespace && hunks.is_empty() && status.starts_with('M') {
+            eprintln!("(only whitespace changes, skipping)");
+            continue;
+        }
+
+        // Generate chunks by parsing each hunk's body.
+        let chunks = generate_chunks_from_hunks(&hunks);
+
+        // Convert ParsedHunk -> JSON shape expected by the JSON output / render.
+        let hunks_json: Vec<serde_json::Value> = hunks
+            .iter()
+            .map(|h| {
+                serde_json::json!({
+                    "old_start": h.old_start,
+                    "old_count": h.old_count,
+                    "new_start": h.new_start,
+                    "new_count": h.new_count,
+                })
+            })
+            .collect();
 
         let diff_status = match status.chars().next() {
             Some('A') => "added",
@@ -333,7 +410,7 @@ pub fn run(diff_args: &[String], output_dir: &Path) -> Result<()> {
             "chunks": chunks,
             "old_lines": old_lines,
             "new_lines": new_lines,
-            "hunks": hunks,
+            "hunks": hunks_json,
         });
 
         let chunk_count = json

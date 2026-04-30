@@ -3279,6 +3279,12 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
     let mut last_block_base_line_old: usize = 0; // base old-line (0-based) for old-side folds
     let mut last_block_file = String::new(); // file path for syntax-highlighting folds
     let mut referenced: std::collections::HashSet<(String, usize)> = std::collections::HashSet::new();
+    // Track each (file, chunk) reference's line filter so we can warn when
+    // the same chunk is rendered multiple times in confusing ways. `None`
+    // means a full render (no lines=); `Some((s,e))` is an absolute 0-based
+    // line range from `lines=`.
+    let mut chunk_refs: std::collections::HashMap<(String, usize), Vec<Option<(usize, usize)>>> =
+        std::collections::HashMap::new();
 
     for line in md_content.lines() {
         if in_notes_block {
@@ -3751,6 +3757,31 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
 
                     for &idx in &indices {
                         referenced.insert((file.clone(), idx));
+
+                        // Warn if this chunk is being rendered again. Two
+                        // `lines=` references with non-overlapping ranges
+                        // are an intentional split (e.g. a large chunk
+                        // narrated in pieces) and don't warn.
+                        let key = (file.clone(), idx);
+                        let prev = chunk_refs.entry(key).or_insert_with(Vec::new);
+                        if !prev.is_empty() {
+                            let conflict = match line_filter {
+                                None => true, // current is a full render
+                                Some((s, e)) => prev.iter().any(|p| match p {
+                                    None => true, // a previous full render
+                                    Some((ps, pe)) => s <= *pe && *ps <= e, // overlap
+                                }),
+                            };
+                            if conflict {
+                                eprintln!(
+                                    "Warning: {} chunk {} rendered multiple times (in:\n  {}\n  )",
+                                    file,
+                                    idx,
+                                    line.trim(),
+                                );
+                            }
+                        }
+                        prev.push(line_filter);
                     }
                     let collapse = if is_generated {
                         CollapseMode::Hidden

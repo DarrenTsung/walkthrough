@@ -1120,10 +1120,25 @@ const JS: &str = r#"
 
 // Collapsible diff blocks: click header to toggle, search to auto-expand
 (function() {
+    var STORAGE_KEY = 'walkthrough-viewed:' + location.pathname;
+    function loadViewed() {
+        try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return {};
+            var parsed = JSON.parse(raw);
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch (e) { return {}; }
+    }
+    function saveViewed(state) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    }
+    var viewedState = loadViewed();
+
     document.querySelectorAll('.diff-block').forEach(function(block) {
         var header = block.querySelector('.diff-header');
         var body = block.querySelector('.diff-body');
         if (!header || !body) return;
+        var blockId = block.getAttribute('data-block-id');
 
         function collapse() {
             block.classList.add('collapsed');
@@ -1150,13 +1165,23 @@ const JS: &str = r#"
         if (disclaimer) disclaimer.addEventListener('click', toggle);
 
         var checkbox = block.querySelector('.viewed-check');
+        if (blockId && viewedState[blockId] && checkbox) {
+            checkbox.checked = true;
+            block.classList.add('viewed');
+            collapse();
+        }
         if (checkbox) {
             checkbox.addEventListener('change', function() {
                 if (checkbox.checked) {
                     block.classList.add('viewed');
                     collapse();
+                    if (blockId) { viewedState[blockId] = 1; saveViewed(viewedState); }
                 } else {
                     block.classList.remove('viewed');
+                    if (blockId && viewedState[blockId]) {
+                        delete viewedState[blockId];
+                        saveViewed(viewedState);
+                    }
                 }
             });
         }
@@ -2563,13 +2588,19 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
         CollapseMode::None => "",
     };
 
+    let chunk_indices_str = chunk_indices.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(",");
+    let block_id = match line_filter {
+        Some((start, end)) => format!("{}#{}@{}-{}", file_path, chunk_indices_str, start, end),
+        None => format!("{}#{}", file_path, chunk_indices_str),
+    };
+
     let mut html = String::new();
     html.push_str(&format!(
-        "<div class=\"{}\" {}><div class=\"diff-header\">\
+        "<div class=\"{}\" {} data-block-id=\"{}\"><div class=\"diff-header\">\
          <span class=\"collapse-arrow\">{}</span> {}\
          <label class=\"viewed-label\"><input type=\"checkbox\" class=\"viewed-check\"><span>Viewed</span></label>\
          </div>{}",
-        block_class, collapse_attr, arrow, html_escape(file_path), disclaimer
+        block_class, collapse_attr, html_escape(&block_id), arrow, html_escape(file_path), disclaimer
     ));
 
     let body_attr = match collapse {
@@ -3065,7 +3096,7 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     // Find the minimum indent across both LHS and RHS non-empty cells,
     // then remove that many spaces from every cell so deeply-nested code
     // doesn't waste horizontal space.
-    let code_cell_re = Regex::new(r#"class="code[^"]*">( +)"#).unwrap();
+    let code_cell_re = Regex::new(r#"class="code[^"]*">( *)\S"#).unwrap();
     let min_indent = code_cell_re.captures_iter(&html)
         .map(|c| c[1].len())
         .min()

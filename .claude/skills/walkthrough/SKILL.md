@@ -1,6 +1,6 @@
 ---
 name: walkthrough
-description: "Generate a narrative walkthrough of code changes with difftastic diffs and verified complete coverage. Also works as a general markdown renderer with source blocks, folds, tables, and mermaid diagrams."
+description: "Generate a narrative walkthrough of code changes with difftastic diffs and verified complete coverage. Also works as a general markdown renderer with source blocks, tables, and mermaid diagrams."
 allowed-tools: "Bash, Read, Write, Edit, Glob, Grep, Agent"
 argument-hint: "[diff-source | markdown-file] [--output path]"
 ---
@@ -14,8 +14,8 @@ ensure accuracy and clarity.
 
 The renderer also works as a **general-purpose markdown-to-HTML tool** without any diff
 data. Use it for technical documents, design docs, or explanations that benefit from the
-walkthrough styling (tables, mermaid diagrams, source blocks with syntax highlighting,
-code folds with pseudocode). To render plain markdown:
+walkthrough styling (tables, mermaid diagrams, source blocks with syntax highlighting).
+To render plain markdown:
 
 ```bash
 walkthrough render doc.md --no-diff-data -o doc.html
@@ -195,64 +195,6 @@ correspondence themselves. A sentence like "The config is a direct port of the e
 explaining each field mapping in prose. The diff already shows the new code; the `src`
 block shows what it replaced.
 
-### Code folds (pseudocode)
-
-Use `` ```folds `` blocks immediately after a difft or src block to collapse verbose code
-into pseudocode summaries. This is especially useful for **tests**, where setup, mock
-configuration, and teardown boilerplate obscure the interesting logic.
-
-**Line numbers are relative** (1-based, from the first new-file line in the chunk), the
-same numbering shown in the enriched text diff. Do NOT use absolute file line numbers.
-
-The pseudocode should look like simplified real code (not prose descriptions). It gets
-syntax-highlighted using the same language as the file. Readers can click to expand and
-see the original code.
-
-**Single-line folds** (auto-indented to match the code):
-
-````markdown
-```folds
-5-15: setup_test(mock_api)
-20-30: assert(result.has(expected_value))
-```
-````
-
-**Multi-line folds** (leave the first line empty, control indentation yourself):
-
-````markdown
-```folds
-15-44:
-    mock_api.expect_one_checkpoint().return(|checkpoint_bytes, activities| {
-        assert(checkpoint_bytes.has(rounded_rect((10, 10))));
-        assert!(activities.has_user(connection.user_id()).with_one_edits());
-        // Send more changes while checkpoint is in-flight.
-        connection.send_node_changes(frame((10, 12)));
-        Err("Failed to checkpoint!")
-    })
-46-50:
-    // Modify the document and trigger checkpoint.
-    connection.send_node_changes(rounded_rect((10, 10)));
-    event_loop.checkpoint().await;
-```
-````
-
-**When to use folds:**
-- Test setup/teardown boilerplate (mock creation, event loop setup, cleanup)
-- Mock expectation bodies with verbose assertion chains
-- Builder patterns with many chained calls
-- Any code section where the WHAT matters more than the HOW
-
-**When NOT to use folds:**
-- Core logic that the walkthrough is explaining (show the real code)
-- Short code sections (< 5 lines) where folding adds no value
-
-**Writing good pseudocode:**
-- Write it like simplified real code, not prose descriptions
-- Keep variable names from the real code for recognition
-- Collapse verbose Rust patterns (Box::pin, async move, Arc::clone) into intent
-- Keep comments that explain non-obvious behavior
-- Don't fold function signatures or closing braces (leave those visible for structure)
-
 ### Service badges
 
 Use `` `@service-name` `` in inline code to render service names as styled badges
@@ -378,7 +320,7 @@ If the render output reports uncovered chunks, add sections referencing them and
 
 ## Step 6: Review loop
 
-The review loop ensures the narrative is accurate, complete, and clear. Spawn four reviewer
+The review loop ensures the narrative is accurate, complete, and clear. Spawn three reviewer
 agents in parallel. Each reads the rendered markdown (with enriched diffs) and produces a
 verdict. The loop continues until all reviewers pass.
 
@@ -487,21 +429,19 @@ markdown file at {OUTPUT_PATH}.
 
 The file contains prose sections interleaved with difft code blocks and
 optional `notes` blocks (code annotations). Your job is to find prose that
-restates what the code already says, and suggest converting it to annotations
-or removing it entirely.
+restates what the code already says, and suggest removing it entirely.
 
 Check each section for:
 
 1. **Redundant explanations** — prose that describes what specific lines of
    code do, when the code is self-evident. Example: "A 30-second timeout guards
    against sboxd being unresponsive" is redundant when the code shows
-   `setTimeout(() => reject(...), 30_000)`. Convert these to `notes` blocks
-   (one-line annotations on the relevant lines) or remove them entirely.
+   `setTimeout(() => reject(...), 30_000)`. Remove them entirely.
 
 2. **Paragraph-as-code-tour** — multiple sentences walking through the code
    line by line. The reader can read the code. Focus prose on WHY, not WHAT.
    Suggest which sentences to keep (the ones with non-obvious context) and
-   which to convert to annotations or cut.
+   which to cut.
 
 3. **Overly detailed field-by-field descriptions** — listing every field in a
    config or type when the diff shows them. Suggest using a `src` block to
@@ -524,68 +464,6 @@ End with a verdict:
 Output ONLY the review, no preamble.
 ```
 
-### Reviewer 4: Test Pseudocode
-
-Spawns an agent (subagent_type: general-purpose, model: sonnet) with this prompt:
-
-```
-You are a test readability reviewer for a code walkthrough. Read the walkthrough
-markdown file at {OUTPUT_PATH}.
-
-The file contains prose sections interleaved with difft code blocks (showing diffs)
-and src code blocks (showing source code). Some blocks may have `folds` blocks after
-them that collapse code ranges into pseudocode summaries.
-
-Your job is to check that every test function shown in the walkthrough has pseudocode
-folds that make it readable at a glance. Tests are verbose by nature (setup, mocking,
-assertions, teardown) and benefit greatly from pseudocode that summarizes the intent.
-
-For each test function in a difft or src block, check:
-
-1. **Missing folds** — the test body is shown as raw code with no `folds` block.
-   Every test should have folds that cover the entire body (except the function
-   signature and closing brace, which should remain visible for structure).
-
-2. **Prose-style folds** — fold text that reads like English descriptions instead
-   of simplified code. Bad: "Set up test fixtures and mock data". Good:
-   "mock_api = create_mock_api; setup_test(mock_api)". Pseudocode should look
-   like simplified real code with the same variable names.
-
-3. **Incomplete coverage** — folds that only cover part of the test body, leaving
-   large blocks of raw test code visible. The goal is that with all folds
-   collapsed, the reader sees: function signature, pseudocode summaries, closing
-   brace.
-
-4. **Over-folding structure** — folds that hide the function signature
-   (`async fn test_name() {`) or closing brace (`}`). These should stay visible
-   so the reader sees the test's boundaries.
-
-5. **Absolute line numbers** — fold line numbers MUST be relative (1-based,
-   where line 1 = the first line shown in the code block), NOT absolute file
-   line numbers. For a `src` block showing lines 12-103, fold line 1 refers
-   to file line 12. Check the enriched text in the code block body: the left
-   column shows absolute file line numbers, fold references should be the
-   offset from the block's start.
-
-For each issue, suggest a specific fix with the fold ranges and pseudocode text.
-Write the pseudocode as simplified code: keep variable names from the real code,
-collapse verbose patterns (Box::pin, async move, Arc::clone) into intent, keep
-comments that explain non-obvious behavior.
-
-Use multi-line fold syntax for multi-line pseudocode:
-    5-20:
-        mock_api.expect_checkpoint(|bytes| {
-            assert(bytes.has(rounded_rect(10, 10)))
-            Err("Failed!")
-        })
-
-End with a verdict:
-- PASS — all tests have readable pseudocode folds
-- FAIL — {N} tests need pseudocode folds
-
-Output ONLY the review, no preamble.
-```
-
 ### Processing review results
 
 After all four reviewers complete:
@@ -600,7 +478,7 @@ After all four reviewers complete:
 
 For each reviewer issue, classify it as one of:
 - **add-to-overview**: domain context or definitions that belong in the introduction
-- **add-annotation**: a brief note on a specific line (use `notes` or `folds` block)
+- **add-annotation**: a brief note on a specific line (use `notes` block)
 - **remove-prose**: code-touring or redundant text to cut
 - **out-of-scope**: rabbit-hole questions about the broader codebase that aren't about
   this change's design (e.g. "explain the SequenceNumber numbering scheme" when the

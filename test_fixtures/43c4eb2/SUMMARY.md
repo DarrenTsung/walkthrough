@@ -58,6 +58,9 @@ Mostly added lines with one paired changed line in the middle.
   20  		}
   21  		// Check if session is being deleted (subplan 01)
   22  		if s.deleting {
+  23  			m.mu.Unlock()
+  24  			return nil, ErrSessionDeleting
+  25  		}
 ```
 
 ```folds
@@ -74,6 +77,8 @@ Mostly added lines with one paired changed line in the middle.
 All lines are old-side only. The `old` fold targets old-file line numbers.
 
 ```difft services/agentplat/sbox/sboxd/internal/session/manager.go chunks=7
+1051  	if err := os.MkdirAll(filepath.Join(m.streamsDir, id), 0700); err != nil {
+1052  		delete(m.sessions, id)
 1053  		m.metrics.RecordSessionsActive(len(m.sessions))
 1054  		return nil, fmt.Errorf("create session streams dir: %w", err)
 1055  	}
@@ -85,9 +90,9 @@ All lines are old-side only. The `old` fold targets old-file line numbers.
 1056 -			return nil, fmt.Errorf("create per-session config dir: %w", err)
 1056 -		}
 1056 -	}
-1056 -
 1057  	// Caller handles persistence (subplan 02)
 1058  	return s, nil
+1059  }
 ```
 
 ```folds
@@ -125,7 +130,7 @@ old 1-8:
   21 +	}
   22 +	return nil
   23 +}
-  24 +
+  24  
   25  func (m *Manager) allocatePromptID(s *session) int {
   26  	id := s.info.NextPromptID
 ```

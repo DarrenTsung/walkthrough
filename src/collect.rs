@@ -153,8 +153,14 @@ fn generate_chunks_from_hunks(hunks: &[ParsedHunk]) -> Vec<serde_json::Value> {
                     new_line += 1;
                 }
                 ' ' => {
-                    // Context line splits the run; flush before advancing.
+                    // Context line ends the current chunk. `--inter-hunk-context=3`
+                    // merges nearby hunks into one body — but a chunk's entries
+                    // must stay contiguous (no gaps in line numbers), so we
+                    // flush and split here.
                     flush(&mut removed, &mut added, &mut entries);
+                    if !entries.is_empty() {
+                        chunks.push(serde_json::Value::Array(std::mem::take(&mut entries)));
+                    }
                     old_line += 1;
                     new_line += 1;
                 }

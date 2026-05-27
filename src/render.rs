@@ -2637,55 +2637,96 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     let mut rendered_old: std::collections::HashSet<usize> = std::collections::HashSet::new();
     let mut rendered_new: std::collections::HashSet<usize> = std::collections::HashSet::new();
 
-    // Pre-compute each chunk's first old/new line so we can cap post-context
-    // to avoid rendering past the next chunk's start (which causes ordering issues).
-    let chunk_boundaries: Vec<(usize, usize)> = chunk_indices.iter().filter_map(|&ci| {
-        let chunk = difft.chunks.get(ci)?;
-        let (lr, rr) = chunk_line_range(chunk);
-        let old_min = match lr {
-            Some((min, _)) => min as usize,
-            None => {
-                let rmin = rr.map_or(0, |(min, _)| min);
-                to_0based(new_to_old_line(rmin + 1, hunks))
-            }
-        };
-        let new_min = match rr {
-            Some((min, _)) => min as usize,
-            None => {
-                let lmin = lr.map_or(0, |(min, _)| min);
-                to_0based(old_to_new_line(lmin + 1, hunks))
-            }
-        };
-        Some((old_min, new_min))
-    }).collect();
+    // Pre-compute virtual (old_first, old_last, new_first, new_last) for each
+    // chunk by tracking counter positions across the chunk sequence. This is
+    // critical for one-sided chunks (added- or removed-only): the unified diff
+    // hunk header only records totals (e.g. `+183,12`), so a one-sided chunk
+    // in the *middle* of a merged hunk would otherwise resolve to the hunk's
+    // start — which is wrong and breaks the side-by-side context computation
+    // (causing 189-191 / 153-157 etc. to silently disappear from rendering).
+    //
+    // Model: between any two adjacent chunks (after splitting on context),
+    // every intervening file line is unchanged context on BOTH sides, so old
+    // and new counters advance in lockstep. Each chunk's entries advance the
+    // counter only on the side(s) where it has entries.
+    //
+    // Returns (old_first, old_last, new_first, new_last, has_lhs_entries, has_rhs_entries).
+    let chunk_virtual_ranges: Vec<(usize, usize, usize, usize, bool, bool)> = {
+        let mut out = Vec::with_capacity(chunk_indices.len());
+        let mut cur_old: usize = 0;
+        let mut cur_new: usize = 0;
+        for &ci in chunk_indices {
+            let Some(chunk) = difft.chunks.get(ci) else {
+                out.push((cur_old, cur_old, cur_new, cur_new, false, false));
+                continue;
+            };
+            let (lr, rr) = chunk_line_range(chunk);
+            let has_lhs = lr.is_some();
+            let has_rhs = rr.is_some();
+
+            // Advance cur_old / cur_new through the unchanged gap before this
+            // chunk's entries, using whichever side has entries as the anchor.
+            // For paired chunks both sides agree; we use the new side.
+            let target = match rr {
+                Some((min, _)) => min as usize,
+                None => match lr {
+                    Some((min, _)) => {
+                        // Removed-only: anchor on old side instead.
+                        let gap = (min as usize).saturating_sub(cur_old);
+                        cur_old += gap;
+                        cur_new += gap;
+                        // Already advanced; skip the rhs-based advance below.
+                        let old_first = min as usize;
+                        let (_, old_last) = lr.unwrap();
+                        let old_last = old_last as usize;
+                        let new_first = cur_new;
+                        let new_last = cur_new;
+                        out.push((old_first, old_last, new_first, new_last, has_lhs, has_rhs));
+                        cur_old = old_last + 1;
+                        // cur_new unchanged: removed-only doesn't bump new counter
+                        continue;
+                    }
+                    None => {
+                        out.push((cur_old, cur_old, cur_new, cur_new, false, false));
+                        continue;
+                    }
+                },
+            };
+            let gap = target.saturating_sub(cur_new);
+            cur_old += gap;
+            cur_new += gap;
+
+            let (old_first, old_last) = match lr {
+                Some((min, max)) => (min as usize, max as usize),
+                None => (cur_old, cur_old),
+            };
+            let (new_first, new_last) = match rr {
+                Some((min, max)) => (min as usize, max as usize),
+                None => (cur_new, cur_new),
+            };
+            out.push((old_first, old_last, new_first, new_last, has_lhs, has_rhs));
+
+            // Advance counters past this chunk's entries.
+            if lr.is_some() { cur_old = old_last + 1; }
+            if rr.is_some() { cur_new = new_last + 1; }
+        }
+        out
+    };
+
+    let chunk_boundaries: Vec<(usize, usize)> = chunk_virtual_ranges
+        .iter()
+        .map(|&(o_min, _, n_min, _, _, _)| (o_min, n_min))
+        .collect();
 
     let mut first_chunk = true;
     for (chunk_order, &idx) in chunk_indices.iter().enumerate() {
         let Some(chunk) = difft.chunks.get(idx) else { continue };
 
-        let (lhs_range, rhs_range) = chunk_line_range(chunk);
-
-        // Resolve the first/last 0-based line on each side, using unified diff hunks
-        // to map between old/new when one side has no entries in this chunk.
-        let (mut old_first, mut old_last) = match lhs_range {
-            Some((min, max)) => (min as usize, max as usize),
-            None => {
-                let (rmin, rmax) = rhs_range.unwrap_or((0, 0));
-                // rmin/rmax are 0-based difft lines; hunks use 1-based git lines
-                let o_min = to_0based(new_to_old_line(rmin + 1, hunks));
-                let o_max = to_0based(new_to_old_line(rmax + 1, hunks));
-                (o_min, o_max)
-            }
-        };
-        let (mut new_first, mut new_last) = match rhs_range {
-            Some((min, max)) => (min as usize, max as usize),
-            None => {
-                let (lmin, lmax) = lhs_range.unwrap_or((0, 0));
-                let n_min = to_0based(old_to_new_line(lmin + 1, hunks));
-                let n_max = to_0based(old_to_new_line(lmax + 1, hunks));
-                (n_min, n_max)
-            }
-        };
+        // Use the pre-computed virtual ranges (see chunk_virtual_ranges above)
+        // so one-sided chunks get the correct old/new position, not the hunk
+        // start that new_to_old_line / old_to_new_line would return.
+        let (mut old_first, mut old_last, mut new_first, mut new_last, chunk_has_lhs, chunk_has_rhs) =
+            chunk_virtual_ranges[chunk_order];
 
         // Build a list of render items from consolidated difft rows.
         let rows = consolidate_chunk(chunk);
@@ -3085,8 +3126,13 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
             last_old_rendered = Some(old_post_start + post_count - 1);
             last_new_rendered = Some(new_post_start + post_count - 1);
         } else {
-            last_old_rendered = Some(old_last);
-            last_new_rendered = Some(new_last);
+            // Only update the side(s) the chunk actually rendered. For one-sided
+            // chunks the other side wasn't touched, so its tracker must stay
+            // where the previous chunk left it — otherwise the next chunk's
+            // pre-context skips the unchanged file line where this chunk was
+            // inserted (e.g. an added-only chunk between two unchanged lines).
+            if chunk_has_lhs { last_old_rendered = Some(old_last); }
+            if chunk_has_rhs { last_new_rendered = Some(new_last); }
         }
     }
 
@@ -3115,6 +3161,36 @@ fn render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, 
     }
 
     html
+}
+
+/// Validate that within each chunk, the lhs and rhs line numbers form
+/// contiguous runs (no gaps). A gap means the renderer would silently elide
+/// lines, producing a misleading diff. Returns the first detected violation.
+pub fn check_chunks_contiguous(difft: &DifftOutput) -> Result<()> {
+    let path = difft.path.as_deref().unwrap_or("<unknown>");
+    for (ci, chunk) in difft.chunks.iter().enumerate() {
+        for side_name in ["lhs", "rhs"] {
+            let nums: Vec<u64> = chunk
+                .iter()
+                .filter_map(|e| {
+                    let side = if side_name == "lhs" { e.lhs.as_ref() } else { e.rhs.as_ref() };
+                    side.map(|s| s.line_number)
+                })
+                .collect();
+            if nums.len() < 2 { continue; }
+            for w in nums.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                if b != a + 1 {
+                    bail!(
+                        "chunk {} in {} has a gap on the {} side: line {} followed by {} \
+                         (chunks must contain contiguous line ranges; re-run `walkthrough collect`)",
+                        ci, path, side_name, a + 1, b + 1
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Generate a walkthrough-ready markdown with all diffs as difft code blocks.
@@ -3250,6 +3326,8 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                 let json_str = fs::read_to_string(&path)?;
                 let difft: DifftOutput = serde_json::from_str(&json_str)
                     .with_context(|| format!("Failed to parse {}", path.display()))?;
+                check_chunks_contiguous(&difft)
+                    .with_context(|| format!("Invalid chunk data in {}", path.display()))?;
                 if let Some(ref path) = difft.path {
                     data.insert(path.clone(), difft);
                 }
@@ -4331,6 +4409,105 @@ mod tests {
         LineSide { line_number: line, changes: spans }
     }
 
+    #[test]
+    fn contiguity_check_passes_on_well_formed_chunks() {
+        let chunks = vec![
+            vec![
+                LineEntry { lhs: Some(side(10, vec![])), rhs: Some(side(20, vec![])) },
+                LineEntry { lhs: Some(side(11, vec![])), rhs: Some(side(21, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(22, vec![])) },
+            ],
+            vec![
+                LineEntry { lhs: Some(side(50, vec![])), rhs: None },
+                LineEntry { lhs: Some(side(51, vec![])), rhs: None },
+            ],
+        ];
+        let difft = make_difft(vec!["x"; 100], vec!["y"; 100], chunks, vec![]);
+        check_chunks_contiguous(&difft).expect("contiguous chunks should pass");
+    }
+
+    /// Regression: unchanged file lines BETWEEN adjacent chunks must appear
+    /// as context rows in the rendered HTML. Reproduces the auth.go bug where
+    /// a paired chunk followed by added-only chunks dropped the bridging
+    /// context lines (e.g. `if m.Enforce { ... }` body at lines 189-191).
+    ///
+    /// Shape:
+    ///   chunk 0 (paired):     lhs=20 rhs=20         — anchors side-by-side
+    ///   chunk 1 (added-only): rhs=22                — one + line
+    ///   chunk 2 (added-only): rhs=26,27,28          — three + lines
+    /// New file (1-based): lines 23, 24, 25 between chunks 1 and 2 are
+    /// unchanged context that the renderer was silently dropping.
+    #[test]
+    fn inter_chunk_context_lines_render_for_one_sided_chunks() {
+        let old_lines: Vec<&str> = (0..40)
+            .map(|i| match i {
+                20 => "old paired",
+                21 => "}",
+                22 => "}",
+                23 => "",
+                _ => "filler",
+            })
+            .collect();
+        let new_lines: Vec<&str> = (0..40)
+            .map(|i| match i {
+                20 => "new paired",
+                21 => "inserted-A",
+                22 => "}",
+                23 => "}",
+                24 => "",
+                25 => "inserted-B",
+                26 => "inserted-C",
+                27 => "inserted-D",
+                _ => "filler",
+            })
+            .collect();
+
+        let chunks = vec![
+            vec![LineEntry { lhs: Some(side(20, vec![])), rhs: Some(side(20, vec![])) }],
+            vec![LineEntry { lhs: None, rhs: Some(side(21, vec![])) }],
+            vec![
+                LineEntry { lhs: None, rhs: Some(side(25, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(26, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(27, vec![])) },
+            ],
+        ];
+        let hunks = vec![DiffHunk { old_start: 21, old_count: 4, new_start: 21, new_count: 8 }];
+        let difft = make_difft(old_lines, new_lines, chunks, hunks);
+        check_chunks_contiguous(&difft).expect("chunks should be contiguous");
+
+        let html = test_render_chunks(&difft, &[0, 1, 2], "test.go", None);
+        let rows = extract_rows(&html);
+        let rendered_new: std::collections::BTreeSet<u64> = rows.iter()
+            .filter_map(|(_, _, n)| *n)
+            .collect();
+
+        // Lines 23, 24, 25 (1-based) are unchanged context BETWEEN chunks 1
+        // and 2 on the new side. The bug dropped them silently — assert they
+        // appear in the rendered HTML.
+        for ln in [23u64, 24, 25] {
+            assert!(rendered_new.contains(&ln),
+                "new-side line {} (inter-chunk context) is missing from render. \
+                 Rendered new lines: {:?}\nHTML:\n{}",
+                ln, rendered_new, &html[..html.len().min(4000)]);
+        }
+    }
+
+    #[test]
+    fn contiguity_check_fails_on_gapped_chunk() {
+        // rhs jumps 21 -> 25, simulating the bug where context lines inside a
+        // merged hunk caused silently-elided line ranges.
+        let chunks = vec![vec![
+            LineEntry { lhs: Some(side(10, vec![])), rhs: Some(side(20, vec![])) },
+            LineEntry { lhs: Some(side(11, vec![])), rhs: Some(side(21, vec![])) },
+            LineEntry { lhs: Some(side(12, vec![])), rhs: Some(side(25, vec![])) },
+        ]];
+        let difft = make_difft(vec!["x"; 100], vec!["y"; 100], chunks, vec![]);
+        let err = check_chunks_contiguous(&difft).expect_err("gapped chunk must error");
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("gap on the rhs side"), "unexpected error: {}", msg);
+        assert!(msg.contains("22") && msg.contains("26"), "should mention 1-based line numbers: {}", msg);
+    }
+
     fn span(content: &str, start: usize, end: usize) -> ChangeSpan {
         ChangeSpan { content: content.to_string(), highlight: "normal".to_string(), start, end }
     }
@@ -4719,23 +4896,16 @@ mod tests {
         // Test the full run() path: relative lines= in markdown get converted
         // to absolute new-file lines using the chunk's first new-file line.
         //
-        // Chunk has changes at 0-based new lines 100, 110, 120.
-        // Relative line 1 = new line 100, so lines=1-5 should show only line 100,
-        // and lines=8-15 should show only line 110.
+        // Chunk has 21 contiguous paired changes at 0-based new lines 100..=120.
+        // Relative line 1 = new line 100, so lines=1-5 should show new lines 100-104.
         let old_lines: Vec<&str> = (0..130).map(|_| "old").collect();
         let new_lines: Vec<&str> = (0..130).map(|_| "new").collect();
 
-        let chunk = vec![
-            LineEntry { lhs: Some(side(100, vec![])), rhs: Some(side(100, vec![])) },
-            LineEntry { lhs: Some(side(110, vec![])), rhs: Some(side(110, vec![])) },
-            LineEntry { lhs: Some(side(120, vec![])), rhs: Some(side(120, vec![])) },
-        ];
+        let chunk: Vec<LineEntry> = (100u64..=120)
+            .map(|i| LineEntry { lhs: Some(side(i, vec![])), rhs: Some(side(i, vec![])) })
+            .collect();
 
-        let hunks = vec![
-            DiffHunk { old_start: 101, old_count: 1, new_start: 101, new_count: 1 },
-            DiffHunk { old_start: 111, old_count: 1, new_start: 111, new_count: 1 },
-            DiffHunk { old_start: 121, old_count: 1, new_start: 121, new_count: 1 },
-        ];
+        let hunks = vec![DiffHunk { old_start: 101, old_count: 21, new_start: 101, new_count: 21 }];
         let difft = make_difft(old_lines, new_lines, vec![chunk], hunks);
 
         // Write JSON to a temp data dir
@@ -4745,7 +4915,7 @@ mod tests {
         let json = serde_json::to_string_pretty(&difft).unwrap();
         fs::write(data_dir.join("test.ts.json"), &json).unwrap();
 
-        // Write markdown with relative lines=1-5 (should resolve to 0-based 100-104)
+        // Write markdown with relative lines=1-5 (should resolve to 1-based new lines 101-105)
         let md_path = data_dir.join("test.md");
         fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=1-5\n```\n").unwrap();
 
@@ -4758,11 +4928,11 @@ mod tests {
             .filter(|(c, _, _)| c == "line-paired")
             .collect();
 
-        // Only the first change (new line 101, 1-based) should be present
-        assert_eq!(changed.len(), 1, "relative lines=1-5 should include only 1 changed line");
-        assert_eq!(changed[0].2, Some(101), "should be new-side line 101 (1-based)");
+        let new_lns: Vec<u64> = changed.iter().filter_map(|(_, _, n)| *n).collect();
+        assert_eq!(new_lns, vec![101, 102, 103, 104, 105],
+            "relative lines=1-5 should map to new lines 101-105 (1-based)");
 
-        // Now test lines=8-15 which should hit only line 110 (relative 11)
+        // Now test lines=8-15 which should map to new lines 108-115 (1-based)
         fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=8-15\n```\n").unwrap();
         run(&md_path, &data_dir, &html_path, false).unwrap();
 
@@ -4771,8 +4941,9 @@ mod tests {
         let changed: Vec<_> = rows.iter()
             .filter(|(c, _, _)| c == "line-paired")
             .collect();
-        assert_eq!(changed.len(), 1, "relative lines=8-15 should include only 1 changed line");
-        assert_eq!(changed[0].2, Some(111), "should be new-side line 111 (1-based)");
+        let new_lns: Vec<u64> = changed.iter().filter_map(|(_, _, n)| *n).collect();
+        assert_eq!(new_lns, vec![108, 109, 110, 111, 112, 113, 114, 115],
+            "relative lines=8-15 should map to new lines 108-115 (1-based)");
 
         let _ = fs::remove_dir_all(&data_dir);
     }
@@ -5293,6 +5464,7 @@ mod tests {
                 errors.push(format!("duplicate new-side line: {}", ln));
             }
         }
+
 
         // 4, 5 & 5b. Highlight correctness using difft JSON spans as ground truth.
         //

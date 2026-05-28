@@ -448,3 +448,95 @@ pub fn run(diff_args: &[String], output_dir: &Path, ignore_whitespace: bool) -> 
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a ParsedHunk from a compact body spec: each char is a line
+    /// prefix (`-` removed, `+` added, ` ` context). The text content is
+    /// irrelevant to chunk generation, so we leave it empty.
+    fn hunk(old_start: u64, old_count: u64, new_start: u64, new_count: u64, body: &str) -> ParsedHunk {
+        ParsedHunk {
+            old_start,
+            old_count,
+            new_start,
+            new_count,
+            body: body.chars().map(|c| (c, String::new())).collect(),
+        }
+    }
+
+    /// Extract the line numbers recorded on one side (`"lhs"`/`"rhs"`) of every
+    /// generated chunk, one inner Vec per chunk.
+    fn side_numbers(chunks: &[serde_json::Value], side: &str) -> Vec<Vec<u64>> {
+        chunks
+            .iter()
+            .map(|c| {
+                c.as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|e| {
+                        e.get(side)
+                            .and_then(|s| s.get("line_number"))
+                            .and_then(|n| n.as_u64())
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// Regression for the auth.go "line 227 jumps to 231" bug.
+    ///
+    /// `git diff -U0 --inter-hunk-context=3` merges two nearby edits into a
+    /// single hunk joined by the 3 unchanged lines between them. Chunk
+    /// generation must FLUSH and split on those context lines, otherwise the
+    /// additions on either side land in one chunk whose rhs line numbers jump
+    /// across the gap (e.g. 227 -> 231). The renderer indexes lines by number,
+    /// so such a gap silently elides the bridging lines from the diff.
+    ///
+    /// Real hunk from services/agentplat/sbox/internal/auth/auth.go:
+    ///   @@ -166,4 +224,12 @@
+    ///   - old166                                  removed (pairs with new224)
+    ///   + new224 new225 new226 new227             added
+    ///     old167/new228 old168/new229 old169/new230   3 context lines
+    ///   + new231 new232 new233 new234 new235      added
+    ///
+    /// Line numbers in the JSON are 0-based (render adds 1 for display), so the
+    /// expected split is rhs [223,224,225,226] then rhs [230,231,232,233,234].
+    #[test]
+    fn context_lines_split_chunks_so_no_line_is_elided() {
+        let chunks = generate_chunks_from_hunks(&[hunk(166, 4, 224, 12, "-++++   +++++")]);
+
+        // The context lines must split the additions into two separate chunks.
+        assert_eq!(chunks.len(), 2, "context lines should split into 2 chunks, got {:#?}", chunks);
+
+        let rhs = side_numbers(&chunks, "rhs");
+        let lhs = side_numbers(&chunks, "lhs");
+
+        // chunk 0: old166 removed, paired with new224; then new225,226,227.
+        assert_eq!(lhs[0], vec![165], "chunk 0 lhs");
+        assert_eq!(rhs[0], vec![223, 224, 225, 226], "chunk 0 rhs");
+        // chunk 1: the trailing additions new231..235, AFTER the context gap.
+        assert_eq!(lhs[1], Vec::<u64>::new(), "chunk 1 lhs");
+        assert_eq!(rhs[1], vec![230, 231, 232, 233, 234], "chunk 1 rhs");
+
+        // The defining symptom: no chunk may contain a line-number gap on
+        // either side. A gap (e.g. rhs 226 -> 230, i.e. display 227 -> 231)
+        // is exactly the lines-elided bug.
+        for (side_name, per_chunk) in [("rhs", &rhs), ("lhs", &lhs)] {
+            for (ci, nums) in per_chunk.iter().enumerate() {
+                for w in nums.windows(2) {
+                    assert_eq!(
+                        w[1],
+                        w[0] + 1,
+                        "chunk {} has a {} gap: line {} jumps to {} (lines elided)",
+                        ci,
+                        side_name,
+                        w[0] + 1,
+                        w[1] + 1,
+                    );
+                }
+            }
+        }
+    }
+}

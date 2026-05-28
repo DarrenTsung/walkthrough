@@ -111,14 +111,24 @@ fn expand_context_for_expressions(
         if depth > 0 {
             let saved = new_after;
             let mut remaining = depth;
+            // Closers in the normal post-context window (last+1 .. ctx_after)
+            // may already balance the opener. Count them first — without
+            // spending expansion budget — so a brace that closes inside the
+            // post-context does not trigger expansion. (The bug here scanned
+            // from ctx_after, skipping this window, and so over-expanded past
+            // the post-context into unrelated following lines.)
+            let mut idx = last + 1;
+            while idx < saved && remaining > 0 {
+                remaining += bracket_balance(&lines[idx]);
+                idx += 1;
+            }
+            // Still unbalanced after the normal window: expand outward up to
+            // MAX_EXPRESSION_CONTEXT extra lines to reach the closer.
             let mut extra = 0;
-            while new_after < lines.len() && extra < MAX_EXPRESSION_CONTEXT {
+            while new_after < lines.len() && remaining > 0 && extra < MAX_EXPRESSION_CONTEXT {
                 remaining += bracket_balance(&lines[new_after]);
                 new_after += 1;
                 extra += 1;
-                if remaining <= 0 {
-                    break;
-                }
             }
             // If we hit the cap without balancing, fall back.
             if remaining > 0 {
@@ -6283,6 +6293,90 @@ mod tests {
              to be included.\n\
              Rendered new lines: {:?}",
             rendered_new_lines,
+        );
+    }
+
+    /// Regression for the auth.go markdown-writeback duplication bug.
+    ///
+    /// Shape (mirrors the real auth.go hunk): a paired chunk whose last changed
+    /// line opens a brace (`if !ok {`), followed by 3 unchanged bridging lines
+    /// (one of which CLOSES that brace), followed by an added-only chunk.
+    ///
+    /// The after-expansion in expand_context_for_expressions sees the unclosed
+    /// `{` over the changed lines (+1) and scans forward for its closer — but it
+    /// started the scan at ctx_after, SKIPPING the bridging post-context window
+    /// where the `}` actually closes. So it kept scanning, over-extended past the
+    /// bridge into the following added-only chunk, and render_chunks_text emitted
+    /// those lines as CONTEXT — while the added-only chunk also emitted them as
+    /// additions. Result: the block appeared twice in the enriched markdown.
+    #[test]
+    fn text_render_does_not_duplicate_added_lines_via_overexpanded_context() {
+        let new_lines = vec![
+            "package p",                 // 0
+            "import x",                  // 1
+            "var y",                     // 2
+            "result := check()",         // 3  chunk0 paired (new)
+            "logCall(arg)",              // 4  chunk0 added
+            "if !ok {",                  // 5  chunk0 added — opener {
+            "    handleError()",         // 6  bridge (unchanged)
+            "    return",                // 7  bridge (unchanged)
+            "}",                         // 8  bridge — CLOSES the if-brace
+            "MARKER_added_comment",      // 9  chunk1 added (unique marker)
+            "more_added",                // 10 chunk1 added
+            "} else {",                  // 11 chunk1 added
+            "elseBody()",                // 12 chunk1 added
+            "}",                         // 13 chunk1 added
+            "tail1",                     // 14
+            "tail2",                     // 15
+            "tail3",                     // 16
+        ];
+        let old_lines = vec![
+            "package p",                 // 0
+            "import x",                  // 1
+            "var y",                     // 2
+            "result := checkOld()",      // 3  chunk0 paired (old)
+            "    handleError()",         // 4  == new 6
+            "    return",                // 5  == new 7
+            "}",                         // 6  == new 8
+            "tail1",                     // 7  == new 14
+            "tail2",                     // 8
+            "tail3",                     // 9
+        ];
+
+        let chunks = vec![
+            vec![
+                LineEntry { lhs: Some(side(3, vec![])), rhs: Some(side(3, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(4, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(5, vec![])) },
+            ],
+            vec![
+                LineEntry { lhs: None, rhs: Some(side(9, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(10, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(11, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(12, vec![])) },
+                LineEntry { lhs: None, rhs: Some(side(13, vec![])) },
+            ],
+        ];
+        let hunks = vec![DiffHunk { old_start: 4, old_count: 4, new_start: 4, new_count: 11 }];
+        let difft = make_difft(old_lines, new_lines, chunks, hunks);
+
+        let text = render_chunks_text(&difft, &[0, 1], None);
+
+        // The marker line is an addition in chunk 1. It must appear exactly
+        // once — the bug rendered it as bridging context too.
+        let marker_count = text.matches("MARKER_added_comment").count();
+        assert_eq!(
+            marker_count, 1,
+            "added line duplicated (rendered as both context and addition).\n\
+             Text output:\n{}",
+            text,
+        );
+
+        // Sanity: the genuine bridging line should still render (as context).
+        assert!(
+            text.contains("handleError()"),
+            "bridging context line is missing.\nText output:\n{}",
+            text,
         );
     }
 

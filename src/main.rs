@@ -60,6 +60,14 @@ enum Commands {
         /// Render without diff data (pure markdown mode)
         #[arg(long)]
         no_diff_data: bool,
+
+        /// Render even if the collected data is stale (HEAD has moved since collect)
+        #[arg(long)]
+        allow_stale: bool,
+
+        /// On stale data, automatically re-run collect (using the stored diff args) before rendering
+        #[arg(long)]
+        recollect: bool,
     },
 
     /// Publish walkthrough HTML to $WALKTHROUGH_PUBLISH_PATH
@@ -91,9 +99,11 @@ fn main() {
             data_dir,
             output,
             no_diff_data,
+            allow_stale,
+            recollect,
         } => {
             let output_path = output.unwrap_or_else(|| walkthrough.with_extension("html"));
-            render::run(&walkthrough, &data_dir, &output_path, no_diff_data)
+            render::run(&walkthrough, &data_dir, &output_path, no_diff_data, allow_stale, recollect)
         }
 
         Commands::Publish { html } => publish::run(&html),

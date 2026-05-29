@@ -33,6 +33,28 @@ reliable even when the local master ref is stale or the branch has been rebased.
 
 Default data directory for all commands: `.walkthrough_data` (in the current directory)
 
+### Staleness detection on render
+
+`collect` records the HEAD it ran against in `.meta.json`. If HEAD moves before you
+`render` (e.g. a lint commit lands), the collected chunk data is stale and rendering it
+produces misleading output. `render` **fails fast** by default rather than emitting
+silently-wrong HTML:
+
+```
+# default: errors out if HEAD has drifted since collect
+cargo run -- render walkthrough.md -o walkthrough.html
+
+# re-collect automatically (using the diff args stored in .meta.json), then render
+cargo run -- render walkthrough.md --recollect -o walkthrough.html
+
+# render the stale data anyway (downgrades the error to a warning)
+cargo run -- render walkthrough.md --allow-stale -o walkthrough.html
+```
+
+After `--recollect`, run `walkthrough verify` — re-collecting can renumber chunks, so a
+hand-authored walkthrough's `chunks=N` references may no longer line up. Fixtures have
+`.meta.json` removed, so they carry no `head_sha` and are exempt from this check.
+
 ## Walkthrough markdown syntax
 
 Diff code blocks reference collected data by file path and chunk indices (`difft` is also accepted for backwards compatibility):

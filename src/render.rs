@@ -3292,7 +3292,90 @@ pub fn write_summary(data_dir: &Path, output: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff_data: bool) -> Result<()> {
+/// Resolve the current `git HEAD` SHA, or `None` if it can't be determined
+/// (e.g. not a git repo). A missing HEAD means we can't assert drift, so callers
+/// treat it as "no drift" rather than blocking the render.
+fn current_head_sha() -> Option<String> {
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+}
+
+/// Compare the HEAD recorded by `collect` (in .meta.json) against the current
+/// HEAD and act on any drift. By default this fails fast so stale data never
+/// reaches the renderer; `recollect` re-runs `collect` with the stored diff args,
+/// and `allow_stale` downgrades the failure to a warning. A missing .meta.json or
+/// head_sha (as with fixtures) is treated as "no drift".
+fn handle_stale_data(data_dir: &Path, allow_stale: bool, recollect: bool) -> Result<()> {
+    let meta_path = data_dir.join(".meta.json");
+    let meta_str = match fs::read_to_string(&meta_path) {
+        Ok(s) => s,
+        Err(_) => return Ok(()),
+    };
+    let meta: serde_json::Value = match serde_json::from_str(&meta_str) {
+        Ok(m) => m,
+        Err(_) => return Ok(()),
+    };
+    let collected_head = match meta.get("head_sha").and_then(|v| v.as_str()) {
+        Some(h) => h,
+        None => return Ok(()),
+    };
+    let current_head = match current_head_sha() {
+        Some(h) => h,
+        None => return Ok(()),
+    };
+    if current_head == collected_head {
+        return Ok(());
+    }
+
+    let short_collected = &collected_head[..collected_head.len().min(8)];
+    let short_current = &current_head[..current_head.len().min(8)];
+
+    if recollect {
+        let diff_args: Vec<String> = meta
+            .get("diff_args")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        eprintln!(
+            "HEAD moved {} -> {}; re-collecting (diff args: {:?})...",
+            short_collected, short_current, diff_args,
+        );
+        crate::collect::run(&diff_args, data_dir, true)
+            .context("auto re-collect (--recollect) failed")?;
+        eprintln!(
+            "Re-collected. Note: chunk numbering may have changed; run `walkthrough verify` \
+             to confirm the walkthrough's chunk references still cover the new diff."
+        );
+        Ok(())
+    } else if allow_stale {
+        eprintln!(
+            "Warning: rendering stale data (collected at HEAD {}, current HEAD {}). \
+             Output may not match the current diff.",
+            short_collected, short_current,
+        );
+        Ok(())
+    } else {
+        bail!(
+            "collected data is from HEAD {} but current HEAD is {}. \
+             Re-run `walkthrough collect`, or pass --recollect to re-collect automatically, \
+             or --allow-stale to render the stale data anyway.",
+            short_collected, short_current,
+        )
+    }
+}
+
+pub fn run(
+    walkthrough_path: &Path,
+    data_dir: &Path,
+    output_path: &Path,
+    no_diff_data: bool,
+    allow_stale: bool,
+    recollect: bool,
+) -> Result<()> {
     let raw_content = fs::read_to_string(walkthrough_path)
         .with_context(|| format!("Failed to read {}", walkthrough_path.display()))?;
 
@@ -3325,6 +3408,16 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
 
     let mut hl = Highlighter::new();
 
+    // Detect drift between the collected data and the current HEAD before loading
+    // it. `collect` records the HEAD it ran against in .meta.json; if HEAD has since
+    // moved (e.g. a lint commit landed after collect), the chunk data is stale and
+    // rendering it produces misleading output. Fail fast by default so we never emit
+    // silently-wrong HTML. Fixtures have .meta.json removed, so they carry no
+    // head_sha and are exempt from this check entirely.
+    if !no_diff_data {
+        handle_stale_data(data_dir, allow_stale, recollect)?;
+    }
+
     // Load all difft JSON data (skip when --no-diff-data is set)
     let mut data: HashMap<String, DifftOutput> = HashMap::new();
     if !no_diff_data {
@@ -3340,34 +3433,6 @@ pub fn run(walkthrough_path: &Path, data_dir: &Path, output_path: &Path, no_diff
                     .with_context(|| format!("Invalid chunk data in {}", path.display()))?;
                 if let Some(ref path) = difft.path {
                     data.insert(path.clone(), difft);
-                }
-            }
-        }
-    }
-
-    // Warn if collected data may be stale (HEAD has moved since collection).
-    if !no_diff_data {
-        let meta_path = data_dir.join(".meta.json");
-        if let Ok(meta_str) = fs::read_to_string(&meta_path) {
-            if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&meta_str) {
-                if let Some(collected_head) = meta.get("head_sha").and_then(|v| v.as_str()) {
-                    let current_head = std::process::Command::new("git")
-                        .args(["rev-parse", "HEAD"])
-                        .output()
-                        .ok()
-                        .filter(|o| o.status.success())
-                        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-                    if let Some(ref cur) = current_head {
-                        if cur != collected_head {
-                            let short_collected = &collected_head[..collected_head.len().min(8)];
-                            let short_current = &cur[..cur.len().min(8)];
-                            eprintln!(
-                                "Warning: collected data is from HEAD {} but current HEAD is {}. \
-                                 Re-run `walkthrough collect` if the diff has changed.",
-                                short_collected, short_current,
-                            );
-                        }
-                    }
                 }
             }
         }
@@ -4522,6 +4587,46 @@ mod tests {
         ChangeSpan { content: content.to_string(), highlight: "normal".to_string(), start, end }
     }
 
+    // Tests run inside the walkthrough git repo, so the current HEAD never equals
+    // this bogus SHA, guaranteeing drift is detected.
+    fn write_stale_meta(dir: &Path) {
+        fs::create_dir_all(dir).unwrap();
+        fs::write(
+            dir.join(".meta.json"),
+            r#"{"diff_args":["HEAD~1..HEAD"],"head_sha":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}"#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn stale_data_fails_fast_by_default() {
+        let dir = std::env::temp_dir().join("walkthrough_stale_default");
+        let _ = fs::remove_dir_all(&dir);
+        write_stale_meta(&dir);
+        let err = handle_stale_data(&dir, false, false)
+            .expect_err("drift must fail fast without --allow-stale/--recollect");
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("--allow-stale") && msg.contains("--recollect"),
+            "error should point at the escape hatches: {}", msg);
+    }
+
+    #[test]
+    fn allow_stale_downgrades_drift_to_warning() {
+        let dir = std::env::temp_dir().join("walkthrough_stale_allow");
+        let _ = fs::remove_dir_all(&dir);
+        write_stale_meta(&dir);
+        handle_stale_data(&dir, true, false).expect("--allow-stale should render despite drift");
+    }
+
+    #[test]
+    fn missing_meta_is_not_drift() {
+        // Fixtures have .meta.json removed; absence must not block rendering.
+        let dir = std::env::temp_dir().join("walkthrough_stale_nometa");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        handle_stale_data(&dir, false, false).expect("no .meta.json means no drift check");
+    }
+
     /// Build a DifftOutput from old/new lines, chunks, and hunks.
     /// Helper to call render_chunks with default syntax highlighting.
     fn test_render_chunks(difft: &DifftOutput, chunk_indices: &[usize], file_path: &str, line_filter: LineFilter) -> String {
@@ -4930,7 +5035,7 @@ mod tests {
         fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=1-5\n```\n").unwrap();
 
         let html_path = data_dir.join("test.html");
-        run(&md_path, &data_dir, &html_path, false).unwrap();
+        run(&md_path, &data_dir, &html_path, false, false, false).unwrap();
 
         let html = fs::read_to_string(&html_path).unwrap();
         let rows = extract_rows(&html);
@@ -4944,7 +5049,7 @@ mod tests {
 
         // Now test lines=8-15 which should map to new lines 108-115 (1-based)
         fs::write(&md_path, "# Test\n\n```difft test.ts chunks=0 lines=8-15\n```\n").unwrap();
-        run(&md_path, &data_dir, &html_path, false).unwrap();
+        run(&md_path, &data_dir, &html_path, false, false, false).unwrap();
 
         let html = fs::read_to_string(&html_path).unwrap();
         let rows = extract_rows(&html);

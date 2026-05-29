@@ -124,6 +124,13 @@ For every chunk in every fixture JSON, `fixture_rendering_matches` verifies:
 5. **Removed-only rows** have no `hl-del` token highlights
 6. **Text rendering** changed-line count matches HTML rendering
 
+Additionally, once per fixture JSON, `check_chunks_contiguous` asserts that each
+chunk's lhs/rhs line numbers form contiguous runs (no gaps). This is a
+**collect-output invariant** that catches collect-side gapped-chunk regressions
+(e.g. the line-number elision fixed in 5aaac10) which the per-chunk checks miss.
+Fixtures that intentionally carry gapped/jumbled chunks to exercise the renderer's
+tolerance opt out with an empty `.allow-gaps` marker file in the fixture directory.
+
 ### Adding a new fixture
 
 ```bash

@@ -5748,6 +5748,17 @@ mod tests {
                     .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path.display(), e));
                 let file_path = difft.path.as_deref().unwrap_or("unknown");
 
+                // Whole-file contiguity check: catches collect-side regressions that
+                // emit gapped chunks (line-number elision), which per-chunk checks miss.
+                // Opt out via a `.allow-gaps` marker for fixtures that intentionally
+                // carry gapped/jumbled chunks to exercise the renderer's tolerance.
+                if !fixture_dir.path().join(".allow-gaps").exists() {
+                    if let Err(e) = check_chunks_contiguous(&difft) {
+                        total_errors += 1;
+                        error_messages.push(format!("[{}] {}: {}", dir_name, file_path, e));
+                    }
+                }
+
                 // Run per-chunk checks
                 let mut all_rendered: Vec<Vec<(String, Option<u64>, Option<u64>)>> = Vec::new();
                 for chunk_idx in 0..difft.chunks.len() {

@@ -318,6 +318,34 @@ This does three things:
 
 If the render output reports uncovered chunks, add sections referencing them and re-render.
 
+### Handling stale-data errors
+
+`walkthrough render` **fails fast** (non-zero exit) if HEAD has moved since `collect`
+ran — e.g. a lint commit, amend, or rebase landed while you were writing the narrative
+or iterating in the review loop. The error looks like:
+
+```
+Error: collected data is from HEAD <a> but current HEAD is <b>. Re-run `walkthrough
+collect`, or pass --recollect to re-collect automatically, or --allow-stale ...
+```
+
+This guard exists because the collected chunk data no longer matches the working tree;
+rendering it produces a diff that doesn't reflect the current code. **Do NOT silence it
+with `--allow-stale`** — that ships the exact mismatch the guard prevents. Reconcile
+instead:
+
+1. Re-collect: `walkthrough collect -o .walkthrough_data/` (re-detects the branch diff).
+2. Re-verify the narrative's chunk references, since re-collecting can renumber chunks:
+   ```bash
+   walkthrough verify "$OUTPUT_PATH" --data-dir .walkthrough_data/
+   ```
+3. Fix any `chunks=` specs that `verify` flags as uncovered or out of range (a changed
+   diff may have split, merged, or shifted chunks), then re-render.
+
+`render --recollect` folds step 1 into the render, but you must **still run `verify`
+afterward** to catch shifted references — so prefer the explicit re-collect + verify
+sequence above when this fires mid-walkthrough.
+
 ## Step 6: Review loop
 
 The review loop ensures the narrative is accurate, complete, and clear. Spawn three reviewer

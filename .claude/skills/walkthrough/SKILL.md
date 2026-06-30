@@ -58,7 +58,7 @@ Verify the version supports JSON output (0.67.0+): `difft --version`.
 
 Run `which walkthrough`. If not found, install it:
 ```bash
-cargo install --path ~/Documents/walkthrough
+cargo install --path ~/code/walkthrough
 ```
 
 ## Step 2: Collect diffs
@@ -296,6 +296,11 @@ falls back to showing the mermaid source in a code block.
     more, the section should probably be split. Avoid restating what the diff already shows
     (e.g. don't list every field that was added if the diff is self-evident). Focus on the
     non-obvious: why this approach, what trade-off was made, what edge case it handles.
+    But only assert a WHY you can actually source — from the diff, the PR description,
+    commit messages, or surrounding code. Don't invent a plausible-sounding rationale or
+    mechanism to fill the gap; a fabricated "why" reads as authoritative and is worse than
+    omitting it. If the motivation isn't evident, either leave it out or hedge explicitly
+    ("likely", "appears to"). The adversary reviewer flags fabricated rationale (check 7).
 
 12. **Connect sections.** Brief transitions help the reader follow the thread. "With the
     types in place, the client can now..." is better than an abrupt jump to the next section.
@@ -391,6 +396,15 @@ Check each section for:
 6. **Overclaiming** — prose that states implications or consequences not evident
    from the code (e.g. "this improves performance" when the diff just
    restructures code).
+
+7. **Fabricated rationale** — invented causal/mechanism explanations for WHY a
+   change was made or HOW something works, not grounded in the diff, PR
+   description, commit messages, or surrounding code (e.g. "the browser derived
+   it from the URL pattern" when nothing in the change shows that). This is the
+   most dangerous failure because item 3 actively asks for the WHY — a plausible
+   but unsupported "why" reads as authoritative. Flag any causal claim you can't
+   trace to concrete evidence. The fix is to either ground it in a citable source
+   or hedge it explicitly ("likely", "appears to") — not to assert it.
 
 Write your findings as a numbered list. For each issue, cite the section number,
 the specific prose, and what the diff actually shows.
